@@ -1,5 +1,4 @@
 // Achievements for the details view: Steam (Web API key) and Xbox (OpenXBL).
-const { xbl, xblAccount } = require('./xbl');
 
 const cache = new Map();
 const TTL = 10 * 60 * 1000;
@@ -39,15 +38,9 @@ async function steamAchievements(settings, steamId, appid) {
   return { list };
 }
 
-async function xboxAchievements(settings, store, titleId) {
-  const key = String(settings.openXblKey || '').trim();
-  if (!key) return { error: 'Add an OpenXBL key in Settings to see Xbox achievements.' };
-  if (!store.data.settings.xboxXuid) {
-    const acc = await xblAccount(key);
-    store.data.settings.xboxXuid = acc.xuid;
-    store.changed();
-  }
-  const j = await xbl(key, `/achievements/player/${store.data.settings.xboxXuid}/${titleId}`);
+async function xboxAchievements(xbox, titleId) {
+  if (!xbox || !xbox.configured) return { error: 'Sign in to Xbox in Settings to see Xbox achievements.' };
+  const j = await xbox.achievements(titleId);
   const list = (j.achievements || []).map((a) => {
     const gs = (a.rewards || []).find((r) => /gamerscore/i.test(r.type));
     return {
@@ -62,13 +55,13 @@ async function xboxAchievements(settings, store, titleId) {
   return list.length ? { list } : { none: true };
 }
 
-async function getAchievements(store, it, steamId) {
+async function getAchievements(store, it, steamId, xbox) {
   const k = it.id;
   const hit = cache.get(k);
   if (hit && Date.now() - hit.t < TTL) return hit.v;
   let v;
   try {
-    if (it.source === 'xbox' && it.meta && it.meta.xboxTitleId) v = await xboxAchievements(store.data.settings, store, it.meta.xboxTitleId);
+    if (it.source === 'xbox' && it.meta && it.meta.xboxTitleId) v = await xboxAchievements(xbox, it.meta.xboxTitleId);
     else if (it.steamAppId) v = await steamAchievements(store.data.settings, steamId, it.steamAppId);
     else v = { unsupported: true };
   } catch (e) {

@@ -1,6 +1,5 @@
 // Friends from Steam and Xbox with online status and what they are playing.
 // People with matching names on both are shown as one person; links can be changed by hand.
-const { xbl } = require('./xbl');
 const { similarity, normName } = require('./util');
 
 const STEAM_STATES = { 0: 'offline', 1: 'online', 2: 'busy', 3: 'away', 4: 'away', 5: 'online', 6: 'online' };
@@ -33,10 +32,9 @@ async function steamFriends(settings, steamId) {
   return people;
 }
 
-async function xboxFriends(settings) {
-  const key = String(settings.openXblKey || '').trim();
-  if (!key) return null;
-  const j = await xbl(key, '/friends');
+async function xboxFriends(xbox) {
+  if (!xbox || !xbox.configured) return null;
+  const j = await xbox.friends();
   return (j.people || []).map((p) => {
     const online = /online/i.test(p.presenceState || '');
     const text = p.presenceText || '';
@@ -90,7 +88,8 @@ function combine(accounts, links) {
 }
 
 class Friends {
-  constructor(store, send, getSteamId) {
+  constructor(store, send, getSteamId, xbox) {
+    this.xbox = xbox;
     this.store = store;
     this.send = send;
     this.getSteamId = getSteamId;
@@ -115,7 +114,7 @@ class Friends {
     const steamId = await this.getSteamId();
     const results = await Promise.all([
       steamFriends(s, steamId).catch((e) => { errors.push(`Steam: ${e.message}`); return []; }),
-      xboxFriends(s).catch((e) => { errors.push(`Xbox: ${e.message}`); return []; }),
+      xboxFriends(this.xbox).catch((e) => { errors.push(`Xbox: ${e.message}`); return []; }),
     ]);
     const configured = results.some((r) => r !== null);
     for (const r of results) if (r) accounts = accounts.concat(r);

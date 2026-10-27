@@ -38,6 +38,8 @@ contextBridge.exposeInMainWorld('library', {
   steamSignIn: call('auth:steamSignIn'),
   steamSignOut: call('auth:steamSignOut'),
   testXbox: call('auth:testXbox'),
+  xboxSignIn: call('auth:xboxSignIn'),
+  xboxSignOut: call('auth:xboxSignOut'),
   achievements: call('item:achievements'),
   getFriends: call('friends:get'),
   refreshFriends: call('friends:refresh'),

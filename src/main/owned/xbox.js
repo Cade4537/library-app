@@ -1,12 +1,10 @@
 // Xbox games played on the account, from OpenXBL title history. Only titles that run on PC are kept.
-const { xbl } = require('../xbl');
 
 const isPc = (devices) => (devices || []).some((d) => /^(pc|win32|windows)/i.test(d));
 
 async function scanXboxOwned(ctx) {
-  const key = String(ctx.settings.openXblKey || '').trim();
-  if (!key) return { skipped: true };
-  const j = await xbl(key, '/player/titleHistory');
+  if (!ctx.xbox || !ctx.xbox.configured) return { skipped: true };
+  const j = await ctx.xbox.titleHistory();
   const titles = j.titles || [];
   const out = [];
   for (const t of titles) {

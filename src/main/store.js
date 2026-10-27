@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS = {
   gogOwned: true,
   openXblKey: '',
   steamFamily: false,
+  ubisoftOwned: true,
   genreSort: true,
   steamCollections: true,
 };

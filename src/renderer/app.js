@@ -131,7 +131,7 @@ function fmtHours(min) {
   return `${h < 10 ? h.toFixed(1) : Math.round(h)} hrs`;
 }
 
-const showRemotePlay = () => !!(S.lib.settings.openXblKey || S.lib.items.some((i) => i.source === 'xbox' || (i.launch && /Microsoft\.GamingApp/i.test(i.launch.target || ''))));
+const showRemotePlay = () => !!(S.lib.settings.openXblKey || S.lib.settings.xboxConnected || S.lib.items.some((i) => i.source === 'xbox' || (i.launch && /Microsoft\.GamingApp/i.test(i.launch.target || ''))));
 
 function remotePlayButton() {
   const b = h('button', { class: 'nav-btn', title: 'Play games from your Xbox console on this PC' }, icon('gamepad'), h('span', { class: 'label' }, 'Xbox Remote Play'));
@@ -224,7 +224,8 @@ function cardSig(it) {
 
 function buildCard(id) {
   const card = h('button', { class: 'card', 'data-id': id, draggable: 'true' });
-  card.addEventListener('click', () => launch(id));
+  // Clicking a card opens its details; the Play button on the card (and in details) launches it.
+  card.addEventListener('click', () => openDetails(id));
   card.addEventListener('contextmenu', (e) => { e.preventDefault(); itemMenu(id, { x: e.clientX, y: e.clientY }); });
   card.addEventListener('dragstart', (e) => {
     e.dataTransfer.setData('application/x-item', id);
@@ -249,7 +250,9 @@ function fillCard(card, it) {
   art.append(more);
   if (notInstalled(it)) art.append(h('span', { class: 'ni-badge' }, icon('download'), 'Not installed'));
   if (it.running) art.append(h('span', { class: 'run-badge' }, h('span', { class: 'dot' }), 'Playing now'));
-  art.append(h('div', { class: 'play-pill' }, h('span', {}, icon(notInstalled(it) ? 'download' : 'play'), notInstalled(it) ? 'Install' : it.kind === 'game' ? 'Play' : 'Open')));
+  const pill = h('span', { class: 'pill-btn', role: 'button', title: notInstalled(it) ? 'Install' : 'Play' }, icon(notInstalled(it) ? 'download' : 'play'), notInstalled(it) ? 'Install' : it.kind === 'game' ? 'Play' : 'Open');
+  pill.addEventListener('click', (e) => { e.stopPropagation(); launch(it.id); });
+  art.append(h('div', { class: 'play-pill' }, pill));
   const rel = relatedOf(it.id).length;
   const sub = rel ? h('span', { class: 'sub related-link', role: 'button', onclick: (e) => { e.stopPropagation(); relatedModal(it.id); } }, `+${rel} related ${rel === 1 ? 'app' : 'apps'}`)
     : isGrouped(it) ? h('div', { class: 'sub' }, `Part of ${(S.byId.get(it.parentId) || {}).name || 'a suite'}`)
@@ -963,6 +966,7 @@ function openSettings() {
   let musicEnabled = s.musicEnabled !== false;
   let musicAnyApp = !!s.musicAnyApp;
   let gogOwned = s.gogOwned !== false;
+  let ubisoftOwned = s.ubisoftOwned !== false;
   let genreSort = s.genreSort !== false;
   let steamCollections = s.steamCollections !== false;
 
@@ -973,6 +977,21 @@ function openSettings() {
   const cf = h('input', { class: 'text-input', value: s.curseforgeInstancesPath || '', placeholder: 'Default: %USERPROFILE%\\curseforge\\minecraft\\Instances', spellcheck: 'false' });
   const cfBrowse = h('button', { class: 'btn', onclick: async () => { const f = await api.pickFolder(); if (f) cf.value = f; } }, 'Browse');
 
+  const xboxBtn = h('button', { class: 'btn' });
+  const fillXbox = (on) => {
+    xboxBtn.textContent = on ? 'Sign out' : 'Sign in with Microsoft';
+    xboxBtn.className = 'btn' + (on ? '' : ' primary');
+    xboxBtn.onclick = async () => {
+      if (on) { await api.xboxSignOut(); showToast('Signed out of Xbox'); fillXbox(false); return; }
+      xboxBtn.disabled = true;
+      const r = await api.xboxSignIn();
+      xboxBtn.disabled = false;
+      if (r.ok) { showToast(`Signed in to Xbox as ${r.gamertag}. Reading your games and friends.`); fillXbox(true); }
+      else if (r.error) showToast(r.error, 'error');
+    };
+  };
+  fillXbox(!!s.xboxConnected);
+  const xblDetails = h('details', { class: 'alt-key' }, h('summary', {}, 'Use an OpenXBL key instead'));
   const xblStatus = h('div', { class: 'help' });
   const xblTest = h('button', { class: 'btn', onclick: async () => {
     xblTest.disabled = true;
@@ -1051,17 +1070,18 @@ function openSettings() {
         h('div', { class: 'field' }, h('label', {}, 'Steam Family'),
           h('div', { class: 'row' }, h('div', { class: 'help', style: { flex: 1 } }, s.steamFamily ? `Connected${counts.family != null ? `. ${counts.family} shared games.` : '.'}` : 'Shows games your family shares with you. Sign in to the Steam store once.'), famBtn),
           errNote('Steam Family:'))),
-      connBlock('Xbox', !!s.openXblKey, null, 'xbox',
+      connBlock('Xbox', !!(s.xboxConnected || s.openXblKey), s.xboxConnected ? `Signed in${s.xboxGamertag ? ` as ${s.xboxGamertag}` : ''}` : s.openXblKey ? 'Using OpenXBL' : null, 'xbox',
         errNote('Xbox:'),
-        h('div', { class: 'field' }, h('label', {}, 'OpenXBL API key'),
-          h('div', { class: 'row' }, xblKey.row, xblTest),
-          xblStatus,
-          h('div', { class: 'help' }, 'Xbox PC games you own, achievements and Xbox friends. Only games that run on PC are added.'))),
+        h('div', { class: 'row' }, h('div', { class: 'help', style: { flex: 1 } }, 'Xbox PC games you own, achievements and Xbox friends. Only games that run on PC are added. You sign in on Microsoft\'s own page.'), xboxBtn),
+        (xblDetails.append(h('div', { class: 'field', style: { marginTop: '10px' } }, h('label', {}, 'OpenXBL API key'), h('div', { class: 'row' }, xblKey.row, xblTest), xblStatus)), xblDetails)),
       connBlock('Epic Games', !!s.epicConnected, s.epicConnected ? `Connected${s.epicName ? ` as ${s.epicName}` : ''}` : null, 'epic',
         errNote('Epic:'),
         h('div', { class: 'row' }, h('div', { class: 'help', style: { flex: 1 } }, 'Every game on your Epic account, installed or not. You sign in on Epic\'s own page.'), epicBtn)),
       connBlock('GOG', gogOwned, gogOwned ? (counts.gog != null ? `${counts.gog} games` : 'On') : 'Off', 'gog',
         toggleRow('Read GOG library', 'From GOG Galaxy on this PC, no sign in needed', gogOwned, (v) => { gogOwned = v; })),
+      connBlock('Ubisoft', ubisoftOwned, ubisoftOwned ? (counts.ubisoft != null ? `${counts.ubisoft} games` : 'On') : 'Off', 'ubisoft',
+        errNote('Ubisoft:'),
+        toggleRow('Read Ubisoft library', 'From Ubisoft Connect on this PC. Open Ubisoft Connect and sign in once first.', ubisoftOwned, (v) => { ubisoftOwned = v; })),
       connBlock('SteamGridDB', !!s.steamGridDbKey, null, 'sgdb',
         h('div', { class: 'field' }, h('label', {}, 'SteamGridDB API key'), sgdb.row,
           h('div', { class: 'help' }, 'Cover art for games from other launchers and for apps.'))),
@@ -1084,7 +1104,7 @@ function openSettings() {
       { label: 'Save', primary: true, run: async () => {
         await api.updateSettings({
           steamGridDbKey: sgdb.input.value.trim(), curseforgeInstancesPath: cf.value.trim(), includeApps, musicEnabled, musicAnyApp,
-          steamApiKey: steamKey.input.value.trim(), steamId: steamId.value.trim(), gogOwned, openXblKey: xblKey.input.value.trim(), genreSort, steamCollections,
+          steamApiKey: steamKey.input.value.trim(), steamId: steamId.value.trim(), gogOwned, openXblKey: xblKey.input.value.trim(), genreSort, steamCollections, ubisoftOwned,
         });
         S.keyErrorShown = false;
         showToast('Settings saved');
@@ -1128,12 +1148,16 @@ function openConnectionsHelp(focus) {
       'A Steam store window opens. Sign in like normal (scan the QR code with the Steam app, or type your password).',
       'The window closes by itself and the shared games show up under All owned.',
     ]),
-    helpSection('xbox', 'Xbox: PC games, achievements and friends', 'Uses OpenXBL, a free service that reads your Xbox account.', [
-      ['Open OpenXBL and click Login. Sign in with the Microsoft account you use on Xbox, then allow access. ', linkBtn('Open OpenXBL', 'https://xbl.io')],
-      'Once signed in, open your profile page and find the API Keys section.',
-      'Click Create (or the + button) to make a key, then copy it.',
-      'In this app, open Settings, paste it into OpenXBL API key, click Test key to check it, then Save.',
+    helpSection('xbox', 'Xbox: PC games, achievements and friends', null, [
+      'In Settings, under Xbox, click Sign in with Microsoft.',
+      'Microsoft\'s sign in page opens in a small window. Use the account you play Xbox with and allow access if asked.',
+      'The window closes by itself. Your Xbox PC games, achievements and Xbox friends start loading.',
       'Only Xbox games that run on PC are added. For console games, use Xbox Remote Play in the sidebar.',
+      'If sign in does not work, open "Use an OpenXBL key instead" under Xbox and follow the steps at xbl.io.',
+    ]),
+    helpSection('ubisoft', 'Ubisoft', null, [
+      'Open Ubisoft Connect on this PC and sign in once. It saves your game list on this PC.',
+      'Click the rescan button in this app. Your owned Ubisoft games show up under All owned.',
     ]),
     helpSection('epic', 'Epic Games: every game on your account', null, [
       'In Settings, under Epic Games, click Sign in to Epic.',

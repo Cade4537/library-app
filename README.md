@@ -74,7 +74,8 @@ Settings > Connections. Settings > Help has step by step guides for each one.
 |---|---|---|
 | Steam | Owned games, hours played, achievements, friends | Free Steam Web API key |
 | Steam Family | Games shared with you | Sign in to the Steam store once |
-| Xbox | PC games you own, achievements, friends | Free OpenXBL key from xbl.io |
+| Xbox | PC games you own, achievements, friends | Sign in with Microsoft (or an OpenXBL key) |
+| Ubisoft | Owned Ubisoft games | Automatic from Ubisoft Connect on this PC |
 | Epic Games | Every game on your account | Sign in on Epic's page |
 | GOG | Owned GOG games | Automatic from GOG Galaxy |
 | SteamGridDB | Cover art for everything else | Free API key |
@@ -85,7 +86,7 @@ Games you have not placed yourself are sorted automatically: demos and playtests
 
 ## Hours played and achievements
 
-Hours come from Steam for Steam games. For every other game, the app checks every 30 seconds which programs are running and counts time while a game's files are in use. Click a game's name (or right click > Details) to see hours, last played and achievements (Steam and Xbox).
+Hours come from Steam for Steam games. For every other game, the app checks every 30 seconds which programs are running and counts time while a game's files are in use. Click a game's card to see hours, last played and achievements (Steam and Xbox).
 
 ## Friends
 
