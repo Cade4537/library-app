@@ -73,6 +73,15 @@ class DiscordView {
     if (!this.shown) { view.setVisible(true); this.shown = true; }
   }
 
+  // Closes the Discord tab to free its memory. It loads again the next time you open the tab.
+  unload() {
+    const win = this.getWindow();
+    if (!this.view) return;
+    try { if (win && !win.isDestroyed()) win.contentView.removeChildView(this.view); } catch {}
+    try { this.view.webContents.close(); } catch {}
+    this.view = null; this.shown = false;
+  }
+
   reload() { if (this.view) this.view.webContents.loadURL(URL_HOME); }
 
   openExternal() { shell.openExternal('discord://'); }

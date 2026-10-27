@@ -17,14 +17,20 @@ function Await($op, [Type]$t) { $task = $asTaskGeneric.MakeGenericMethod($t).Inv
 [Windows.Storage.Streams.IRandomAccessStreamWithContentType, Windows.Storage.Streams, ContentType = WindowsRuntime] | Out-Null
 [Windows.Storage.Streams.DataReader, Windows.Storage.Streams, ContentType = WindowsRuntime] | Out-Null
 function ReadThumb($ref) {
-  $st = Await ($ref.OpenReadAsync()) ([Windows.Storage.Streams.IRandomAccessStreamWithContentType])
-  $size = [uint32]$st.Size
-  if ($size -lt 100) { return $null }
-  $reader = [Windows.Storage.Streams.DataReader]::new($st.GetInputStreamAt(0))
-  Await ($reader.LoadAsync($size)) ([uint32]) | Out-Null
-  $bytes = New-Object byte[] $size
-  $reader.ReadBytes($bytes)
-  $reader.Dispose(); $st.Dispose()
+  $st = $null; $reader = $null
+  try {
+    $st = Await ($ref.OpenReadAsync()) ([Windows.Storage.Streams.IRandomAccessStreamWithContentType])
+    $size = [uint32]$st.Size
+    if ($size -lt 100 -or $size -gt 8000000) { return $null }
+    $reader = [Windows.Storage.Streams.DataReader]::new($st.GetInputStreamAt(0))
+    Await ($reader.LoadAsync($size)) ([uint32]) | Out-Null
+    $bytes = New-Object byte[] $size
+    $reader.ReadBytes($bytes)
+  } finally {
+    # Always release the Windows stream, even when reading fails, so memory does not build up.
+    if ($reader) { $reader.Dispose() }
+    if ($st) { $st.Dispose() }
+  }
   $type = 'image/jpeg'
   if ($bytes[0] -eq 0x89) { $type = 'image/png' }
   return 'data:' + $type + ';base64,' + [Convert]::ToBase64String($bytes)
@@ -107,11 +113,20 @@ class MediaBridge {
     this.restartTimer = null;
     this.failures = 0;
     this.artCache = new Map();
+    this.lastSent = null;
+    this.recycle = null;
+  }
+
+  // Remembers artwork for the last 200 songs only.
+  rememberArt(key, url) {
+    this.artCache.delete(key);
+    this.artCache.set(key, url);
+    while (this.artCache.size > 200) this.artCache.delete(this.artCache.keys().next().value);
   }
 
   // Fallback when the player gives no thumbnail: look the song up on Apple's public iTunes search.
   async lookupArt(key, s) {
-    this.artCache.set(key, null);
+    this.rememberArt(key, null);
     const artist = String(s.artist || '').split(/\s+\u2014\s+/)[0];
     const term = `${artist} ${s.title}`.trim();
     if (!term) return;
@@ -122,7 +137,7 @@ class MediaBridge {
       const r = (j.results || []).find((x) => x.artworkUrl100);
       if (!r) return;
       const url = r.artworkUrl100.replace(/100x100bb/, '600x600bb');
-      this.artCache.set(key, url);
+      this.rememberArt(key, url);
       if (this.state.active && `${this.state.title}|${this.state.artist}` === key && !this.state.art) this.emit({ ...this.state, art: url });
     } catch {}
   }
@@ -147,6 +162,9 @@ class MediaBridge {
       this.proc = null;
       return;
     }
+    // Restart the helper every 3 hours so a long running PowerShell never grows without limit.
+    clearTimeout(this.recycle);
+    this.recycle = setTimeout(() => { if (this.enabled) { this.stop(); this.failures = 0; this.start(); } }, 3 * 3600 * 1000);
     let buf = '';
     this.proc.stdout.on('data', (d) => {
       buf += d.toString('utf8');
@@ -164,7 +182,11 @@ class MediaBridge {
       }
     });
     this.proc.stderr.on('data', () => {});
-    this.proc.on('close', () => {
+    const proc = this.proc;
+    proc.on('close', () => {
+      // A helper that was replaced (settings change or the 3 hour restart) must not restart itself,
+      // or two helpers would end up running side by side.
+      if (this.proc !== proc) return;
       this.proc = null;
       if (!this.enabled) return;
       this.failures++;
@@ -176,6 +198,7 @@ class MediaBridge {
 
   stop() {
     clearTimeout(this.restartTimer);
+    clearTimeout(this.recycle);
     if (this.proc) {
       const p = this.proc;
       this.proc = null;
@@ -191,6 +214,16 @@ class MediaBridge {
       else if (hit === undefined) this.lookupArt(key, s);
     }
     this.state = s;
+    // While a song plays the helper reports every 0.7 seconds. Only pass it on when something
+    // changed (or the position drifted), so the window is not sent the same artwork over and over.
+    const sig = [s.active, s.app, s.title, s.artist, s.status, s.dur, s.art ? s.art.length + s.art.slice(-32) : ''].join('|');
+    const last = this.lastSent;
+    const now = Date.now();
+    if (last && last.sig === sig) {
+      const expected = last.pos + (s.status === 'Playing' ? (now - last.at) / 1000 : 0);
+      if (Math.abs((s.pos || 0) - expected) < 2.5) return;
+    }
+    this.lastSent = { sig, pos: s.pos || 0, at: now };
     this.send({ ...s, isApple: !!(s.app && /^AppleInc\.AppleMusic/i.test(s.app)) });
   }
 

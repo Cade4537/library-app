@@ -1,6 +1,7 @@
 // Small inline line icons. Use <span data-icon="name"></span> or icon('name').
 (function () {
   const P = {
+    check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
     chat: '<path d="M4 5h16v11H9l-4 4v-4H4z"/><path d="M8 9.5h8M8 12.5h5"/>',
     tv: '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/>',
     sidebar: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',

@@ -152,6 +152,8 @@ async function getAchievements(store, it, steamId, xbox, epic) {
     store.changed();
   }
   cache.set(k, { t: Date.now(), v });
+  // Drop old entries so the cache stays small however many games you open.
+  for (const [key, e] of cache) if (Date.now() - e.t > 10 * 60 * 1000 || cache.size > 60) cache.delete(key); else break;
   return v;
 }
 

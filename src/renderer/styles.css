@@ -698,3 +698,101 @@ body.side-collapsed .nav-btn:hover::after {
 .tv-hints { position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 26px; justify-content: center; padding: 16px; background: linear-gradient(to top, rgba(5,5,6,.95), transparent); font-size: 14px; color: var(--muted); }
 .tv-hints span { display: inline-flex; align-items: center; gap: 8px; }
 body.tv-on #padHints { display: none !important; }
+
+/* ---------- 0.9.6: Surprise me reel ---------- */
+.spin { position: fixed; inset: 0; z-index: 70; display: flex; flex-direction: column; overflow: hidden; background: #030304; opacity: 0; transition: opacity .25s; }
+.spin.in { opacity: 1; }
+.spin.out { opacity: 0; }
+.spin-bg { position: absolute; inset: -60px; background-size: cover; background-position: center 30%; filter: blur(46px) saturate(1.4) brightness(.38); opacity: 0; transition: opacity .6s, filter .6s; }
+.spin-bg.on { opacity: 1; }
+.spin.landed .spin-bg.on.real { inset: 0; filter: blur(0) brightness(.55) saturate(1.1); }
+.spin-vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 30%, rgba(3,3,4,.85) 100%), linear-gradient(0deg, rgba(3,3,4,.95) 0%, transparent 45%); pointer-events: none; }
+.spin > *:not(.spin-bg):not(.spin-vignette):not(.spin-fx) { position: relative; }
+.spin-top { display: flex; align-items: center; gap: 10px; padding: 18px 28px; }
+.spin-title { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); }
+.spin-title .ic { width: 20px; height: 20px; }
+.spin-top .spacer { flex: 1; }
+.spin-sound { width: auto; padding: 0 12px; font-size: 12px; font-weight: 600; }
+.spin-stage { position: relative; margin-top: 7vh; height: 300px; }
+.spin-reel { position: absolute; inset: 0; overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent); mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent); }
+.spin-strip { position: absolute; top: 18px; left: 0; display: flex; gap: 18px; will-change: transform; }
+.spin-item { width: 176px; flex: none; transition: transform .25s, opacity .4s, filter .4s; }
+.spin-item .art { box-shadow: 0 16px 40px rgba(0,0,0,.6); }
+.spin-item.hot { transform: scale(1.06); }
+.spin.landed .spin-item:not(.win) { opacity: .25; filter: grayscale(.6) blur(1px); }
+.spin-item.win { transform: scale(1.16); z-index: 2; }
+.spin-item.win .art { outline: 3px solid var(--accent); outline-offset: 4px; box-shadow: 0 0 0 1px rgba(255,255,255,.2), 0 0 60px var(--accent), 0 30px 70px rgba(0,0,0,.7); animation: winGlow 1.6s ease-in-out infinite alternate; }
+@keyframes winGlow { from { box-shadow: 0 0 30px var(--accent), 0 30px 70px rgba(0,0,0,.7); } to { box-shadow: 0 0 80px var(--accent), 0 30px 70px rgba(0,0,0,.7); } }
+.spin-ring { position: absolute; left: 50%; top: 50%; width: 220px; height: 300px; transform: translate(-50%, -50%); border-radius: 18px; border: 2px solid rgba(255,255,255,.22); box-shadow: 0 0 0 1px rgba(0,0,0,.4), inset 0 0 40px rgba(255,255,255,.05); pointer-events: none; }
+.spin.spinning .spin-ring { border-color: var(--accent); box-shadow: 0 0 30px var(--accent-soft), 0 0 0 1px rgba(0,0,0,.4); }
+.spin-ring.pulse::after { content: ''; position: absolute; inset: -4px; border-radius: 22px; border: 3px solid var(--accent); animation: ringOut .9s cubic-bezier(.2,.8,.2,1) forwards; }
+@keyframes ringOut { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(1.9); } }
+.spin-pointer { position: absolute; left: 50%; width: 0; height: 0; transform: translateX(-50%); border-left: 12px solid transparent; border-right: 12px solid transparent; filter: drop-shadow(0 0 10px var(--accent)); }
+.spin-pointer.top { top: -16px; border-top: 16px solid var(--accent); }
+.spin-pointer.bottom { bottom: -16px; border-bottom: 16px solid var(--accent); }
+.spin-result { margin-top: 5vh; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; padding: 0 24px; opacity: 0; transform: translateY(16px); transition: opacity .5s .15s, transform .5s .15s cubic-bezier(.2,.8,.2,1); }
+.spin.landed .spin-result { opacity: 1; transform: none; }
+.spin-kicker { font-size: 12px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: rgba(240,240,244,.6); }
+.spin-name { font: 800 clamp(30px, 4.6vw, 58px)/1.02 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif; letter-spacing: -.02em; text-shadow: 0 8px 40px rgba(0,0,0,.7); max-width: 1000px; }
+.spin-meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.spin-meta > span { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 999px; background: rgba(255,255,255,.1); backdrop-filter: blur(8px); font-size: 12px; font-weight: 600; color: rgba(240,240,244,.85); }
+.spin-meta .ic { width: 13px; height: 13px; }
+.spin-meta .chip-src::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--src, #94a3b8); }
+.spin-actions { display: flex; gap: 10px; margin-top: 10px; }
+.spin-actions .btn.big { height: 46px; padding: 0 24px; font-size: 15px; border-radius: 10px; }
+.spin-play { box-shadow: 0 10px 30px var(--accent-soft); }
+.spin-actions .btn:focus { box-shadow: 0 0 0 3px #fff; }
+.spin-fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
+.spin-hints { position: absolute !important; left: 0; right: 0; bottom: 18px; display: flex; justify-content: center; gap: 24px; font-size: 13px; color: var(--muted); opacity: 0; transition: opacity .3s; }
+body.pad .spin-hints { opacity: 1; }
+.spin-hints span { display: inline-flex; align-items: center; gap: 7px; }
+.spin.reduce .spin-item, .spin.reduce .spin-result { transition: none; }
+
+/* ---------- launch splash ---------- */
+.launch-splash { position: fixed; inset: 0; z-index: 85; display: flex; align-items: center; justify-content: center; gap: 40px; opacity: 0; transition: opacity .35s; cursor: pointer; background: #030304; }
+.launch-splash.in { opacity: 1; }
+.launch-splash.out { opacity: 0; }
+.ls-bg { position: absolute; inset: -40px; background-size: cover; background-position: center 30%; filter: blur(30px) brightness(.4) saturate(1.3); transform: scale(1.08); animation: lsZoom 3.4s ease-out forwards; }
+.ls-bg.real { inset: 0; filter: brightness(.45); }
+@keyframes lsZoom { to { transform: scale(1); } }
+.ls-shade { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 20%, rgba(3,3,4,.9) 100%); }
+.ls-card { position: relative; width: 200px; animation: lsCard .6s cubic-bezier(.2,.8,.2,1) both; }
+.ls-card .art { box-shadow: 0 0 60px var(--accent-soft), 0 30px 80px rgba(0,0,0,.8); }
+@keyframes lsCard { from { opacity: 0; transform: translateY(20px) scale(.92); } }
+.ls-text { position: relative; display: flex; flex-direction: column; gap: 10px; max-width: 560px; animation: lsCard .6s .1s cubic-bezier(.2,.8,.2,1) both; }
+.ls-kicker { font-size: 13px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); }
+.ls-name { font: 800 44px/1.05 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif; }
+.ls-bar { width: 280px; height: 4px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; margin-top: 8px; }
+.ls-bar span { display: block; height: 100%; width: 40%; background: var(--accent); border-radius: 3px; animation: lsBar 1.1s ease-in-out infinite; }
+@keyframes lsBar { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+
+/* ---------- polish ---------- */
+#content { background: radial-gradient(1200px 400px at 30% -120px, var(--accent-soft), transparent 70%) no-repeat; }
+#content.enter > section:not([hidden]) { animation: viewIn .35s cubic-bezier(.2,.8,.2,1) both; }
+#content.enter > #filters { animation-delay: .04s; }
+#content.enter > #grid { animation-delay: .08s; }
+@keyframes viewIn { from { opacity: 0; transform: translateY(10px); } }
+.btn:active:not(:disabled), .icon-btn:active, .chip:active { transform: scale(.96); }
+.art::after { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .2s; background: radial-gradient(circle at var(--mx, 50%) var(--my, 0%), rgba(255,255,255,.22), transparent 55%); }
+.card:hover .art::after { opacity: 1; }
+.art.loading::after { opacity: 1; }
+.card:focus .art { outline-color: var(--accent); box-shadow: 0 0 0 1px rgba(0,0,0,.4), 0 0 28px var(--accent-soft), 0 12px 30px rgba(0,0,0,.5); }
+.toast { display: flex; align-items: center; gap: 10px; border-left: 3px solid var(--accent); animation: toastIn .35s cubic-bezier(.2,.8,.2,1); }
+.toast.error { border-left-color: var(--danger); }
+.toast-ic { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); flex: none; }
+.toast.error .toast-ic { background: rgba(255,93,108,.15); color: var(--danger); }
+.toast-ic .ic { width: 12px; height: 12px; }
+@keyframes toastIn { from { opacity: 0; transform: translateX(30px); } }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: #3ddc84; box-shadow: 0 0 0 0 rgba(61,220,132,.6); animation: live 1.6s infinite; margin-left: auto; }
+@keyframes live { 70% { box-shadow: 0 0 0 7px rgba(61,220,132,0); } 100% { box-shadow: 0 0 0 0 rgba(61,220,132,0); } }
+body.side-collapsed .nav-btn .live-dot { position: absolute; margin: 0 0 14px 22px; }
+
+/* ---------- Remote Play page ---------- */
+#streamHost { position: relative; height: calc(100vh - var(--top) - 150px); min-height: 360px; border-radius: 12px; overflow: hidden; background: #000; border: 1px solid var(--line); display: grid; place-items: center; }
+.stream-idle { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 30px; max-width: 460px; }
+.stream-idle h3 { margin: 6px 0 0; font-size: 24px; }
+.stream-idle p { margin: 0 0 8px; color: var(--muted); }
+.stream-idle-ic { width: 64px; height: 64px; border-radius: 18px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+.stream-idle-ic .ic { width: 34px; height: 34px; }
+#streamIdle:not([hidden]) ~ .stream-loading { display: none; }
+.stream-loading { display: flex; align-items: center; gap: 10px; color: var(--muted); }

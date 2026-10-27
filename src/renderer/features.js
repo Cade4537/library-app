@@ -35,18 +35,25 @@ function setSideCollapsed(v) {
 }
 
 // ---------- Discord tab ----------
-let discordShown = false;
-function syncDiscord() {
-  if (!api || !api.discordBounds) return;
-  const on = S.view.type === 'discord' && !S.tv && !S.modals.length && !document.querySelector('#menuRoot .menu');
-  const host = $('#discordHost');
-  if (!on || !host) {
-    if (discordShown) { api.discordBounds(null); discordShown = false; }
+// Discord and the Remote Play stream are native views laid over the page. They follow their
+// placeholder box, and step aside while a menu, dialog or controller mode is on top.
+const embedShown = { discord: false, stream: false };
+function syncEmbed(kind, hostSel, viewType, send) {
+  if (!api || !send) return;
+  const clear = !S.modals.length && !document.querySelector('#menuRoot .menu') && !S.tv;
+  const host = $(hostSel);
+  const on = S.view.type === viewType && clear && host && !host.closest('[hidden]') && (kind !== 'stream' || (S.stream && S.stream.open));
+  if (!on) {
+    if (embedShown[kind]) { send(null); embedShown[kind] = false; }
     return;
   }
   const r = host.getBoundingClientRect();
-  api.discordBounds({ x: r.left, y: r.top, width: r.width, height: r.height });
-  discordShown = true;
+  send({ x: r.left, y: r.top, width: r.width, height: r.height });
+  embedShown[kind] = true;
+}
+function syncDiscord() {
+  syncEmbed('discord', '#discordHost', 'discord', api && api.discordBounds);
+  syncEmbed('stream', '#streamHost', 'remoteplay', api && api.streamBounds);
 }
 
 // Screen share from the Discord tab: pick a screen or window.
@@ -178,9 +185,14 @@ function wireFeatures() {
   $('#sideToggle').addEventListener('click', () => setSideCollapsed(!S.sideCollapsed));
   $('#tvBtn').addEventListener('click', () => setTV(true));
   $('#tvExit').addEventListener('click', () => setTV(false));
+  $('#streamStartBtn').addEventListener('click', () => startRemotePlay('inapp'));
+  if (api.streamState) api.streamState().then((st) => { S.stream = st; if (S.view.type === 'remoteplay') render(); });
   window.addEventListener('resize', syncDiscord);
   const host = $('#discordHost');
   if (window.ResizeObserver && host) new ResizeObserver(() => syncDiscord()).observe(host);
+  const sHost = $('#streamHost');
+  if (window.ResizeObserver && sHost) new ResizeObserver(() => syncDiscord()).observe(sHost);
+  if (api.onStreamState) api.onStreamState((st) => { S.stream = st; if (S.view.type === 'remoteplay' || !st.open) render(); else renderSidebar(); });
   if (api.onDiscordPickSource) api.onDiscordPickSource(pickShareSource);
   setInterval(tvClock, 15000);
   document.addEventListener('keydown', (e) => {

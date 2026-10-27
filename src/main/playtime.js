@@ -32,6 +32,9 @@ class PlaytimeTracker {
     } catch {
       return;
     }
+    // Restart the helper every 6 hours so it never grows without limit.
+    clearTimeout(this.recycle);
+    this.recycle = setTimeout(() => { if (!this.stopped && this.proc) { const p = this.proc; this.proc = null; this.failures = 0; try { p.removeAllListeners('close'); p.kill(); } catch {} this.start(); } }, 6 * 3600 * 1000);
     let buf = '';
     this.proc.stdout.on('data', (d) => {
       buf += d.toString('utf8');
@@ -44,7 +47,9 @@ class PlaytimeTracker {
       }
     });
     this.proc.stderr.on('data', () => {});
-    this.proc.on('close', () => {
+    const proc = this.proc;
+    proc.on('close', () => {
+      if (this.proc !== proc) return;
       this.proc = null;
       if (this.stopped || ++this.failures > 5) return;
       setTimeout(() => this.start(), 5000 * this.failures);
@@ -53,6 +58,7 @@ class PlaytimeTracker {
 
   stop() {
     this.stopped = true;
+    clearTimeout(this.recycle);
     if (this.proc) { try { this.proc.kill(); } catch {} this.proc = null; }
   }
 

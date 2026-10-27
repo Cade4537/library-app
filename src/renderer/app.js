@@ -81,6 +81,7 @@ const S = {
   sideCollapsed: prefs.get('sideCollapsed', false),
   accent: prefs.get('accent', 'crimson'),
   tv: false,
+  stream: { open: false, full: false },
   storeInfo: new Map(),
   friendGames: new Map(),
   version: '',
@@ -105,6 +106,10 @@ function indexLibrary(snap) {
   }
   for (const list of S.related.values()) list.sort((a, b) => displayName(a).localeCompare(displayName(b)));
   if (S.view.type === 'category' && !S.cats.has(S.view.id)) S.view = { type: 'home' };
+  // Forget cards and store info for items that left the library, so they do not pile up.
+  for (const id of cardCache.keys()) if (!S.byId.has(id)) cardCache.delete(id);
+  for (const id of S.storeInfo.keys()) if (!S.byId.has(id)) S.storeInfo.delete(id);
+  if (headerCache.size > 200) headerCache.clear();
 }
 
 const childrenOf = (id) => S.kids.get(id || null) || [];
@@ -144,7 +149,18 @@ const showRemotePlay = () => !!(S.lib.settings.openXblKey || S.lib.settings.xbox
 // Default: a Crimson Vault window that signs in with your Xbox connection and starts your console.
 // Backup: open the Xbox app and press its remote play buttons automatically.
 async function startRemotePlay(where) {
-  if (where === 'window') showToast('Opening Xbox Remote Play. Your console starts by itself if you have one. Ctrl+W closes it.');
+  if (where === 'inapp') {
+    if (!S.stream.open) {
+      S.stream = { open: true, full: false };
+      showToast('Starting Xbox Remote Play. Your console connects by itself.');
+      const r = await api.remotePlay('inapp');
+      if (r && r.error) { S.stream = { open: false, full: false }; showToast(r.error, 'error'); return; }
+    }
+    if (S.tv) setTV(false);
+    setView({ type: 'remoteplay' });
+    return;
+  }
+  if (where === 'window') showToast('Opening Xbox Remote Play in its own window. Ctrl+W closes it.');
   if (where === 'appAuto') showToast('Opening the Xbox app and connecting to your console');
   const r = await api.remotePlay(where);
   if (r && r.error) showToast(r.error, 'error');
@@ -153,16 +169,21 @@ async function startRemotePlay(where) {
 
 function remotePlayMenu(pos) {
   openMenu([
-    { label: 'Play in Crimson Vault window', run: () => startRemotePlay('window') },
+    { label: 'Play here, next to the sidebar', run: () => startRemotePlay('inapp') },
+    { label: 'Play in its own window', run: () => startRemotePlay('window') },
     { label: 'Open Xbox app and connect', run: () => startRemotePlay('appAuto') },
     { label: 'Open Xbox app only', run: () => startRemotePlay('app') },
     { label: 'Open in browser', run: () => startRemotePlay('web') },
-  ], pos);
+    S.stream.open ? '-' : null,
+    S.stream.open ? { label: 'End stream', danger: true, run: () => api.streamStop() } : null,
+  ].filter(Boolean), pos);
 }
 
 function remotePlayButton() {
-  const b = h('button', { class: 'nav-btn nav-action', 'data-label': 'Xbox Remote Play', title: 'Play games from your Xbox console on this PC' }, icon('gamepad'), h('span', { class: 'label' }, 'Xbox Remote Play'));
-  b.addEventListener('click', () => startRemotePlay('window'));
+  const active = S.view.type === 'remoteplay';
+  const b = h('button', { class: 'nav-btn nav-action' + (active ? ' active' : ''), 'data-label': 'Xbox Remote Play', title: 'Play games from your Xbox console on this PC' }, icon('gamepad'), h('span', { class: 'label' }, 'Xbox Remote Play'),
+    S.stream.open ? h('span', { class: 'live-dot', title: 'Streaming' }) : null);
+  b.addEventListener('click', () => startRemotePlay('inapp'));
   b.addEventListener('contextmenu', (e) => { e.preventDefault(); remotePlayMenu({ x: e.clientX, y: e.clientY }); });
   return b;
 }
@@ -226,6 +247,7 @@ function viewTitle(view = S.view) {
     case 'launchers': return 'Launchers';
     case 'storage': return 'Storage';
     case 'discord': return 'Discord';
+    case 'remoteplay': return 'Xbox Remote Play';
     case 'launcher': return `${SOURCES[view.source] || view.source} games`;
     case 'category': return (S.cats.get(view.id) || {}).name || 'Category';
     default: return 'Library';
@@ -238,6 +260,8 @@ function setView(v) {
   prefs.set('view', v);
   render();
   $('#content').scrollTop = 0;
+  const c = $('#content');
+  c.classList.remove('enter'); void c.offsetWidth; c.classList.add('enter');
 }
 
 // ---------- artwork ----------
@@ -367,10 +391,13 @@ function render() {
   const lv = S.view.type === 'launchers';
   const sv = S.view.type === 'storage';
   const dv = S.view.type === 'discord';
-  document.body.classList.toggle('discord-on', dv);
+  const rv = S.view.type === 'remoteplay';
+  document.body.classList.toggle('discord-on', dv || rv);
   $('#discordView').hidden = !dv;
-  if (dv) {
+  $('#streamView').hidden = !rv;
+  if (dv || rv) {
     for (const id of ['#friendsView', '#launchersView', '#storageView', '#grid', '#filters', '#jump', '#empty']) $(id).hidden = true;
+    if (rv) $('#streamIdle').hidden = !!S.stream.open;
     renderSidebar();
     renderHeader();
     syncDiscord();
@@ -543,12 +570,20 @@ function renderHeader() {
     }
   }
   const total = S.view.type === 'friends' ? (S.friends.people || []).length : viewItems().length;
-  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : S.view.type === 'storage' ? (S.drives ? `${fmtBytes(S.drives.reduce((a, d) => a + d.free, 0))} free` : '') : S.view.type === 'discord' ? '' : `${total} ${total === 1 ? 'item' : 'items'}`)));
+  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : S.view.type === 'storage' ? (S.drives ? `${fmtBytes(S.drives.reduce((a, d) => a + d.free, 0))} free` : '') : S.view.type === 'discord' || S.view.type === 'remoteplay' ? '' : `${total} ${total === 1 ? 'item' : 'items'}`)));
   if (S.view.type === 'discord') {
     kids.push(h('div', { class: 'discord-bar' },
       h('span', { class: 'help', style: { flex: 1 } }, 'Discord\'s own app, right here. Voice calls keep going while you switch pages.'),
       h('button', { class: 'btn', onclick: () => api.discordReload() }, icon('refresh'), 'Reload'),
-      h('button', { class: 'btn', onclick: () => api.discordOpenApp() }, icon('exit'), 'Open Discord app')));
+      h('button', { class: 'btn', onclick: () => api.discordOpenApp() }, icon('exit'), 'Open Discord app'),
+      h('button', { class: 'btn', title: 'Closes the tab to free memory. It loads again when you come back.', onclick: async () => { await api.discordUnload(); setView({ type: 'home' }); showToast('Discord tab closed to free memory'); } }, icon('close'), 'Close tab')));
+  }
+  if (S.view.type === 'remoteplay') {
+    kids.push(h('div', { class: 'discord-bar' },
+      h('span', { class: 'help', style: { flex: 1 } }, S.stream.open ? 'Streaming from your Xbox. Use your controller in the stream; it keeps going while you look at other pages.' : 'Play your Xbox console on this PC, right here next to the sidebar.'),
+      S.stream.open ? h('button', { class: 'btn', onclick: () => api.streamFull(true) }, icon('expand'), 'Full screen') : null,
+      h('button', { class: 'btn', onclick: (e) => remotePlayMenu({ el: e.currentTarget }) }, icon('more'), 'Other ways'),
+      S.stream.open ? h('button', { class: 'btn danger', onclick: () => api.streamStop() }, icon('close'), 'End stream') : null));
   }
   if (S.view.type === 'category' && !S.search) {
     const subCounts = new Map(childrenOf(S.view.id).map((c) => [c.id, baseItems({ type: 'category', id: c.id }).length]));
@@ -705,8 +740,8 @@ function renderGrid() {
 async function launch(id) {
   const it = S.byId.get(id);
   if (!it) return;
-  if (notInstalled(it)) showToast(`Opening ${SOURCES[it.source] || 'the launcher'} to install ${displayName(it)}`);
-  else showToast(`${it.kind === 'game' ? 'Launching' : 'Opening'} ${displayName(it)}`);
+  if (it.kind === 'game') launchSplash(it);
+  else showToast(`Opening ${displayName(it)}`);
   const r = await api.launch(id);
   if (!r || !r.ok) showToast(`Could not launch: ${(r && r.error) || 'unknown error'}`, 'error');
 }
@@ -920,7 +955,7 @@ function openDetails(id) {
   let m;
   const actions = h('div', { class: 'det-actions' },
     h('button', { class: 'btn primary', onclick: () => { m.close(); launch(id); } }, icon(ni ? 'download' : 'play'), ni ? 'Install' : it.kind === 'game' ? 'Play' : 'Open'),
-    it.source === 'xbox' ? h('button', { class: 'btn', onclick: () => startRemotePlay('window'), oncontextmenu: (e) => { e.preventDefault(); remotePlayMenu({ x: e.clientX, y: e.clientY }); } }, icon('gamepad'), 'Stream from console') : null,
+    it.source === 'xbox' ? h('button', { class: 'btn', onclick: () => { m.close(); startRemotePlay('inapp'); }, oncontextmenu: (e) => { e.preventDefault(); remotePlayMenu({ x: e.clientX, y: e.clientY }); } }, icon('gamepad'), 'Stream from console') : null,
     h('button', { class: 'btn', onclick: () => { m.close(); coverPicker(id); } }, icon('image'), 'Change cover'),
     it.installDir ? h('button', { class: 'btn', onclick: () => api.openFolder(id) }, icon('folder'), 'Open folder') : null,
     it.installed && !it.manual && it.kind === 'game' ? h('button', { class: 'btn danger', onclick: () => { m.close(); uninstallGame(id); } }, icon('trash'), 'Uninstall') : null);
@@ -1595,52 +1630,10 @@ function surprisePool() {
 }
 
 function surprise() {
+  if (S.spin && document.contains(document.querySelector('.spin'))) { S.spin.spinAgain(); return; }
   const { pool, from } = surprisePool();
   if (!pool.length) { showToast('No games to pick from yet'); return; }
-  let pick = null;
-  const bg = h('div', { class: 'surprise-bg' });
-  const cardHolder = h('div', { class: 'surprise-card' });
-  const name = h('div', { class: 'surprise-name' });
-  const meta = h('div', { class: 'surprise-meta' });
-  const playBtn = h('button', { class: 'btn primary' }, icon('play'), 'Play');
-  const againBtn = h('button', { class: 'btn' }, icon('dice'), 'Pick again');
-  const closeBtn = h('button', { class: 'btn' }, 'Close');
-  const inner = h('div', { class: 'surprise-inner' }, cardHolder,
-    h('div', { class: 'surprise-info' }, h('div', { class: 'surprise-kicker' }, `Picked from ${from}`), name, meta, h('div', { class: 'surprise-actions' }, playBtn, againBtn, closeBtn)));
-  const m = openModal({ body: [bg, inner], cls: 'surprise' });
-  m.panel.querySelector('.modal-body').style.padding = '0';
-
-  const show = (it) => {
-    cardHolder.replaceChildren(artFor(it));
-    name.textContent = displayName(it);
-    const cat = it.categoryId ? catPath(it.categoryId).map((c) => c.name).join(' › ') : 'No category';
-    meta.textContent = `${SOURCES[it.source] || it.source} · ${cat} · ${timeAgo(it.lastPlayed)}`;
-    bg.style.backgroundImage = it.coverUrl ? `url("${it.coverUrl}")` : 'none';
-    playBtn.replaceChildren(icon(notInstalled(it) ? 'download' : 'play'), notInstalled(it) ? 'Install' : 'Play');
-  };
-  const roll = () => {
-    const panel = m.panel;
-    panel.classList.add('shuffling');
-    [playBtn, againBtn].forEach((b) => (b.disabled = true));
-    let n = pool.length > 1 ? 12 : 0;
-    const step = () => {
-      let next = pool[Math.floor(Math.random() * pool.length)];
-      if (pool.length > 1) while (next === pick) next = pool[Math.floor(Math.random() * pool.length)];
-      pick = next;
-      show(pick);
-      if (n-- > 0) setTimeout(step, 55 + (12 - n) * 9);
-      else {
-        panel.classList.remove('shuffling');
-        [playBtn, againBtn].forEach((b) => (b.disabled = false));
-        playBtn.focus();
-      }
-    };
-    step();
-  };
-  playBtn.addEventListener('click', () => { m.close(); launch(pick.id); });
-  againBtn.addEventListener('click', roll);
-  closeBtn.addEventListener('click', () => m.close());
-  roll();
+  S.spin = spinOverlay(pool, from);
 }
 
 function surpriseModeMenu(e) {
@@ -1771,7 +1764,7 @@ function setUpdateState(u) {
 
 // ---------- toasts ----------
 function showToast(text, kind = 'info') {
-  const t = h('div', { class: 'toast' + (kind === 'error' ? ' error' : '') }, text);
+  const t = h('div', { class: 'toast' + (kind === 'error' ? ' error' : '') }, h('span', { class: 'toast-ic' }, icon(kind === 'error' ? 'close' : 'check')), h('span', {}, text));
   const box = $('#toasts');
   box.append(t);
   while (box.children.length > 4) box.firstChild.remove();
@@ -1809,7 +1802,7 @@ window.padActions = {
     const el = document.activeElement;
     if (el && !el.closest('#grid')) spatial.focusDefault();
   },
-  x: () => { if (!S.modals.length) surprise(); },
+  x: () => { if (!S.modals.length || (S.spin && document.querySelector('.spin'))) surprise(); },
   y: () => { const id = focusedCardId(); if (id) { const it = S.byId.get(id); api.updateItem(id, { favorite: !it.favorite }); showToast(it.favorite ? 'Removed from favorites' : 'Added to favorites'); } },
   lb: () => { if (S.modals.length) return; if (S.tv) tvJumpRow(-1); else cycleView(-1); },
   rb: () => { if (S.modals.length) return; if (S.tv) tvJumpRow(1); else cycleView(1); },

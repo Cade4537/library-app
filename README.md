@@ -63,7 +63,8 @@ Owned games that are not installed show when the Installed / All owned switch ab
 - **Drag and drop:** drag cards onto a category, Favorites or Hidden. Drag categories onto each other to nest them, or onto the top quarter of one to reorder.
 - **Cover art:** from Steam, then SteamGridDB, then a Steam store match. Right click > Change cover to pick another or use your own image.
 - **Add by hand:** the + button adds any program, shortcut or link.
-- **Surprise me:** picks a random game from the current view. The arrow next to it switches between installed games and all owned games.
+- **Surprise me:** a reel of covers spins, slows down and lands on a random game from the current view, with sound, sparks and the game's art filling the screen. Play, Spin again (X) or Details from there; the sound can be turned off in the corner. The arrow next to the button switches between installed games and all owned games.
+- **Launching:** starting a game shows a short splash with its art.
 
 ## Hours played and achievements
 
@@ -96,9 +97,9 @@ Shows which game launchers are installed and how many games each has. Click one 
 
 ## Xbox Remote Play
 
-The sidebar button (or Stream from console in an Xbox game's details) opens Xbox Remote Play in its own full screen Crimson Vault window, signed in with your Xbox connection. If you have one console it starts streaming by itself; with more than one, pick the console. F11 leaves full screen and Ctrl+W closes the window.
+The sidebar button (or Stream from console in an Xbox game's details) opens Remote Play right inside Crimson Vault, next to the sidebar, signed in with your Xbox connection. Your console connects by itself. The stream keeps going while you look at other pages (a green dot shows on the button), Full screen fills the screen (F11 too), and End stream closes it and frees its memory.
 
-Right click the button (or press Menu on a controller) for other ways: open the Xbox app and let Crimson Vault press its remote play buttons for you, open the Xbox app only, or open remote play in your browser.
+Other ways (Other ways button, right click, or Menu on a controller): play in its own window, open the Xbox app and let Crimson Vault press its remote play buttons for you, open the Xbox app only, or open remote play in your browser.
 
 ## Apple Music
 
@@ -119,6 +120,10 @@ The player at the bottom of the sidebar reads what is playing from Windows media
 | Search | Ctrl+F or / | View |
 | Scroll | Wheel | Right stick, LT / RT |
 | Fullscreen | F11 | |
+
+## Memory
+
+Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpers restart themselves every few hours, song artwork and achievement caches are capped, cards for removed games are dropped, and the music player only sends updates when something changes. The Discord tab and the Remote Play stream are the heavy parts; Close tab and End stream free them.
 
 ## Data
 

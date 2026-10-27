@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, clipboard } = require('electron');
 const { DiscordView } = require('./src/main/discordView');
 const { DiscordRpc } = require('./src/main/discordRpc');
+const { StreamView } = require('./src/main/streamView');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { Store } = require('./src/main/store');
@@ -43,6 +44,7 @@ let collections = [];
 let lastRegistry = {};
 let steamIdCache = null;
 let discordView = null;
+let streamView = null;
 const rpc = new DiscordRpc();
 const runningSince = new Map();
 const pendingSource = new Map();
@@ -332,6 +334,11 @@ function registerIpc() {
   });
 
   ipcMain.handle('discord:bounds', (_e, b) => { if (discordView) discordView.set(b); });
+  ipcMain.handle('discord:unload', () => discordView && discordView.unload());
+  ipcMain.handle('stream:bounds', (_e, b) => { if (streamView) streamView.set(b); });
+  ipcMain.handle('stream:full', (_e, v) => streamView && streamView.setFull(v));
+  ipcMain.handle('stream:stop', () => streamView && streamView.stop());
+  ipcMain.handle('stream:state', () => ({ open: !!(streamView && streamView.open), full: !!(streamView && streamView.full) }));
   ipcMain.handle('discord:reload', () => discordView && discordView.reload());
   ipcMain.handle('discord:signOut', () => discordView && discordView.signOut());
   ipcMain.handle('discord:openApp', () => shell.openExternal('discord://'));
@@ -493,14 +500,15 @@ function registerIpc() {
   ipcMain.handle('xbox:remotePlay', async (_e, where) => {
     if (where === 'web') return shell.openExternal('https://www.xbox.com/play/consoles');
     let consoleName = '';
-    if (where === 'window' || where === 'appAuto') {
+    if (where === 'window' || where === 'appAuto' || where === 'inapp') {
       try {
         const list = await xbox.consoles();
         const pick = list.find((c) => /^on$/i.test(c.power || '')) || list[0];
         consoleName = (pick && pick.name) || '';
       } catch {}
     }
-    if (where === 'window') return openRemotePlayWindow(win, consoleName);
+    if (where === 'inapp') { streamView.start(consoleName); return { ok: true }; }
+    if (where === 'window') { if (streamView.open) streamView.stop(); return openRemotePlayWindow(win, consoleName); }
     if (where === 'appAuto') return openXboxAppAndConnect(consoleName);
     try {
       await launchItem({ launch: { type: 'aumid', target: XBOX_APP_AUMID } });
@@ -545,6 +553,8 @@ if (!app.requestSingleInstanceLock()) {
     registerIpc();
     createWindow();
     playtime.start();
+    streamView = new StreamView(() => win, (st) => sendTo('stream:state', st));
+    win.on('resize', () => { if (streamView.full) streamView.layout(); });
     discordView = new DiscordView(() => win, (list) => new Promise((resolve) => {
       const id = Math.random().toString(36).slice(2);
       pendingSource.set(id, resolve);
