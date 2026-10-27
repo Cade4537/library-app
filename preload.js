@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld('library', {
   openDataFolder: call('app:openDataFolder'),
   toggleFullscreen: call('app:toggleFullscreen'),
   openExternal: call('app:openExternal'),
+  copyText: call('app:copyText'),
   getUpdate: call('update:get'),
   checkUpdate: call('update:check'),
   installUpdate: call('update:install'),

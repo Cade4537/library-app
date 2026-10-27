@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, clipboard } = require('electron');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { Store } = require('./src/main/store');
@@ -249,6 +249,7 @@ function registerIpc() {
   ipcMain.handle('app:version', () => app.getVersion());
   ipcMain.handle('app:openDataFolder', () => shell.openPath(app.getPath('userData')));
   ipcMain.handle('app:toggleFullscreen', () => win.setFullScreen(!win.isFullScreen()));
+  ipcMain.handle('app:copyText', (_e, text) => clipboard.writeText(String(text || '')));
   ipcMain.handle('app:openExternal', (_e, url) => {
     if (/^https:\/\//.test(url)) shell.openExternal(url);
   });

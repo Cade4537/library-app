@@ -813,7 +813,7 @@ function openSettings() {
         h('label', {}, 'SteamGridDB API key'),
         h('div', { class: 'row' }, key, show),
         h('div', { class: 'help' }, 'Free. Gives cover art for non Steam games and apps. ',
-          h('button', { class: 'link-btn', onclick: () => api.openExternal('https://www.steamgriddb.com/profile/preferences/api') }, 'Get a key'))),
+          h('button', { class: 'link-btn', onclick: () => openConnectionsHelp('sgdb') }, 'How to get a key'))),
       h('div', { class: 'field' },
         h('label', {}, 'CurseForge instances folder'),
         h('div', { class: 'row' }, cf, cfBrowse),
@@ -824,7 +824,7 @@ function openSettings() {
         h('label', {}, 'Steam Web API key'),
         h('div', { class: 'row' }, steamKey, steamShow),
         h('div', { class: 'help' }, 'Free. Lists every game on your Steam account, installed or not. Your Steam profile\'s Game details must be set to Public. ',
-          h('button', { class: 'link-btn', onclick: () => api.openExternal('https://steamcommunity.com/dev/apikey') }, 'Get a key'))),
+          h('button', { class: 'link-btn', onclick: () => openConnectionsHelp('steam') }, 'How to get a key'))),
       h('div', { class: 'field' },
         h('label', {}, 'SteamID or profile link'),
         steamId,
@@ -835,6 +835,7 @@ function openSettings() {
       h('div', { class: 'field' }, toggleRow('Apple Music player', 'Shows what is playing in the sidebar with play, pause and skip', musicEnabled, (v) => { musicEnabled = v; })),
       h('div', { class: 'field' }, toggleRow('Other music apps too', 'Falls back to Spotify, a browser, or whatever is playing when Apple Music is closed', musicAnyApp, (v) => { musicAnyApp = v; }))),
     actions: [
+      { label: 'Help', left: true, run: () => { openConnectionsHelp(); return false; } },
       { label: 'Find missing covers', left: true, run: async () => { await api.refetchCovers(); showToast('Looking for missing covers'); return false; } },
       { label: 'Open data folder', left: true, run: () => { api.openDataFolder(); return false; } },
       { label: 'Cancel' },
@@ -845,6 +846,55 @@ function openSettings() {
       } },
     ],
   });
+}
+
+// ---------- connections help ----------
+const STEAM_DOMAIN = 'https://github.com/Cade4537/library-app';
+
+function copyRow(text) {
+  const btn = h('button', { class: 'btn', onclick: async () => { await api.copyText(text); btn.textContent = 'Copied'; setTimeout(() => { btn.textContent = 'Copy'; }, 1500); } }, 'Copy');
+  return h('div', { class: 'copy-row' }, h('code', {}, text), btn);
+}
+
+function linkBtn(label, url) {
+  return h('button', { class: 'btn primary small-btn', onclick: () => api.openExternal(url) }, label);
+}
+
+function helpSection(id, title, sub, steps) {
+  return h('section', { class: 'help-sec', 'data-sec': id },
+    h('h3', {}, title), sub ? h('p', { class: 'help-sub' }, sub) : null,
+    h('ol', { class: 'help-steps' }, steps.map((st) => h('li', {}, st))));
+}
+
+function openConnectionsHelp(focus) {
+  const body = h('div', { class: 'help-body' },
+    h('p', { class: 'help-sub', style: { marginTop: 0 } }, 'Some features need a free key from another service. A key is like a password that lets this app ask that service for your info. Each one takes about a minute. Keys stay on this PC.'),
+    helpSection('steam', 'Steam: show every game you own', 'Lets the app list games on your Steam account that are not installed.', [
+      ['Open the Steam key page and sign in with your Steam account. ', linkBtn('Open Steam key page', 'https://steamcommunity.com/dev/apikey')],
+      ['In the Domain Name box, paste this:', copyRow(STEAM_DOMAIN)],
+      'Check "I agree to the Steam Web API Terms of Use" and click Register. Steam may ask you to confirm in the Steam mobile app.',
+      'Copy the Key it shows (a long mix of letters and numbers).',
+      'In this app, open Settings, paste it into Steam Web API key, and click Save.',
+      ['Make your game list visible: on your Steam privacy page, set Game details to Public. ', linkBtn('Open Steam privacy settings', 'https://steamcommunity.com/my/edit/settings')],
+    ]),
+    h('p', { class: 'help-note' }, 'If Steam says your account is limited, it needs at least $5 spent on Steam before it can make keys.'),
+    helpSection('sgdb', 'SteamGridDB: cover art for everything else', 'Gives covers to games from other launchers and to apps.', [
+      ['Open SteamGridDB and click Login. You can sign in with Steam. ', linkBtn('Open SteamGridDB', 'https://www.steamgriddb.com')],
+      ['Go to your API page. ', linkBtn('Open SteamGridDB API page', 'https://www.steamgriddb.com/profile/preferences/api')],
+      'Click Generate API Key and copy it.',
+      'In this app, open Settings, paste it into SteamGridDB API key, and click Save. Covers start filling in right away.',
+    ]),
+    helpSection('gog', 'GOG', null, [
+      'Nothing to set up. If GOG Galaxy is installed and signed in on this PC, your GOG games show up automatically.',
+    ]),
+    helpSection('music', 'Apple Music', null, [
+      'Nothing to set up. Play something in Apple Music and it shows in the sidebar.',
+    ]));
+  openModal({ title: 'Connections help', body, cls: 'wide help-modal', actions: [{ label: 'Close' }] });
+  if (focus) setTimeout(() => {
+    const sec = document.querySelector(`.help-sec[data-sec="${focus}"]`);
+    if (sec) { sec.scrollIntoView({ block: 'start' }); sec.classList.add('flash'); }
+  }, 50);
 }
 
 // ---------- surprise me ----------
