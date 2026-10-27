@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, shell, clipboard } = require('elect
 const { DiscordView } = require('./src/main/discordView');
 const { DiscordRpc } = require('./src/main/discordRpc');
 const { StreamView } = require('./src/main/streamView');
+const { UbisoftActivity } = require('./src/main/ubisoftActivity');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { Store } = require('./src/main/store');
@@ -46,6 +47,7 @@ let lastRegistry = {};
 let steamIdCache = null;
 let discordView = null;
 let streamView = null;
+let ubisoft = null;
 const rpc = new DiscordRpc();
 const runningSince = new Map();
 const pendingSource = new Map();
@@ -232,6 +234,7 @@ async function rescan(silent = false) {
     applyAutoCategories();
     steamInfo.refresh();
     sizes.run();
+    if (ubisoft && ubisoft.connected) ubisoft.refresh(false).then((r) => { if (r && !r.skipped) store.changed(); }).catch(() => {});
     lastOwnedStatus = { counts: ownedCounts, errors: ownedErrors, steamId: detectedSteamId || null, at: Date.now() };
     store.changed();
     covers.queueAll();
@@ -456,6 +459,19 @@ function registerIpc() {
       return { ok: false, error: e.message };
     }
   });
+  ipcMain.handle('auth:ubisoftSignIn', async () => {
+    const ok = await ubisoft.signIn(win).catch(() => false);
+    if (!ok) return { ok: false };
+    store.data.settings.ubisoftActivity = true;
+    const r = await ubisoft.refresh(true);
+    store.changed();
+    return { ok: true, count: r && r.count, error: r && r.error };
+  });
+  ipcMain.handle('auth:ubisoftSignOut', async () => {
+    await ubisoft.signOut().catch(() => {});
+    store.changed();
+  });
+  ipcMain.handle('auth:ubisoftRefresh', async () => { const r = await ubisoft.refresh(true); store.changed(); return r; });
   ipcMain.handle('auth:epicSignOut', async () => {
     delete store.data.settings.epicAuth;
     epic.reset();
@@ -579,6 +595,7 @@ if (!app.requestSingleInstanceLock()) {
     sizes = new SizeTracker(store, () => store.changed());
     xbox = new XboxLive(store);
     epic = new EpicClient(store);
+    ubisoft = new UbisoftActivity(store);
     friends = new Friends(store, (s) => sendTo('friends:state', s), getSteamId, xbox, epic);
     registerIpc();
     createWindow();

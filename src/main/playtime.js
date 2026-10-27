@@ -121,7 +121,7 @@ class PlaytimeTracker {
 // Minutes played: Steam's own count when there is one, plus anything tracked here for other games.
 function minutesPlayed(it) {
   const m = it.meta || {};
-  return Math.max(m.playtime || 0, m.xboxMinutes || 0, m.epicMinutes || 0, m.gogMinutes || 0, Math.round(m.trackedMinutes || 0));
+  return Math.max(m.playtime || 0, m.xboxMinutes || 0, m.epicMinutes || 0, m.gogMinutes || 0, m.ubiMinutes || 0, Math.round(m.trackedMinutes || 0));
 }
 
 module.exports = { PlaytimeTracker, minutesPlayed };

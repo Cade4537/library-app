@@ -39,7 +39,7 @@ Settings > Connections. Settings > Help has step by step guides, including the D
 | Steam Family | Games shared with you | Sign in to the Steam store once |
 | Xbox | PC games you own, hours played, achievements, friends | Sign in with Microsoft (or an OpenXBL key) |
 | Epic Games | Every game on your account, hours played, achievements, friends | Sign in on Epic's page |
-| Ubisoft | Owned Ubisoft games | Automatic from Ubisoft Connect on this PC (sign in there once) |
+| Ubisoft | Owned Ubisoft games, hours played and last played (including console time) | Owned games are automatic from Ubisoft Connect on this PC. For hours, sign in on Ubisoft's page in Settings; Crimson Vault reads your account's Games activity every 6 hours. Ubisoft friends are not available (Ubisoft only shows them inside its own app) |
 | GOG | Owned GOG games, hours played | Automatic from GOG Galaxy |
 | SteamGridDB | Cover art for everything else | Free API key |
 
@@ -74,7 +74,7 @@ Owned games that are not installed show when the Installed / All owned switch ab
 
 ## Hours played and achievements
 
-Hours come from Steam, Epic, GOG Galaxy and Xbox when connected. For every other game the app checks every 30 seconds which programs are running and counts time while a game's files are in use; a running game shows "Playing now". Achievements show in a game's details for Steam, Xbox and Epic games.
+Hours come from Steam, Epic, GOG Galaxy, Xbox and Ubisoft when connected. For every other game the app checks every 30 seconds which programs are running and counts time while a game's files are in use; a running game shows "Playing now". Achievements show in a game's details for Steam, Xbox and Epic games.
 
 ## Friends
 

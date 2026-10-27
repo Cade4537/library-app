@@ -1450,6 +1450,26 @@ function openSettings() {
     xblStatus.className = 'help ' + (r.ok ? 'ok-text' : 'err-text');
   } }, 'Test key');
 
+  // Ubisoft hours played: sign in on Ubisoft's own page, then Crimson Vault reads your games activity.
+  const ubiStatus = h('div', { class: 'help' }, s.ubisoftActivity
+    ? (s.ubisoftActivityError || (s.ubisoftActivityAt ? `Hours and last played read ${timeAgo(s.ubisoftActivityAt).toLowerCase()}. Updates every 6 hours.` : 'Signed in. Reading your hours.'))
+    : 'Sign in to add Ubisoft\'s hours played and last played (including console time) to your games.');
+  const ubiBtns = h('div', { class: 'row', style: { gap: '8px', marginTop: '8px' } });
+  const fillUbi = (on) => {
+    ubiBtns.replaceChildren(...(on ? [
+      h('button', { class: 'btn', onclick: async (e) => { e.currentTarget.disabled = true; const r = await api.ubisoftRefresh(); ubiStatus.textContent = r && r.error ? r.error : r && r.count != null ? `Read ${r.count} games from Ubisoft just now.` : 'Up to date.'; } }, icon('refresh'), 'Refresh hours'),
+      h('button', { class: 'btn', onclick: async () => { await api.ubisoftSignOut(); fillUbi(false); ubiStatus.textContent = 'Signed out of Ubisoft.'; } }, 'Sign out'),
+    ] : [
+      h('button', { class: 'btn primary', onclick: async (e) => {
+        e.currentTarget.disabled = true;
+        ubiStatus.textContent = 'Sign in on Ubisoft\'s page. The window closes by itself when your games show.';
+        const r = await api.ubisoftSignIn();
+        if (r && r.ok) { fillUbi(true); ubiStatus.textContent = r.error || `Signed in. Read ${r.count || 0} games from Ubisoft.`; showToast('Ubisoft hours added'); }
+        else { e.currentTarget.disabled = false; ubiStatus.textContent = 'Sign in did not finish. Try again.'; }
+      } }, 'Sign in for hours played'),
+    ]));
+  };
+  fillUbi(!!s.ubisoftActivity);
   const epicBtn = h('button', { class: 'btn' + (s.epicConnected ? '' : ' primary') });
   const fillEpic = (connected, name) => {
     epicBtn.textContent = connected ? 'Sign out' : 'Sign in to Epic';
@@ -1529,7 +1549,8 @@ function openSettings() {
         toggleRow('Read GOG library', 'From GOG Galaxy on this PC, no sign in needed', gogOwned, (v) => { gogOwned = v; })),
       connBlock('Ubisoft', ubisoftOwned, ubisoftOwned ? (counts.ubisoft != null ? `${counts.ubisoft} games` : 'On') : 'Off', 'ubisoft',
         errNote('Ubisoft:'),
-        toggleRow('Read Ubisoft library', 'From Ubisoft Connect on this PC. Open Ubisoft Connect and sign in once first.', ubisoftOwned, (v) => { ubisoftOwned = v; })),
+        toggleRow('Read Ubisoft library', 'From Ubisoft Connect on this PC. Open Ubisoft Connect and sign in once first.', ubisoftOwned, (v) => { ubisoftOwned = v; }),
+        h('div', { class: 'field', style: { marginTop: '10px' } }, h('label', {}, 'Hours played'), ubiStatus, ubiBtns)),
       connBlock('SteamGridDB', !!s.steamGridDbKey, null, 'sgdb',
         h('div', { class: 'field' }, h('label', {}, 'SteamGridDB API key'), sgdb.row,
           h('div', { class: 'help' }, 'Cover art for games from other launchers and for apps.'))),
@@ -1622,6 +1643,8 @@ function openConnectionsHelp(focus) {
     helpSection('ubisoft', 'Ubisoft', null, [
       'Open Ubisoft Connect on this PC and sign in once. It saves your game list on this PC.',
       'Click the rescan button in this app. Your owned Ubisoft games show up under All owned.',
+      'For hours played: in Settings, under Ubisoft, click Sign in for hours played and sign in on Ubisoft\'s page. Tick Keep me logged so it stays signed in. The window closes by itself when your games show.',
+      'Hours come from your Ubisoft account\'s Games activity page, so they include time on Xbox and other platforms. Ubisoft friends are not available: Ubisoft only shows friends inside the Ubisoft Connect app, not on the web.',
     ]),
     helpSection('epic', 'Epic Games: every game on your account', null, [
       'In Settings, under Epic Games, click Sign in to Epic.',
