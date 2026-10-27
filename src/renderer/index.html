@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' file: data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+  <title>Library</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header id="topbar">
+      <div class="brand"><span class="brand-mark"></span><span class="brand-name">Library</span></div>
+      <div class="search-wrap">
+        <span class="search-icon" data-icon="search"></span>
+        <input id="search" type="search" placeholder="Search your library" spellcheck="false" autocomplete="off" />
+      </div>
+      <div class="top-actions">
+        <button id="updateBtn" hidden><span data-icon="refresh"></span><span>Restart to update</span></button>
+        <div class="split">
+          <button id="surpriseBtn" class="btn primary"><span data-icon="dice"></span><span>Surprise me</span></button>
+          <button id="surpriseMode" class="btn primary caret" aria-label="Surprise me options"><span data-icon="chevron"></span></button>
+        </div>
+        <button id="addBtn" class="icon-btn" title="Add a game or app"><span data-icon="plus"></span></button>
+        <button id="rescanBtn" class="icon-btn" title="Rescan launchers"><span data-icon="refresh"></span></button>
+        <button id="settingsBtn" class="icon-btn" title="Settings"><span data-icon="gear"></span></button>
+        <button id="fullscreenBtn" class="icon-btn" title="Fullscreen (F11)"><span data-icon="expand"></span></button>
+      </div>
+    </header>
+
+    <aside id="sidebar">
+      <nav id="nav"></nav>
+      <div class="side-head" id="catHead">
+        <span>Categories</span>
+        <button id="newCatBtn" class="icon-btn small" title="New category"><span data-icon="plus"></span></button>
+      </div>
+      <div id="tree"></div>
+      <div id="nowPlaying"></div>
+      <div id="scanStatus" hidden><span class="spinner"></span><span>Scanning launchers</span></div>
+    </aside>
+
+    <main id="content">
+      <section id="viewHeader"></section>
+      <section id="jump" hidden></section>
+      <section id="filters"></section>
+      <section id="grid"></section>
+      <div id="empty" hidden></div>
+    </main>
+  </div>
+
+  <div id="padHints" hidden>
+    <span><b class="pb a">A</b>Play</span>
+    <span><b class="pb b">B</b>Back</span>
+    <span><b class="pb x">X</b>Surprise me</span>
+    <span><b class="pb y">Y</b>Favorite</span>
+    <span><b class="pb m">&#9776;</b>Options</span>
+    <span><b class="pb sh">LB</b><b class="pb sh">RB</b>Switch view</span>
+  </div>
+
+  <div id="modalRoot"></div>
+  <div id="menuRoot"></div>
+  <div id="toasts"></div>
+
+  <script src="icons.js"></script>
+  <script src="gamepad.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
