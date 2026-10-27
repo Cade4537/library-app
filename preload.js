@@ -64,6 +64,8 @@ contextBridge.exposeInMainWorld('library', {
   onStreamState: (cb) => ipcRenderer.on('stream:state', (_e, s) => cb(s)),
   discordTestPresence: call('discord:testPresence'),
   storeInfo: call('item:storeInfo'),
+  sessions: call('stats:sessions'),
+  focusGame: call('item:focus'),
   setFullscreen: call('app:setFullscreen'),
   onDiscordPickSource: (cb) => ipcRenderer.on('discord:pickSource', (_e, s) => cb(s)),
   onFriends: (cb) => ipcRenderer.on('friends:state', (_e, s) => cb(s)),

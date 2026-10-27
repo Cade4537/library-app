@@ -49,6 +49,12 @@ Owned games that are not installed show when the Installed / All owned switch ab
 
 - **Continue playing:** the top of Home shows your last game as a big banner with its art, hours and achievement progress, plus the next four as tiles.
 - **Details:** clicking a card opens its page with the game's wide art, description, release date, developer, genres and screenshots from the Steam store (click a screenshot to see it full size), plus hours, size and achievements.
+- **Collections:** big tiles for each genre folder on Home, with a mosaic of covers (Hide removes them; Settings > Look brings them back).
+- **Trailers:** a game's details plays its Steam trailer, muted, behind the top of the page (Sound on in the corner; Settings > Look turns trailers off).
+- **Wide banners:** the switch next to Sort changes the cards from covers to wide banners with the art blurred behind.
+- **Back to game:** while a game runs, a small bar at the bottom brings its window back to the front.
+- **Stats:** hours played, games, achievements, a 14 day chart of play time (from when Crimson Vault saw games running), most played, hours by launcher, and the games closest to 100%.
+- **Startup animation:** the crimson gem intro when the app opens (click or press a key to skip; Settings > Look turns it off).
 - **Cards:** hover a card to see hours played and achievement progress. A green tag shows when a friend is playing that game. Covers shimmer while they load.
 
 ## Library

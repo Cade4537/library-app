@@ -20,6 +20,7 @@ const { XboxLive } = require('./src/main/xboxlive');
 const { EpicClient } = require('./src/main/epicClient');
 const { getLaunchers, openLauncher } = require('./src/main/launchers');
 const { getDrives, SizeTracker, uninstall } = require('./src/main/storage');
+const { runPowerShell } = require('./src/main/util');
 
 const { openRemotePlayWindow, openXboxAppAndConnect } = require('./src/main/remoteplay');
 const XBOX_APP_AUMID = 'Microsoft.GamingApp_8wekyb3d8bbwe!Microsoft.Xbox.App';
@@ -89,13 +90,22 @@ function publicSettings() {
 
 // Description, release date and screenshots from the Steam store, for the details page.
 const storeInfoMem = new Map();
+// A trailer that plays in a normal video tag (mp4 or webm), preferring the highlighted one.
+function pickMovie(movies) {
+  const list = Array.isArray(movies) ? movies : [];
+  for (const m of [...list.filter((x) => x.highlight), ...list]) {
+    const url = (m.mp4 && (m.mp4['480'] || m.mp4.max)) || (m.webm && (m.webm['480'] || m.webm.max));
+    if (url) return String(url).replace(/^http:/, 'https:');
+  }
+  return null;
+}
 async function storeInfo(it) {
   if (!it || it.kind !== 'game') return null;
   const appid = it.steamAppId || (steamInfo && steamInfo.appIdFor(it));
   if (!appid) return null;
   if (!store.data.storeExtra) store.data.storeExtra = {};
   const cached = store.data.storeExtra[appid];
-  if (cached && Date.now() - cached.t < 30 * 86400000) return cached;
+  if (cached && cached.v === 2 && Date.now() - cached.t < 30 * 86400000) return cached;
   if (storeInfoMem.has(appid)) return storeInfoMem.get(appid);
   const p = (async () => {
     try {
@@ -113,6 +123,8 @@ async function storeInfo(it) {
         bg: d.background_raw || d.background || d.header_image || '',
         shots: (d.screenshots || []).slice(0, 8).map((s) => ({ thumb: s.path_thumbnail, full: s.path_full })),
         metacritic: d.metacritic && d.metacritic.score ? d.metacritic.score : null,
+        v: 2,
+        movie: pickMovie(d.movies),
       };
       store.data.storeExtra[appid] = out;
       store.changed();
@@ -125,6 +137,22 @@ async function storeInfo(it) {
   })();
   storeInfoMem.set(appid, p);
   return p;
+}
+
+// Brings a running game's window to the front (for the "Back to game" bar).
+async function focusGame(it) {
+  if (!it || !it.installDir) return { ok: false };
+  const dir = String(it.installDir).replace(/'/g, "''");
+  const out = await runPowerShell(`
+Add-Type @'
+using System; using System.Runtime.InteropServices;
+public static class CvWin { [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h); [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c); [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h); }
+'@
+$dir = '${dir}'
+$p = Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith($dir, [StringComparison]::OrdinalIgnoreCase) -and $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+if ($p) { if ([CvWin]::IsIconic($p.MainWindowHandle)) { [CvWin]::ShowWindow($p.MainWindowHandle, 9) | Out-Null }; [CvWin]::SetForegroundWindow($p.MainWindowHandle) | Out-Null; 'ok' } else { 'none' }
+`, 20000);
+  return { ok: String(out || '').trim().endsWith('ok') };
 }
 
 function applyAutoCategories() {
@@ -350,6 +378,8 @@ function registerIpc() {
     return { ok: !!rpc.clientId, connected: rpc.ready };
   });
   ipcMain.handle('item:storeInfo', (_e, id) => storeInfo(store.data.items[id]));
+  ipcMain.handle('stats:sessions', () => (store.data.sessions || []).slice(-1000));
+  ipcMain.handle('item:focus', (_e, id) => focusGame(store.data.items[id]));
 
   ipcMain.handle('settings:update', (_e, patch) => {
     const before = store.data.settings;
@@ -570,6 +600,7 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.on('before-quit', () => {
+    if (playtime) playtime.flushSessions();
     rpc.set(null); rpc.close();
     if (store) store.saveNow();
     if (media) { media.enabled = false; media.stop(); }

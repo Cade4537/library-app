@@ -248,6 +248,7 @@ function viewTitle(view = S.view) {
     case 'storage': return 'Storage';
     case 'discord': return 'Discord';
     case 'remoteplay': return 'Xbox Remote Play';
+    case 'stats': return 'Stats';
     case 'launcher': return `${SOURCES[view.source] || view.source} games`;
     case 'category': return (S.cats.get(view.id) || {}).name || 'Category';
     default: return 'Library';
@@ -346,6 +347,7 @@ function fillCard(card, it) {
   card.dataset.sig = sig;
   card.classList.toggle('missing', !!it.missing);
   card.classList.toggle('not-installed', notInstalled(it));
+  if (it.coverUrl) card.style.setProperty('--cover', `url("${it.coverUrl}")`); else card.style.removeProperty('--cover');
   const art = artFor(it);
   art.append(h('span', { class: `badge src-${it.source}` }, SOURCES[it.source] || it.source));
   if (it.favorite) art.append(h('span', { class: 'fav-mark' }, icon('star')));
@@ -371,8 +373,9 @@ function fillCard(card, it) {
     : isGrouped(it) ? h('div', { class: 'sub' }, `Part of ${(S.byId.get(it.parentId) || {}).name || 'a suite'}`)
     : it.minutes ? h('div', { class: 'sub' }, fmtHours(it.minutes)) : null;
   const titleEl = h('div', { class: 'title' }, displayName(it));
+  const wideSub = h('div', { class: 'wide-sub' }, [SOURCES[it.source] || it.source, it.running ? 'Playing now' : it.lastPlayed ? timeAgo(it.lastPlayed) : null].filter(Boolean).join(' · '));
   titleEl.addEventListener('click', (e) => { e.stopPropagation(); openDetails(it.id); });
-  card.replaceChildren(...[art, titleEl, sub].filter(Boolean));
+  card.replaceChildren(...[art, h('div', { class: 'card-text' }, titleEl, wideSub, sub)].filter(Boolean));
   card.title = displayName(it);
 }
 
@@ -390,13 +393,28 @@ function render() {
   const fv = S.view.type === 'friends';
   const lv = S.view.type === 'launchers';
   const sv = S.view.type === 'storage';
+  const tv2 = S.view.type === 'stats';
+  $('#statsView').hidden = !tv2;
+  if (tv2) {
+    for (const id of ['#friendsView', '#launchersView', '#storageView', '#grid', '#filters', '#jump', '#collections', '#empty', '#discordView', '#streamView']) $(id).hidden = true;
+    document.body.classList.remove('discord-on');
+    renderSidebar();
+    renderHeader();
+    if (!render.statsShown) renderStats();
+    render.statsShown = true;
+    renderResume();
+    syncDiscord();
+    return;
+  }
+  render.statsShown = false;
   const dv = S.view.type === 'discord';
   const rv = S.view.type === 'remoteplay';
   document.body.classList.toggle('discord-on', dv || rv);
   $('#discordView').hidden = !dv;
   $('#streamView').hidden = !rv;
   if (dv || rv) {
-    for (const id of ['#friendsView', '#launchersView', '#storageView', '#grid', '#filters', '#jump', '#empty']) $(id).hidden = true;
+    for (const id of ['#friendsView', '#launchersView', '#storageView', '#grid', '#filters', '#jump', '#collections', '#empty']) $(id).hidden = true;
+    renderResume();
     if (rv) $('#streamIdle').hidden = !!S.stream.open;
     renderSidebar();
     renderHeader();
@@ -410,6 +428,8 @@ function render() {
   $('#filters').hidden = fv || lv || sv;
   if (fv || lv || sv) {
     $('#jump').hidden = true;
+    $('#collections').hidden = true;
+    renderResume();
     $('#empty').hidden = true;
     renderSidebar();
     renderHeader();
@@ -426,6 +446,8 @@ function render() {
   const scanning = !!S.lib.scanning;
   $('#scanStatus').hidden = !scanning;
   $('#rescanBtn').classList.toggle('spinning', scanning);
+  renderCollections();
+  renderResume();
   syncDiscord();
 }
 
@@ -461,6 +483,7 @@ function renderSidebar() {
     navButton('home', 'Home', 'home', vis.length),
     navButton('favorites', 'Favorites', 'star', vis.filter((i) => i.favorite).length),
     navButton('recent', 'Recently played', 'clock', null),
+    navButton('stats', 'Stats', 'chart', null),
     navButton('uncategorized', 'Uncategorized', 'inbox', vis.filter((i) => !i.categoryId || !S.cats.has(i.categoryId)).length || null),
     navButton('hidden', 'Hidden', 'eyeOff', S.lib.items.filter((i) => i.hidden).length || null),
     navButton('launchers', 'Launchers', 'rocket', null),
@@ -570,7 +593,7 @@ function renderHeader() {
     }
   }
   const total = S.view.type === 'friends' ? (S.friends.people || []).length : viewItems().length;
-  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : S.view.type === 'storage' ? (S.drives ? `${fmtBytes(S.drives.reduce((a, d) => a + d.free, 0))} free` : '') : S.view.type === 'discord' || S.view.type === 'remoteplay' ? '' : `${total} ${total === 1 ? 'item' : 'items'}`)));
+  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : S.view.type === 'storage' ? (S.drives ? `${fmtBytes(S.drives.reduce((a, d) => a + d.free, 0))} free` : '') : S.view.type === 'discord' || S.view.type === 'remoteplay' || S.view.type === 'stats' ? '' : `${total} ${total === 1 ? 'item' : 'items'}`)));
   if (S.view.type === 'discord') {
     kids.push(h('div', { class: 'discord-bar' },
       h('span', { class: 'help', style: { flex: 1 } }, 'Discord\'s own app, right here. Voice calls keep going while you switch pages.'),
@@ -694,7 +717,7 @@ function renderFilters() {
     h('button', { class: S.libMode === 'installed' ? 'on' : '', onclick: () => { S.libMode = 'installed'; prefs.set('libMode', 'installed'); render(); } }, 'Installed'),
     h('button', { class: S.libMode === 'all' ? 'on' : '', onclick: () => { S.libMode = 'all'; prefs.set('libMode', 'all'); render(); } }, 'All owned')) : null;
   $('#filters').replaceChildren(...[modeSeg].filter(Boolean), ...chips, h('span', { class: 'spacer' }),
-    h('div', { class: 'row', style: { gap: '8px' } }, sortBtn, dirBtn, h('label', { class: 'size-ctl', title: 'Card size' }, icon('image'), range)));
+    h('div', { class: 'row', style: { gap: '8px' } }, layoutSwitch(), sortBtn, dirBtn, h('label', { class: 'size-ctl', title: 'Card size' }, icon('image'), range)));
 }
 
 const headerCache = new Map();
@@ -961,20 +984,28 @@ function openDetails(id) {
     it.installed && !it.manual && it.kind === 'game' ? h('button', { class: 'btn danger', onclick: () => { m.close(); uninstallGame(id); } }, icon('trash'), 'Uninstall') : null);
   const heroBg = h('div', { class: 'det-hero' + (it.coverUrl ? '' : ' plain'), style: it.coverUrl ? { backgroundImage: `url("${it.coverUrl}")` } : { background: `hsl(${hashHue(it.name) % 360} 45% 16%)` } });
   const about = h('div', { class: 'det-about' });
+  let video = null;
   const showInfo = (info) => {
     if (!info) return;
     setHeroBg(heroBg, it, info);
+    // The game's trailer plays quietly behind the top of the page.
+    if (info.movie && prefs.get('trailers', true) && !video && heroBg.isConnected) {
+      video = h('video', { class: 'det-video', src: info.movie, muted: true, autoplay: true, loop: true, playsinline: true, preload: 'auto' });
+      video.muted = true;
+      video.volume = 0.5;
+      video.addEventListener('playing', () => video.classList.add('on'), { once: true });
+      video.addEventListener('error', () => { video.remove(); });
+      const mute = h('button', { class: 'icon-btn det-mute', title: 'Sound' }, h('span', { class: 'det-mute-txt' }, 'Sound off'));
+      mute.addEventListener('click', () => { video.muted = !video.muted; mute.firstChild.textContent = video.muted ? 'Sound off' : 'Sound on'; });
+      heroBg.after(video);
+      body.append(mute);
+    }
     const facts = [info.date ? ['Released', info.date] : null, info.devs && info.devs.length ? ['Developer', info.devs.join(', ')] : null, info.genres && info.genres.length ? ['Genre', info.genres.join(', ')] : null, info.metacritic ? ['Metacritic', String(info.metacritic)] : null].filter(Boolean);
     about.replaceChildren(
       info.desc ? h('p', { class: 'det-desc' }, info.desc) : null,
       facts.length ? h('div', { class: 'det-facts' }, facts.map(([k, v]) => h('div', {}, h('span', {}, k), v))) : null,
       info.shots && info.shots.length ? h('div', { class: 'det-shots' }, info.shots.map((sh, i) => h('button', { class: 'shot', onclick: () => openShots(info.shots, i) }, h('img', { src: sh.thumb, alt: '', loading: 'lazy' })))) : null);
   };
-  if (it.kind === 'game') {
-    const cached = S.storeInfo.get(it.id);
-    if (cached) showInfo(cached);
-    else api.storeInfo(id).then((info) => { S.storeInfo.set(it.id, info || null); showInfo(info); }).catch(() => {});
-  }
   const body = h('div', { class: 'det' },
     heroBg,
     h('div', { class: 'det-hero-shade' }),
@@ -992,8 +1023,13 @@ function openDetails(id) {
     about,
     h('h3', { class: 'section-title', style: { marginTop: '24px' } }, 'Achievements'),
     achBox);
-  m = openModal({ title: null, body, cls: 'wide details-modal' });
+  m = openModal({ title: null, body, cls: 'wide details-modal', onClose: () => { if (video) { video.pause(); video.removeAttribute('src'); video.load(); video.remove(); video = null; } } });
   m.panel.querySelector('.modal-body').style.padding = '0';
+  if (it.kind === 'game') {
+    const cached = S.storeInfo.get(it.id);
+    if (cached) showInfo(cached);
+    else api.storeInfo(id).then((info) => { S.storeInfo.set(it.id, info || null); showInfo(info); }).catch(() => {});
+  }
   if (it.kind !== 'game') { achStat.textContent = 'None'; achBox.replaceChildren(h('div', { class: 'loading' }, 'Apps do not have achievements.')); return; }
   api.achievements(id).then((r) => {
     if (r.list) {
@@ -1515,6 +1551,10 @@ function openSettings() {
       h('div', { class: 'section-label' }, 'Look'),
       h('div', { class: 'field' }, h('label', {}, 'Accent color'), accentRow),
       h('div', { class: 'field' }, h('label', {}, 'Card size'), h('label', { class: 'size-ctl wide' }, icon('image'), sizeRange)),
+      h('div', { class: 'field' }, toggleRow('Play trailers on game pages', 'A muted trailer plays behind the top of a game\'s details', prefs.get('trailers', true), (v) => prefs.set('trailers', v))),
+      h('div', { class: 'field' }, toggleRow('Startup animation', 'The crimson gem intro when Crimson Vault opens', prefs.get('intro', true), (v) => prefs.set('intro', v))),
+      h('div', { class: 'field' }, toggleRow('Back to game bar', 'A small bar at the bottom while a game is running', prefs.get('resumeBar', true), (v) => { prefs.set('resumeBar', v); renderResume(); })),
+      h('div', { class: 'field' }, toggleRow('Collections on Home', 'Big tiles for each genre folder', prefs.get('showCollections', true), (v) => { prefs.set('showCollections', v); renderCollections(); })),
       h('div', { class: 'field' }, toggleRow('Start in controller mode', 'Opens the full screen controller layout when Crimson Vault starts', tvOnStart, (v) => { tvOnStart = v; })),
       h('div', { class: 'section-label' }, 'Music'),
       h('div', { class: 'field' }, toggleRow('Apple Music player', 'Shows what is playing in the sidebar with play, pause and skip', musicEnabled, (v) => { musicEnabled = v; })),

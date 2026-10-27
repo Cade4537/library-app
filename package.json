@@ -1,7 +1,7 @@
 {
   "name": "library-app",
   "productName": "Crimson Vault",
-  "version": "0.9.6",
+  "version": "0.9.7",
   "description": "One library for all your games and apps",
   "author": "Caden",
   "main": "main.js",

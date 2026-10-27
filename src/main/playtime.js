@@ -56,6 +56,17 @@ class PlaytimeTracker {
     });
   }
 
+  // Saves sessions for games still running when Crimson Vault closes.
+  flushSessions() {
+    const t = Date.now();
+    for (const [id, s] of this.started || []) {
+      if (t - s < 60 * 1000) continue;
+      const list = this.store.data.sessions || (this.store.data.sessions = []);
+      list.push({ id, s, e: t });
+    }
+    if (this.started) this.started.clear();
+  }
+
   stop() {
     this.stopped = true;
     clearTimeout(this.recycle);
@@ -89,6 +100,17 @@ class PlaytimeTracker {
       // Only count time after the first sighting, so a single check does not add 30 seconds by itself.
       if (this.running.has(id)) it.meta.trackedMinutes = (it.meta.trackedMinutes || 0) + INTERVAL / 60;
       it.lastPlayed = t;
+    }
+    // Play sessions (start and end of each time a game ran) for the Stats page.
+    if (!this.started) this.started = new Map();
+    for (const id of now) if (!this.started.has(id)) this.started.set(id, t);
+    for (const [id, s] of [...this.started]) {
+      if (now.has(id)) continue;
+      this.started.delete(id);
+      if (t - s < 60 * 1000) continue;
+      const list = this.store.data.sessions || (this.store.data.sessions = []);
+      list.push({ id, s, e: t });
+      if (list.length > 1500) list.splice(0, list.length - 1500);
     }
     const changed = now.size !== this.running.size || [...now].some((id) => !this.running.has(id));
     this.running = now;

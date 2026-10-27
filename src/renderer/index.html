@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' file: data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' file: data: https:; media-src https:; style-src 'self' 'unsafe-inline'; script-src 'self'" />
   <title>Crimson Vault</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -45,16 +45,20 @@
     <main id="content">
       <section id="viewHeader"></section>
       <section id="jump" hidden></section>
+      <section id="collections" hidden></section>
       <section id="filters"></section>
       <section id="grid"></section>
       <section id="friendsView" hidden></section>
       <section id="launchersView" hidden></section>
       <section id="storageView" hidden></section>
+      <section id="statsView" hidden></section>
       <section id="streamView" hidden><div id="streamHost"><div id="streamIdle" class="stream-idle"><div class="stream-idle-ic"><span data-icon="gamepad"></span></div><h3>Your Xbox, on this PC</h3><p>Streams from your console with the sidebar right here. Your console turns on and connects by itself.</p><button id="streamStartBtn" class="btn primary big"><span data-icon="play"></span><span>Start Remote Play</span></button></div><div class="stream-loading"><span class="spinner"></span>Connecting to your Xbox</div></div></section>
       <section id="discordView" hidden><div id="discordHost"><div class="discord-loading"><span class="spinner"></span>Loading Discord</div></div></section>
       <div id="empty" hidden></div>
     </main>
   </div>
+
+  <div id="resumeBar" hidden></div>
 
   <div id="padHints" hidden>
     <span><b class="pb a">A</b>Open</span>
@@ -94,6 +98,7 @@
   <script src="features.js"></script>
   <script src="spin.js"></script>
   <script src="fx.js"></script>
+  <script src="extras.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
