@@ -71,6 +71,7 @@ const S = {
   surprisePool: prefs.get('surprisePool', 'installed'),
   libMode: prefs.get('libMode', 'installed'),
   modals: [],
+  friends: { people: [], errors: [], configured: false },
   menuReturn: null,
   keyErrorShown: false,
   update: { status: 'dev' },
@@ -123,6 +124,25 @@ const shown = (it) => !it.hidden && (it.installed || it.manual || (S.libMode ===
 const visible = (it) => shown(it) && !isGrouped(it);
 const relatedOf = (id) => (S.related && S.related.get(id)) || [];
 
+function fmtHours(min) {
+  if (!min) return '';
+  if (min < 60) return `${Math.round(min)} min`;
+  const h = min / 60;
+  return `${h < 10 ? h.toFixed(1) : Math.round(h)} hrs`;
+}
+
+const showRemotePlay = () => !!(S.lib.settings.openXblKey || S.lib.items.some((i) => i.source === 'xbox' || (i.launch && /Microsoft\.GamingApp/i.test(i.launch.target || ''))));
+
+function remotePlayButton() {
+  const b = h('button', { class: 'nav-btn', title: 'Play games from your Xbox console on this PC' }, icon('gamepad'), h('span', { class: 'label' }, 'Xbox Remote Play'));
+  b.addEventListener('click', () => { showToast('Opening the Xbox app. Pick your console to start streaming.'); api.remotePlay('app'); });
+  b.addEventListener('contextmenu', (e) => { e.preventDefault(); openMenu([
+    { label: 'Open in Xbox app', run: () => api.remotePlay('app') },
+    { label: 'Open in browser', run: () => api.remotePlay('web') },
+  ], { x: e.clientX, y: e.clientY }); });
+  return b;
+}
+
 // ---------- filtering ----------
 function baseItems(view = S.view) {
   // While searching, helper apps are included so they can still be found by name.
@@ -151,7 +171,7 @@ function viewItems() {
   const sort = S.view.type === 'recent' ? 'played' : S.sort;
   if (sort === 'played') list.sort((a, b) => (b.lastPlayed || 0) - (a.lastPlayed || 0) || byName(a, b));
   else if (sort === 'added') list.sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0) || byName(a, b));
-  else if (sort === 'most') list.sort((a, b) => (b.playCount || 0) - (a.playCount || 0) || byName(a, b));
+  else if (sort === 'most') list.sort((a, b) => (b.minutes || 0) - (a.minutes || 0) || (b.playCount || 0) - (a.playCount || 0) || byName(a, b));
   else list.sort(byName);
   return list;
 }
@@ -163,6 +183,7 @@ function viewTitle(view = S.view) {
     case 'recent': return 'Recently played';
     case 'uncategorized': return 'Uncategorized';
     case 'hidden': return 'Hidden';
+    case 'friends': return 'Friends';
     case 'category': return (S.cats.get(view.id) || {}).name || 'Category';
     default: return 'Library';
   }
@@ -198,7 +219,7 @@ function artFor(it) {
 const cardCache = new Map();
 
 function cardSig(it) {
-  return [displayName(it), it.coverUrl, it.iconUrl, it.coverFit, it.favorite, it.source, it.missing, it.hidden, relatedOf(it.id).length, isGrouped(it), notInstalled(it)].join('|');
+  return [displayName(it), it.coverUrl, it.iconUrl, it.coverFit, it.favorite, it.source, it.missing, it.hidden, relatedOf(it.id).length, isGrouped(it), notInstalled(it), Math.round((it.minutes || 0) / 6), it.running].join('|');
 }
 
 function buildCard(id) {
@@ -227,11 +248,15 @@ function fillCard(card, it) {
   more.addEventListener('click', (e) => { e.stopPropagation(); itemMenu(it.id, { el: card }); });
   art.append(more);
   if (notInstalled(it)) art.append(h('span', { class: 'ni-badge' }, icon('download'), 'Not installed'));
+  if (it.running) art.append(h('span', { class: 'run-badge' }, h('span', { class: 'dot' }), 'Playing now'));
   art.append(h('div', { class: 'play-pill' }, h('span', {}, icon(notInstalled(it) ? 'download' : 'play'), notInstalled(it) ? 'Install' : it.kind === 'game' ? 'Play' : 'Open')));
   const rel = relatedOf(it.id).length;
   const sub = rel ? h('span', { class: 'sub related-link', role: 'button', onclick: (e) => { e.stopPropagation(); relatedModal(it.id); } }, `+${rel} related ${rel === 1 ? 'app' : 'apps'}`)
-    : isGrouped(it) ? h('div', { class: 'sub' }, `Part of ${(S.byId.get(it.parentId) || {}).name || 'a suite'}`) : null;
-  card.replaceChildren(...[art, h('div', { class: 'title' }, displayName(it)), sub].filter(Boolean));
+    : isGrouped(it) ? h('div', { class: 'sub' }, `Part of ${(S.byId.get(it.parentId) || {}).name || 'a suite'}`)
+    : it.minutes ? h('div', { class: 'sub' }, fmtHours(it.minutes)) : null;
+  const titleEl = h('div', { class: 'title' }, displayName(it));
+  titleEl.addEventListener('click', (e) => { e.stopPropagation(); openDetails(it.id); });
+  card.replaceChildren(...[art, titleEl, sub].filter(Boolean));
   card.title = displayName(it);
 }
 
@@ -245,6 +270,19 @@ function cardFor(it) {
 // ---------- rendering ----------
 function render() {
   renderNowPlaying();
+  const fv = S.view.type === 'friends';
+  $('#friendsView').hidden = !fv;
+  $('#grid').hidden = fv;
+  $('#filters').hidden = fv;
+  if (fv) {
+    $('#jump').hidden = true;
+    $('#empty').hidden = true;
+    renderSidebar();
+    renderHeader();
+    renderFriends();
+    $('#scanStatus').hidden = !S.lib.scanning;
+    return;
+  }
   document.documentElement.style.setProperty('--card-w', `${S.size}px`);
   renderSidebar();
   renderHeader();
@@ -279,7 +317,9 @@ function renderSidebar() {
     navButton('favorites', 'Favorites', 'star', vis.filter((i) => i.favorite).length),
     navButton('recent', 'Recently played', 'clock', null),
     navButton('uncategorized', 'Uncategorized', 'inbox', vis.filter((i) => !i.categoryId || !S.cats.has(i.categoryId)).length || null),
-    navButton('hidden', 'Hidden', 'eyeOff', S.lib.items.filter((i) => i.hidden).length || null)
+    navButton('hidden', 'Hidden', 'eyeOff', S.lib.items.filter((i) => i.hidden).length || null),
+    navButton('friends', 'Friends', 'users', (S.friends.people || []).filter((p) => p.status !== 'offline').length || null),
+    showRemotePlay() ? remotePlayButton() : null
   );
 
   const counts = new Map();
@@ -357,8 +397,8 @@ function renderHeader() {
       ])));
     }
   }
-  const total = viewItems().length;
-  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, `${total} ${total === 1 ? 'item' : 'items'}`)));
+  const total = S.view.type === 'friends' ? (S.friends.people || []).length : viewItems().length;
+  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : `${total} ${total === 1 ? 'item' : 'items'}`)));
   if (S.view.type === 'category' && !S.search) {
     const subs = childrenOf(S.view.id);
     const chips = subs.map((c) => {
@@ -388,7 +428,7 @@ function renderJump() {
       h('div', { class: 'tile-art' }, artFor(it)),
       h('div', { class: 'tile-info' },
         h('div', { class: 'tile-name' }, displayName(it)),
-        h('div', { class: 'tile-sub' }, `${SOURCES[it.source] || ''} · ${timeAgo(it.lastPlayed)}`),
+        h('div', { class: 'tile-sub' }, [SOURCES[it.source], it.running ? 'Playing now' : timeAgo(it.lastPlayed), fmtHours(it.minutes)].filter(Boolean).join(' · ')),
         h('span', { class: 'tile-play' }, icon('play'), it.kind === 'game' ? 'Play' : 'Open'))
     );
     t.addEventListener('click', () => launch(it.id));
@@ -462,6 +502,7 @@ function itemMenu(id, pos) {
   if (!it) return;
   openMenu([
     { label: notInstalled(it) ? 'Install' : it.kind === 'game' ? 'Play' : 'Open', run: () => launch(id) },
+    { label: 'Details', run: () => openDetails(id) },
     { label: it.favorite ? 'Remove from favorites' : 'Add to favorites', run: () => api.updateItem(id, { favorite: !it.favorite }) },
     '-',
     { label: 'Change cover', run: () => coverPicker(id) },
@@ -648,6 +689,136 @@ function pickCategory(current) {
   });
 }
 
+// ---------- game details ----------
+function openDetails(id) {
+  const it = S.byId.get(id);
+  if (!it) return;
+  const ni = notInstalled(it);
+  const stat = (label, value) => h('div', { class: 'stat' }, h('div', { class: 'stat-v' }, value), h('div', { class: 'stat-l' }, label));
+  const achBox = h('div', { class: 'ach' }, h('div', { class: 'loading' }, h('span', { class: 'spinner' }), 'Loading achievements'));
+  const achStat = h('div', { class: 'stat-v' }, '…');
+  const cat = it.categoryId ? catPath(it.categoryId).map((c) => c.name).join(' › ') : 'No category';
+  let m;
+  const actions = h('div', { class: 'det-actions' },
+    h('button', { class: 'btn primary', onclick: () => { m.close(); launch(id); } }, icon(ni ? 'download' : 'play'), ni ? 'Install' : it.kind === 'game' ? 'Play' : 'Open'),
+    it.source === 'xbox' ? h('button', { class: 'btn', onclick: () => api.remotePlay('app') }, icon('gamepad'), 'Stream from console') : null,
+    h('button', { class: 'btn', onclick: () => { m.close(); coverPicker(id); } }, icon('image'), 'Change cover'),
+    it.installDir ? h('button', { class: 'btn', onclick: () => api.openFolder(id) }, icon('folder'), 'Open folder') : null);
+  const body = h('div', { class: 'det' },
+    it.coverUrl ? h('div', { class: 'det-bg', style: { backgroundImage: `url("${it.coverUrl}")` } }) : null,
+    h('div', { class: 'det-top' },
+      h('div', { class: 'det-art' }, artFor(it)),
+      h('div', { class: 'det-info' },
+        h('div', { class: 'det-kicker' }, [SOURCES[it.source], cat, it.meta && it.meta.family ? 'Steam Family' : null, ni ? 'Not installed' : null].filter(Boolean).join(' · ')),
+        h('h2', { class: 'det-name' }, displayName(it)),
+        h('div', { class: 'det-stats' },
+          stat('Played', it.minutes ? fmtHours(it.minutes) : 'Not yet'),
+          stat('Last played', it.running ? 'Playing now' : timeAgo(it.lastPlayed)),
+          h('div', { class: 'stat' }, achStat, h('div', { class: 'stat-l' }, 'Achievements'))),
+        actions)),
+    h('h3', { class: 'section-title', style: { marginTop: '24px' } }, 'Achievements'),
+    achBox);
+  m = openModal({ title: null, body, cls: 'wide details-modal' });
+  m.panel.querySelector('.modal-body').style.padding = '0';
+  if (it.kind !== 'game') { achStat.textContent = 'None'; achBox.replaceChildren(h('div', { class: 'loading' }, 'Apps do not have achievements.')); return; }
+  api.achievements(id).then((r) => {
+    if (r.list) {
+      const pct = r.total ? Math.round((r.have / r.total) * 100) : 0;
+      achStat.textContent = `${r.have} / ${r.total}`;
+      achBox.replaceChildren(
+        h('div', { class: 'ach-bar' }, h('span', { style: { width: `${pct}%` } })),
+        h('div', { class: 'ach-sum' }, `${pct}% complete`),
+        h('div', { class: 'ach-list' }, r.list.map((a) => h('div', { class: 'ach-row' + (a.unlocked ? ' got' : '') },
+          a.icon ? h('img', { src: a.icon, alt: '', loading: 'lazy' }) : h('span', { class: 'ach-ic' }, icon('trophy')),
+          h('div', { class: 'ach-text' }, h('div', { class: 'ach-name' }, a.name), h('div', { class: 'ach-desc' }, a.description || '')),
+          h('div', { class: 'ach-when' }, a.unlocked ? (a.unlockTime ? new Date(a.unlockTime).toLocaleDateString() : 'Unlocked') : a.gamerscore ? `${a.gamerscore} G` : 'Locked')))));
+    } else {
+      achStat.textContent = r.none || r.unsupported ? 'None' : '?';
+      const msg = r.error || (r.none ? 'This game has no achievements.' : 'Achievements are available for Steam and Xbox games.');
+      achBox.replaceChildren(h('div', { class: r.error ? 'note err' : 'loading' }, msg));
+    }
+  });
+}
+
+// ---------- friends ----------
+const STATUS_LABEL = { ingame: 'In game', online: 'Online', busy: 'Busy', away: 'Away', offline: 'Offline' };
+
+function renderFriends() {
+  const box = $('#friendsView');
+  const f = S.friends;
+  const kids = [];
+  const refresh = h('button', { class: 'chip', onclick: async () => { refresh.disabled = true; setFriends(await api.refreshFriends()); } }, icon('refresh'), 'Refresh');
+  kids.push(h('div', { class: 'friends-bar' }, refresh, f.updated ? h('span', { class: 'count' }, `Updated ${timeAgo(f.updated).toLowerCase()}`) : null));
+  if (f.errors && f.errors.length) kids.push(h('div', { class: 'note err' }, f.errors.join(' ')));
+  if (!f.configured) {
+    kids.push(h('div', { class: 'friends-empty' },
+      h('h3', {}, 'Connect Steam or Xbox to see friends'),
+      h('p', {}, 'Add a Steam Web API key or an OpenXBL key in Settings. Friends with the same name on both are matched automatically.'),
+      h('div', { class: 'row', style: { justifyContent: 'center' } },
+        h('button', { class: 'btn primary', onclick: openSettings }, 'Open Settings'),
+        h('button', { class: 'btn', onclick: () => openConnectionsHelp('xbox') }, 'How to connect'))));
+    box.replaceChildren(...kids);
+    return;
+  }
+  const q = norm(S.search);
+  const people = (f.people || []).filter((p) => !q || p.accounts.some((a) => norm(a.name).includes(q)));
+  const groups = [['ingame', 'Playing'], ['online', 'Online'], ['away', 'Away'], ['offline', 'Offline']];
+  for (const [st, label] of groups) {
+    const list = people.filter((p) => (st === 'online' ? p.status === 'online' || p.status === 'busy' : p.status === st));
+    if (!list.length) continue;
+    kids.push(h('h3', { class: 'section-title' }, `${label} (${list.length})`), h('div', { class: 'friends-grid' }, list.map(friendCard)));
+  }
+  if (!people.length) kids.push(h('div', { class: 'friends-empty' }, h('h3', {}, S.search ? 'No friends match that search' : 'No friends found')));
+  box.replaceChildren(...kids);
+}
+
+function friendCard(p) {
+  const av = p.avatar ? h('img', { class: 'f-av', src: p.avatar, alt: '' }) : h('div', { class: 'f-av f-init' }, (p.name[0] || '?').toUpperCase());
+  const acc = p.accounts.map((a) => h('div', { class: 'f-acc' },
+    h('span', { class: `f-dot st-${a.status}` }),
+    h('span', { class: `f-plat src-${a.platform}` }, a.platform === 'steam' ? 'Steam' : 'Xbox'),
+    h('span', { class: 'f-name' }, a.name),
+    h('span', { class: 'f-act' }, a.activity || STATUS_LABEL[a.status])));
+  const card = h('button', { class: `friend st-${p.status}` },
+    h('div', { class: 'f-avwrap' }, av, h('span', { class: `f-badge st-${p.status}` })),
+    h('div', { class: 'f-body' },
+      h('div', { class: 'f-title' }, p.name, p.accounts.length > 1 ? h('span', { class: 'f-linked', title: p.manual ? 'Linked by you' : 'Matched by name' }, icon('link')) : null),
+      acc));
+  const menu = (pos) => openMenu([
+    ...p.accounts.map((a) => ({ label: `Open ${a.platform === 'steam' ? 'Steam' : 'Xbox'} profile`, run: () => api.openExternal(a.profile) })),
+    '-',
+    { label: 'Link with another friend', run: () => pickFriendToLink(p) },
+    p.accounts.length > 1 ? { label: 'Unlink accounts', run: async () => { await api.unlinkFriends(p.accounts.map((a) => a.key)); showToast('Accounts unlinked'); } } : null,
+  ].filter(Boolean), pos);
+  card.addEventListener('click', () => menu({ el: card }));
+  card.addEventListener('contextmenu', (e) => { e.preventDefault(); menu({ x: e.clientX, y: e.clientY }); });
+  return card;
+}
+
+function pickFriendToLink(p) {
+  const myPlats = new Set(p.accounts.map((a) => a.platform));
+  const others = (S.friends.people || []).filter((o) => o.id !== p.id && !o.accounts.some((a) => myPlats.has(a.platform)));
+  const input = h('input', { class: 'text-input', placeholder: 'Search by name', spellcheck: 'false', autofocus: true });
+  const list = h('div', { class: 'picker' });
+  let m;
+  const fill = () => {
+    const q = norm(input.value);
+    const rows = others.filter((o) => !q || o.accounts.some((a) => norm(a.name).includes(q))).slice(0, 60).map((o) =>
+      h('button', { onclick: async () => { m.close(); await api.linkFriends(p.accounts.map((a) => a.key), o.accounts.map((a) => a.key)); showToast(`Linked ${p.name} and ${o.name}`); } },
+        h('span', { class: `f-dot st-${o.status}` }), `${o.name}`, h('span', { class: 'count', style: { marginLeft: 'auto' } }, o.accounts.map((a) => (a.platform === 'steam' ? 'Steam' : 'Xbox')).join(', '))));
+    list.replaceChildren(...(rows.length ? rows : [h('div', { class: 'loading' }, 'No one else to link with')]));
+  };
+  input.addEventListener('input', fill);
+  fill();
+  m = openModal({ title: `Link ${p.name} with`, body: h('div', {}, h('p', { class: 'help', style: { marginTop: 0, color: 'var(--faint)', fontSize: '12px' } }, 'Pick the same person on the other platform. They will show as one friend.'), input, h('div', { style: { height: '10px' } }), list), actions: [{ label: 'Cancel' }] });
+}
+
+function setFriends(st) {
+  S.friends = st || S.friends;
+  if (S.view.type === 'friends') { renderHeader(); renderFriends(); }
+  renderSidebar();
+}
+
 // ---------- related apps ----------
 function relatedModal(id) {
   const main = S.byId.get(id);
@@ -769,23 +940,82 @@ function toggleRow(label, sub, on, onChange) {
   return b;
 }
 
+function secretInput(value, placeholder) {
+  const input = h('input', { class: 'text-input', type: 'password', value: value || '', placeholder, spellcheck: 'false' });
+  const show = h('button', { class: 'btn', onclick: () => { input.type = input.type === 'password' ? 'text' : 'password'; show.textContent = input.type === 'password' ? 'Show' : 'Hide'; } }, 'Show');
+  return { input, row: h('div', { class: 'row' }, input, show) };
+}
+
+function connBlock(title, connected, statusText, helpId, ...kids) {
+  return h('div', { class: 'conn' },
+    h('div', { class: 'conn-head' },
+      h('span', { class: 'conn-title' }, title),
+      h('span', { class: 'pill' + (connected ? ' on' : '') }, statusText || (connected ? 'Connected' : 'Not connected')),
+      helpId ? h('button', { class: 'link-btn conn-help', onclick: () => openConnectionsHelp(helpId) }, 'How to connect') : null),
+    kids);
+}
+
 function openSettings() {
   const s = { ...S.lib.settings };
-  const key = h('input', { class: 'text-input', type: 'password', value: s.steamGridDbKey || '', placeholder: 'Paste your API key', spellcheck: 'false' });
-  const show = h('button', { class: 'btn', onclick: () => { key.type = key.type === 'password' ? 'text' : 'password'; } }, 'Show');
-  const cf = h('input', { class: 'text-input', value: s.curseforgeInstancesPath || '', placeholder: 'Default: %USERPROFILE%\\curseforge\\minecraft\\Instances', spellcheck: 'false' });
-  const cfBrowse = h('button', { class: 'btn', onclick: async () => { const f = await api.pickFolder(); if (f) cf.value = f; } }, 'Browse');
+  const os = S.lib.ownedStatus || {};
+  const counts = os.counts || {};
   let includeApps = s.includeApps !== false;
   let musicEnabled = s.musicEnabled !== false;
-  let gogOwned = s.gogOwned !== false;
-  const os = S.lib.ownedStatus || {};
-  const steamKey = h('input', { class: 'text-input', type: 'password', value: s.steamApiKey || '', placeholder: 'Paste your Steam Web API key', spellcheck: 'false' });
-  const steamShow = h('button', { class: 'btn', onclick: () => { steamKey.type = steamKey.type === 'password' ? 'text' : 'password'; } }, 'Show');
-  const steamId = h('input', { class: 'text-input', value: s.steamId || '', placeholder: os.steamId ? `Found automatically: ${os.steamId}` : 'Leave empty to detect from Steam', spellcheck: 'false' });
-  const ownedLine = [];
-  if (os.counts && Object.keys(os.counts).length) ownedLine.push(Object.entries(os.counts).map(([k, n]) => `${n} games on ${SOURCES[k] || k}`).join(', '));
-  if (os.errors && os.errors.length) ownedLine.push(os.errors.join(' '));
   let musicAnyApp = !!s.musicAnyApp;
+  let gogOwned = s.gogOwned !== false;
+  let genreSort = s.genreSort !== false;
+  let steamCollections = s.steamCollections !== false;
+
+  const sgdb = secretInput(s.steamGridDbKey, 'Paste your SteamGridDB API key');
+  const steamKey = secretInput(s.steamApiKey, 'Paste your Steam Web API key');
+  const xblKey = secretInput(s.openXblKey, 'Paste your OpenXBL API key');
+  const steamId = h('input', { class: 'text-input', value: s.steamId || '', placeholder: os.steamId ? `Found automatically: ${os.steamId}` : 'Leave empty to detect from Steam', spellcheck: 'false' });
+  const cf = h('input', { class: 'text-input', value: s.curseforgeInstancesPath || '', placeholder: 'Default: %USERPROFILE%\\curseforge\\minecraft\\Instances', spellcheck: 'false' });
+  const cfBrowse = h('button', { class: 'btn', onclick: async () => { const f = await api.pickFolder(); if (f) cf.value = f; } }, 'Browse');
+
+  const xblStatus = h('div', { class: 'help' });
+  const xblTest = h('button', { class: 'btn', onclick: async () => {
+    xblTest.disabled = true;
+    xblStatus.textContent = 'Checking key';
+    const r = await api.testXbox(xblKey.input.value);
+    xblTest.disabled = false;
+    xblStatus.textContent = r.ok ? `Works. Signed in as ${r.gamertag}.` : r.error || 'That key did not work.';
+    xblStatus.className = 'help ' + (r.ok ? 'ok-text' : 'err-text');
+  } }, 'Test key');
+
+  const epicBtn = h('button', { class: 'btn' + (s.epicConnected ? '' : ' primary') });
+  const fillEpic = (connected, name) => {
+    epicBtn.textContent = connected ? 'Sign out' : 'Sign in to Epic';
+    epicBtn.className = 'btn' + (connected ? '' : ' primary');
+    epicBtn.onclick = async () => {
+      if (connected) { await api.epicSignOut(); showToast('Signed out of Epic'); fillEpic(false); return; }
+      epicBtn.disabled = true;
+      const r = await api.epicSignIn();
+      epicBtn.disabled = false;
+      if (r.ok) { showToast(`Connected to Epic${r.name ? ` as ${r.name}` : ''}. Reading your library.`); fillEpic(true, r.name); }
+      else if (r.error) showToast(r.error, 'error');
+    };
+  };
+  fillEpic(!!s.epicConnected, s.epicName);
+
+  const famBtn = h('button', { class: 'btn' });
+  const fillFam = (on) => {
+    famBtn.textContent = on ? 'Turn off Steam Family' : 'Sign in for Steam Family';
+    famBtn.className = 'btn' + (on ? '' : ' primary');
+    famBtn.onclick = async () => {
+      if (on) { await api.steamSignOut(); showToast('Steam Family turned off'); fillFam(false); return; }
+      famBtn.disabled = true;
+      const r = await api.steamSignIn();
+      famBtn.disabled = false;
+      if (r.ok) { showToast('Steam Family connected. Reading shared games.'); fillFam(true); }
+      else if (r.error) showToast(r.error, 'error');
+    };
+  };
+  fillFam(!!s.steamFamily);
+
+  const errFor = (label) => (os.errors || []).filter((e) => e.startsWith(label)).join(' ');
+  const errNote = (label) => { const e = errFor(label); return e ? h('div', { class: 'note err' }, e) : null; };
+
   const about = h('div', { class: 'about' });
   const fillAbout = () => {
     const u = S.update;
@@ -805,33 +1035,45 @@ function openSettings() {
   };
   fillAbout();
   S.refreshAbout = () => { if (document.contains(about)) fillAbout(); };
+
   openModal({
     title: 'Settings',
+    cls: 'settings-modal',
     body: h('div', {},
       about,
-      h('div', { class: 'field' },
-        h('label', {}, 'SteamGridDB API key'),
-        h('div', { class: 'row' }, key, show),
-        h('div', { class: 'help' }, 'Free. Gives cover art for non Steam games and apps. ',
-          h('button', { class: 'link-btn', onclick: () => openConnectionsHelp('sgdb') }, 'How to get a key'))),
+      h('div', { class: 'section-label' }, 'Connections'),
+      connBlock('Steam', !!s.steamApiKey, s.steamApiKey && counts.steam != null ? `${counts.steam} games` : null, 'steam',
+        errNote('Steam:'),
+        h('div', { class: 'field' }, h('label', {}, 'Steam Web API key'), steamKey.row,
+          h('div', { class: 'help' }, 'Owned games, hours played, achievements and Steam friends.')),
+        h('div', { class: 'field' }, h('label', {}, 'SteamID or profile link'), steamId,
+          h('div', { class: 'help' }, 'Optional. Only needed if the wrong Steam account is picked up.')),
+        h('div', { class: 'field' }, h('label', {}, 'Steam Family'),
+          h('div', { class: 'row' }, h('div', { class: 'help', style: { flex: 1 } }, s.steamFamily ? `Connected${counts.family != null ? `. ${counts.family} shared games.` : '.'}` : 'Shows games your family shares with you. Sign in to the Steam store once.'), famBtn),
+          errNote('Steam Family:'))),
+      connBlock('Xbox', !!s.openXblKey, null, 'xbox',
+        errNote('Xbox:'),
+        h('div', { class: 'field' }, h('label', {}, 'OpenXBL API key'),
+          h('div', { class: 'row' }, xblKey.row, xblTest),
+          xblStatus,
+          h('div', { class: 'help' }, 'Xbox PC games you own, achievements and Xbox friends. Only games that run on PC are added.'))),
+      connBlock('Epic Games', !!s.epicConnected, s.epicConnected ? `Connected${s.epicName ? ` as ${s.epicName}` : ''}` : null, 'epic',
+        errNote('Epic:'),
+        h('div', { class: 'row' }, h('div', { class: 'help', style: { flex: 1 } }, 'Every game on your Epic account, installed or not. You sign in on Epic\'s own page.'), epicBtn)),
+      connBlock('GOG', gogOwned, gogOwned ? (counts.gog != null ? `${counts.gog} games` : 'On') : 'Off', 'gog',
+        toggleRow('Read GOG library', 'From GOG Galaxy on this PC, no sign in needed', gogOwned, (v) => { gogOwned = v; })),
+      connBlock('SteamGridDB', !!s.steamGridDbKey, null, 'sgdb',
+        h('div', { class: 'field' }, h('label', {}, 'SteamGridDB API key'), sgdb.row,
+          h('div', { class: 'help' }, 'Cover art for games from other launchers and for apps.'))),
+      h('div', { class: 'section-label' }, 'Library'),
+      h('div', { class: 'field' }, toggleRow('Sort games by genre', 'Uses Steam store info, like Action, RPG or Racing. Demos and playtests always go to Demos.', genreSort, (v) => { genreSort = v; })),
+      h('div', { class: 'field' }, toggleRow('Import my Steam collections', 'Collections you made in Steam become categories. Dynamic collections stay in Steam.', steamCollections, (v) => { steamCollections = v; })),
+      h('div', { class: 'field' }, toggleRow('Include Windows apps', 'Start Menu, Desktop and Microsoft Store apps', includeApps, (v) => { includeApps = v; })),
       h('div', { class: 'field' },
         h('label', {}, 'CurseForge instances folder'),
         h('div', { class: 'row' }, cf, cfBrowse),
         h('div', { class: 'help' }, 'Only needed if you moved CurseForge\'s Minecraft folder.')),
-      h('div', { class: 'section-label' }, 'Owned games'),
-      ownedLine.length ? h('div', { class: os.errors && os.errors.length ? 'note err' : 'note' }, ownedLine.join(' ')) : null,
-      h('div', { class: 'field' },
-        h('label', {}, 'Steam Web API key'),
-        h('div', { class: 'row' }, steamKey, steamShow),
-        h('div', { class: 'help' }, 'Free. Lists every game on your Steam account, installed or not. Your Steam profile\'s Game details must be set to Public. ',
-          h('button', { class: 'link-btn', onclick: () => openConnectionsHelp('steam') }, 'How to get a key'))),
-      h('div', { class: 'field' },
-        h('label', {}, 'SteamID or profile link'),
-        steamId,
-        h('div', { class: 'help' }, 'Optional. Only needed if the wrong Steam account is picked up.')),
-      h('div', { class: 'field' }, toggleRow('GOG library', 'Reads owned GOG games from GOG Galaxy on this PC', gogOwned, (v) => { gogOwned = v; })),
-      h('div', { class: 'section-label' }, 'Apps and music'),
-      h('div', { class: 'field' }, toggleRow('Include Windows apps', 'Start Menu, Desktop and Microsoft Store apps', includeApps, (v) => { includeApps = v; })),
+      h('div', { class: 'section-label' }, 'Music'),
       h('div', { class: 'field' }, toggleRow('Apple Music player', 'Shows what is playing in the sidebar with play, pause and skip', musicEnabled, (v) => { musicEnabled = v; })),
       h('div', { class: 'field' }, toggleRow('Other music apps too', 'Falls back to Spotify, a browser, or whatever is playing when Apple Music is closed', musicAnyApp, (v) => { musicAnyApp = v; }))),
     actions: [
@@ -840,7 +1082,10 @@ function openSettings() {
       { label: 'Open data folder', left: true, run: () => { api.openDataFolder(); return false; } },
       { label: 'Cancel' },
       { label: 'Save', primary: true, run: async () => {
-        await api.updateSettings({ steamGridDbKey: key.value.trim(), curseforgeInstancesPath: cf.value.trim(), includeApps, musicEnabled, musicAnyApp, steamApiKey: steamKey.value.trim(), steamId: steamId.value.trim(), gogOwned });
+        await api.updateSettings({
+          steamGridDbKey: sgdb.input.value.trim(), curseforgeInstancesPath: cf.value.trim(), includeApps, musicEnabled, musicAnyApp,
+          steamApiKey: steamKey.input.value.trim(), steamId: steamId.value.trim(), gogOwned, openXblKey: xblKey.input.value.trim(), genreSort, steamCollections,
+        });
         S.keyErrorShown = false;
         showToast('Settings saved');
       } },
@@ -877,7 +1122,24 @@ function openConnectionsHelp(focus) {
       'In this app, open Settings, paste it into Steam Web API key, and click Save.',
       ['Make your game list visible: on your Steam privacy page, set Game details to Public. ', linkBtn('Open Steam privacy settings', 'https://steamcommunity.com/my/edit/settings')],
     ]),
-    h('p', { class: 'help-note' }, 'If Steam says your account is limited, it needs at least $5 spent on Steam before it can make keys.'),
+    h('p', { class: 'help-note' }, 'If Steam says your account is limited, it needs at least $5 spent on Steam before it can make keys. Friends list must also be Public on the privacy page for the Friends tab.'),
+    helpSection('family', 'Steam Family: games shared with you', 'Only needed if you are in a Steam Family.', [
+      'In Settings, under Steam, click Sign in for Steam Family.',
+      'A Steam store window opens. Sign in like normal (scan the QR code with the Steam app, or type your password).',
+      'The window closes by itself and the shared games show up under All owned.',
+    ]),
+    helpSection('xbox', 'Xbox: PC games, achievements and friends', 'Uses OpenXBL, a free service that reads your Xbox account.', [
+      ['Open OpenXBL and click Login. Sign in with the Microsoft account you use on Xbox, then allow access. ', linkBtn('Open OpenXBL', 'https://xbl.io')],
+      'Once signed in, open your profile page and find the API Keys section.',
+      'Click Create (or the + button) to make a key, then copy it.',
+      'In this app, open Settings, paste it into OpenXBL API key, click Test key to check it, then Save.',
+      'Only Xbox games that run on PC are added. For console games, use Xbox Remote Play in the sidebar.',
+    ]),
+    helpSection('epic', 'Epic Games: every game on your account', null, [
+      'In Settings, under Epic Games, click Sign in to Epic.',
+      'Epic\'s own sign in page opens in a small window. Sign in like normal.',
+      'The window closes by itself and your Epic games show up under All owned. You stay signed in until you click Sign out.',
+    ]),
     helpSection('sgdb', 'SteamGridDB: cover art for everything else', 'Gives covers to games from other launchers and to apps.', [
       ['Open SteamGridDB and click Login. You can sign in with Steam. ', linkBtn('Open SteamGridDB', 'https://www.steamgriddb.com')],
       ['Go to your API page. ', linkBtn('Open SteamGridDB API page', 'https://www.steamgriddb.com/profile/preferences/api')],
@@ -1153,7 +1415,7 @@ document.addEventListener('keydown', (e) => {
 function wire() {
   hydrateIcons();
   const search = $('#search');
-  search.addEventListener('input', () => { S.search = search.value.trim(); renderHeader(); renderJump(); renderGrid(); });
+  search.addEventListener('input', () => { S.search = search.value.trim(); if (S.view.type === 'friends') { renderFriends(); return; } renderHeader(); renderJump(); renderGrid(); });
   search.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); spatial.focusDefault(); } });
   $('#surpriseBtn').addEventListener('click', surprise);
   $('#surpriseMode').addEventListener('click', surpriseModeMenu);
@@ -1165,6 +1427,7 @@ function wire() {
   dropTarget($('#catHead'), { cat: (id) => api.moveCategory(id, null, null) });
   api.onToast((t) => showToast(t.text, t.kind));
   api.onMedia(setMediaState);
+  api.onFriends(setFriends);
   api.onUpdate(setUpdateState);
   $('#updateBtn').addEventListener('click', () => api.installUpdate());
   api.onFullscreen((v) => document.body.classList.toggle('fullscreen', v));
@@ -1182,4 +1445,5 @@ function wire() {
   S.version = await api.version();
   setUpdateState(await api.getUpdate());
   setMediaState(await api.getMedia());
+  setFriends(await api.getFriends());
 })();

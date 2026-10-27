@@ -1,5 +1,10 @@
 const { scanSteamOwned } = require('./steam');
 const { scanGogOwned } = require('./gog');
+const { scanEpicOwned } = require('./epic');
+const { scanXboxOwned } = require('./xbox');
+const { scanSteamFamily } = require('./steamFamily');
+
+const LABELS = { steam: 'Steam', gog: 'GOG', epic: 'Epic', xbox: 'Xbox', family: 'Steam Family' };
 
 // Returns games from account libraries. A source only counts as read if it succeeded,
 // so a failed lookup never marks games as no longer owned.
@@ -8,20 +13,26 @@ async function scanOwned(ctx) {
   const ownedSources = new Set();
   const counts = {};
   const errors = [];
-  const run = async (name, fn) => {
+  const run = async (name, fn, source = name) => {
     try {
       const r = await fn(ctx);
       if (!r || r.skipped) return;
-      ownedSources.add(name);
+      if (source) ownedSources.add(source);
       owned.push(...r.entries);
       counts[name] = r.entries.length;
       if (r.steamId) ctx.detectedSteamId = r.steamId;
     } catch (e) {
-      errors.push(`${name === 'steam' ? 'Steam' : 'GOG'}: ${e.message}`);
+      errors.push(`${LABELS[name] || name}: ${e.message}`);
     }
   };
-  await Promise.all([run('steam', scanSteamOwned), run('gog', scanGogOwned)]);
+  await Promise.all([
+    // Steam Family runs after Steam so it knows your SteamID. It does not decide ownership on its own.
+    run('steam', scanSteamOwned).then(() => run('family', scanSteamFamily, null)),
+    run('gog', scanGogOwned),
+    run('epic', scanEpicOwned),
+    run('xbox', scanXboxOwned),
+  ]);
   return { owned, ownedSources, counts, errors };
 }
 
-module.exports = { scanOwned };
+module.exports = { scanOwned, LABELS };

@@ -1,0 +1,154 @@
+// Friends from Steam and Xbox with online status and what they are playing.
+// People with matching names on both are shown as one person; links can be changed by hand.
+const { xbl } = require('./xbl');
+const { similarity, normName } = require('./util');
+
+const STEAM_STATES = { 0: 'offline', 1: 'online', 2: 'busy', 3: 'away', 4: 'away', 5: 'online', 6: 'online' };
+
+async function steamFriends(settings, steamId) {
+  const key = String(settings.steamApiKey || '').trim();
+  if (!key || !steamId) return null;
+  const res = await fetch(`https://api.steampowered.com/ISteamUser/GetFriendList/v1/?key=${key}&steamid=${steamId}&relationship=friend`, { signal: AbortSignal.timeout(20000) });
+  if (res.status === 401) throw new Error('Steam friends list is private. Set Friends list to Public in Steam privacy settings.');
+  if (!res.ok) throw new Error(`Steam friends error ${res.status}`);
+  const ids = (((await res.json()).friendslist || {}).friends || []).map((f) => f.steamid);
+  const people = [];
+  for (let i = 0; i < ids.length; i += 100) {
+    const r = await fetch(`https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${key}&steamids=${ids.slice(i, i + 100).join(',')}`, { signal: AbortSignal.timeout(20000) });
+    if (!r.ok) continue;
+    for (const p of ((await r.json()).response || {}).players || []) {
+      const status = STEAM_STATES[p.personastate] || 'offline';
+      people.push({
+        key: `steam:${p.steamid}`,
+        platform: 'steam',
+        name: p.personaname,
+        avatar: p.avatarfull || p.avatarmedium || '',
+        status: p.gameextrainfo ? 'ingame' : status,
+        activity: p.gameextrainfo ? `Playing ${p.gameextrainfo}` : '',
+        profile: p.profileurl || `https://steamcommunity.com/profiles/${p.steamid}`,
+        lastSeen: p.lastlogoff ? p.lastlogoff * 1000 : 0,
+      });
+    }
+  }
+  return people;
+}
+
+async function xboxFriends(settings) {
+  const key = String(settings.openXblKey || '').trim();
+  if (!key) return null;
+  const j = await xbl(key, '/friends');
+  return (j.people || []).map((p) => {
+    const online = /online/i.test(p.presenceState || '');
+    const text = p.presenceText || '';
+    const playing = online && text && !/^(online|home|xbox app)$/i.test(text) && !/^last seen/i.test(text);
+    return {
+      key: `xbox:${p.xuid}`,
+      platform: 'xbox',
+      name: p.gamertag || p.displayName,
+      altName: p.displayName,
+      avatar: p.displayPicRaw || '',
+      status: playing ? 'ingame' : online ? 'online' : 'offline',
+      activity: playing ? (/^playing /i.test(text) ? text : `Playing ${text}`) : online ? '' : text,
+      profile: `https://www.xbox.com/play/user/${encodeURIComponent(p.gamertag || '')}`,
+    };
+  });
+}
+
+const RANK = { ingame: 0, online: 1, busy: 2, away: 3, offline: 4 };
+
+// Groups accounts into people: manual links first, then automatic name matches.
+function combine(accounts, links) {
+  const manual = links.groups || [];
+  const blocked = new Set((links.unlinked || []).map((p) => p.slice().sort().join('|')));
+  const byKey = new Map(accounts.map((a) => [a.key, a]));
+  const used = new Set();
+  const people = [];
+  for (const g of manual) {
+    const accs = g.map((k) => byKey.get(k)).filter(Boolean);
+    if (!accs.length) continue;
+    accs.forEach((a) => used.add(a.key));
+    people.push({ accounts: accs, manual: true });
+  }
+  const steam = accounts.filter((a) => a.platform === 'steam' && !used.has(a.key));
+  const xbox = accounts.filter((a) => a.platform === 'xbox' && !used.has(a.key));
+  for (const s of steam) {
+    const match = xbox.find((x) => !used.has(x.key) && !blocked.has([s.key, x.key].sort().join('|')) &&
+      (normName(x.name) === normName(s.name) || similarity(x.name, s.name) >= 0.8 || (x.altName && normName(x.altName) === normName(s.name))));
+    used.add(s.key);
+    if (match) { used.add(match.key); people.push({ accounts: [s, match], auto: true }); }
+    else people.push({ accounts: [s] });
+  }
+  for (const x of xbox) if (!used.has(x.key)) people.push({ accounts: [x] });
+  for (const p of people) {
+    p.accounts.sort((a, b) => RANK[a.status] - RANK[b.status]);
+    p.id = p.accounts.map((a) => a.key).join('+');
+    p.name = p.accounts[0].name;
+    p.avatar = (p.accounts.find((a) => a.avatar) || {}).avatar || '';
+    p.status = p.accounts[0].status;
+  }
+  return people.sort((a, b) => RANK[a.status] - RANK[b.status] || a.name.localeCompare(b.name));
+}
+
+class Friends {
+  constructor(store, send, getSteamId) {
+    this.store = store;
+    this.send = send;
+    this.getSteamId = getSteamId;
+    this.state = { people: [], errors: [], updated: 0, configured: false };
+    this.timer = null;
+    this.busy = false;
+    if (!store.data.friendLinks) store.data.friendLinks = { groups: [], unlinked: [] };
+  }
+
+  start() {
+    this.refresh();
+    clearInterval(this.timer);
+    this.timer = setInterval(() => this.refresh(), 90 * 1000);
+  }
+
+  async refresh() {
+    if (this.busy) return this.state;
+    this.busy = true;
+    const s = this.store.data.settings;
+    const errors = [];
+    let accounts = [];
+    const steamId = await this.getSteamId();
+    const results = await Promise.all([
+      steamFriends(s, steamId).catch((e) => { errors.push(`Steam: ${e.message}`); return []; }),
+      xboxFriends(s).catch((e) => { errors.push(`Xbox: ${e.message}`); return []; }),
+    ]);
+    const configured = results.some((r) => r !== null);
+    for (const r of results) if (r) accounts = accounts.concat(r);
+    if (configured && accounts.length) this.accounts = accounts;
+    this.state = { people: combine(this.accounts || accounts, this.store.data.friendLinks), errors, updated: Date.now(), configured };
+    this.busy = false;
+    this.send(this.state);
+    return this.state;
+  }
+
+  relink() {
+    this.state = { ...this.state, people: combine(this.accounts || [], this.store.data.friendLinks) };
+    this.store.changed();
+    this.send(this.state);
+  }
+
+  // Joins two people (each given by its account keys) into one.
+  link(keysA, keysB) {
+    const L = this.store.data.friendLinks;
+    const all = [...new Set([...keysA, ...keysB])];
+    L.groups = L.groups.filter((g) => !g.some((k) => all.includes(k)));
+    L.groups.push(all);
+    L.unlinked = L.unlinked.filter((p) => !(all.includes(p[0]) && all.includes(p[1])));
+    this.relink();
+  }
+
+  // Splits a person back into separate accounts and stops them being matched again automatically.
+  unlink(keys) {
+    const L = this.store.data.friendLinks;
+    L.groups = L.groups.filter((g) => !g.some((k) => keys.includes(k)));
+    for (let i = 0; i < keys.length; i++) for (let j = i + 1; j < keys.length; j++) L.unlinked.push([keys[i], keys[j]]);
+    this.relink();
+  }
+}
+
+module.exports = { Friends, combine };

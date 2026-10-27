@@ -12,6 +12,10 @@ const DEFAULT_SETTINGS = {
   steamApiKey: '',
   steamId: '',
   gogOwned: true,
+  openXblKey: '',
+  steamFamily: false,
+  genreSort: true,
+  steamCollections: true,
 };
 
 const ITEM_PATCH_FIELDS = ['customName', 'favorite', 'hidden', 'categoryId', 'kind', 'ungrouped', 'suiteMain'];
@@ -194,6 +198,7 @@ class Store {
             ex.kind = this.kindForCategory(cat, ex.kind);
           }
         }
+        ex.defaultCategory = e.defaultCategory || (e.kind === 'game' ? 'Games' : 'Apps');
         ex.parentId = e.parentId || null;
         ex.suiteName = e.suiteName || null;
         ex.suiteId = e.suiteId || null;
@@ -229,6 +234,7 @@ class Store {
           manual: false,
           categoryId,
           catAuto: true,
+          defaultCategory: e.defaultCategory || (e.kind === 'game' ? 'Games' : 'Apps'),
           parentId: e.parentId || null,
           suiteName: e.suiteName || null,
           suiteId: e.suiteId || null,
@@ -268,7 +274,7 @@ class Store {
         launch: o.launch, installDir: null, iconPath: null,
         steamAppId: o.steamAppId || null, coverHint: o.coverHint || null, coverHintFit: o.coverHintFit || null,
         meta: o.meta || {}, installed: false, owned: true, missing: false, manual: false,
-        categoryId, catAuto: true, parentId: null, suiteName: null, suiteId: null, ungrouped: false,
+        categoryId, catAuto: true, defaultCategory: 'Games', parentId: null, suiteName: null, suiteId: null, ungrouped: false,
         favorite: false, hidden: false, addedAt: now, lastPlayed: o.lastPlayed || 0, playCount: 0,
         cover: null, coverFit: 'cover', coverLocked: false, coverTried: 0, icon: null,
       };
@@ -282,6 +288,21 @@ class Store {
       }
     }
     this.applyPromotions();
+  }
+
+  // Moves games the user has not placed into Demos, a Steam collection, or a genre.
+  applyAutoCategories(fn) {
+    let changed = false;
+    for (const it of Object.values(this.data.items)) {
+      if (it.manual || it.catAuto === false || it.kind !== 'game') continue;
+      if ((it.defaultCategory || 'Games') !== 'Games') continue;
+      const target = fn(it);
+      if (!target) continue;
+      if (target !== 'Games') this.ensureCategoryPath(target);
+      const cat = this.resolveCategoryPath(target);
+      if (cat && cat !== it.categoryId) { it.categoryId = cat; changed = true; }
+    }
+    return changed;
   }
 
   // The user can pick which app in a group is the main one (for example DaVinci Resolve over its tools).

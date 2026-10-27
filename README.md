@@ -61,10 +61,39 @@ Drag cards onto a category in the sidebar to move them, or onto Favorites / Hidd
 
 Settings > Owned games:
 
-- **Steam**: paste a free Steam Web API key (https://steamcommunity.com/dev/apikey, any domain name works). Your SteamID is picked up from the Steam app automatically. Your Steam profile's privacy setting for Game details has to be Public.
+- **Steam**: paste a free Steam Web API key. Settings > Help walks through it and has the Domain Name to paste. Your SteamID is picked up from the Steam app automatically. Your Steam profile's privacy setting for Game details has to be Public.
 - **GOG**: read from GOG Galaxy on this PC. Nothing to set up.
 
 Use the Installed / All owned switch above the cards to show them. Clicking a game that isn't installed opens Steam or GOG Galaxy to install it. Surprise me can pick from all owned games using the arrow next to it.
+
+## Connections
+
+Settings > Connections. Settings > Help has step by step guides for each one.
+
+| Service | What it adds | How |
+|---|---|---|
+| Steam | Owned games, hours played, achievements, friends | Free Steam Web API key |
+| Steam Family | Games shared with you | Sign in to the Steam store once |
+| Xbox | PC games you own, achievements, friends | Free OpenXBL key from xbl.io |
+| Epic Games | Every game on your account | Sign in on Epic's page |
+| GOG | Owned GOG games | Automatic from GOG Galaxy |
+| SteamGridDB | Cover art for everything else | Free API key |
+
+## Sorting
+
+Games you have not placed yourself are sorted automatically: demos and playtests go to Games > Demos, games in a Steam collection you made go to a category with that collection's name, and the rest go by genre (RPG, Strategy, Action, and so on). Both can be turned off in Settings > Library. Moving a game by hand always wins.
+
+## Hours played and achievements
+
+Hours come from Steam for Steam games. For every other game, the app checks every 30 seconds which programs are running and counts time while a game's files are in use. Click a game's name (or right click > Details) to see hours, last played and achievements (Steam and Xbox).
+
+## Friends
+
+The Friends page shows Steam and Xbox friends, whether they are online, and what they are playing. Friends with the same name on both are shown as one person. Click a friend to link or unlink accounts by hand. Discord is not included because Discord does not let apps read friends lists.
+
+## Xbox Remote Play
+
+The Xbox Remote Play button in the sidebar opens the Xbox app so you can stream games from your console to this PC. Right click it to open remote play in a browser instead.
 
 ## Data
 

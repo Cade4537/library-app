@@ -430,3 +430,81 @@ body.pad #toasts { bottom: 74px; }
 .copy-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .copy-row code { flex: 1; padding: 8px 10px; border-radius: 7px; background: var(--panel-2); border: 1px solid var(--line); font: 12px Consolas, monospace; color: #fff; user-select: all; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .small-btn { height: 28px; padding: 0 10px; font-size: 12px; margin-top: 6px; }
+
+/* ---------- running / hours ---------- */
+.run-badge { position: absolute; left: 8px; bottom: 8px; display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; border-radius: 6px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; }
+.run-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .3; } }
+.card:hover .run-badge, .card:focus .run-badge { opacity: 0; }
+.card .title { cursor: pointer; }
+.card .title:hover { text-decoration: underline; }
+
+/* ---------- settings connections ---------- */
+.settings-modal { width: min(640px, calc(100vw - 40px)); }
+.conn { border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin-bottom: 12px; background: var(--bg); }
+.conn .field:last-child { margin-bottom: 0; }
+.conn-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.conn-title { font-weight: 700; font-size: 14px; }
+.conn-help { margin-left: auto; font-size: 12px; }
+.pill { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: var(--panel-3); color: var(--muted); }
+.pill.on { background: var(--accent-soft); color: #ff8f99; }
+.ok-text { color: #7be3a4 !important; }
+.err-text { color: #ff8f99 !important; }
+
+/* ---------- details ---------- */
+.details-modal { width: min(900px, calc(100vw - 40px)); overflow: hidden; position: relative; }
+.det { position: relative; padding: 28px; }
+.det-bg { position: absolute; left: -40px; right: -40px; top: -40px; height: 360px; background-size: cover; background-position: center; filter: blur(40px) saturate(1.3) brightness(.35); mask-image: linear-gradient(to bottom, #000 40%, transparent); }
+.det > *:not(.det-bg) { position: relative; }
+.det-top { display: flex; gap: 26px; align-items: flex-end; }
+.det-art { width: 190px; flex: none; }
+.det-art .art { box-shadow: 0 20px 50px rgba(0,0,0,.6); }
+.det-info { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 10px; }
+.det-kicker { font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #ff6b78; }
+.det-name { margin: 0; font: 600 32px/1.1 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif; }
+.det-stats { display: flex; gap: 28px; margin: 4px 0 6px; }
+.stat-v { font-size: 18px; font-weight: 700; }
+.stat-l { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.det-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.ach-bar { height: 6px; border-radius: 6px; background: var(--panel-3); overflow: hidden; }
+.ach-bar span { display: block; height: 100%; background: var(--accent); }
+.ach-sum { font-size: 12px; color: var(--muted); margin: 6px 0 12px; }
+.ach-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 8px; max-height: 340px; overflow-y: auto; padding-right: 4px; }
+.ach-row { display: flex; gap: 12px; align-items: center; padding: 8px 10px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line); opacity: .55; }
+.ach-row.got { opacity: 1; }
+.ach-row img, .ach-ic { width: 40px; height: 40px; border-radius: 6px; flex: none; }
+.ach-ic { display: grid; place-items: center; background: var(--panel-3); color: var(--muted); }
+.ach-text { min-width: 0; flex: 1; }
+.ach-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ach-desc { font-size: 12px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ach-when { font-size: 11px; color: var(--faint); flex: none; }
+.ach-row.got .ach-when { color: #ff8f99; }
+
+/* ---------- friends ---------- */
+#friendsView { display: flex; flex-direction: column; gap: 6px; }
+.friends-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.friends-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; margin-bottom: 22px; }
+.friend { display: flex; gap: 14px; align-items: flex-start; padding: 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); text-align: left; transition: background .12s, border-color .12s; }
+.friend:hover, .friend:focus { background: var(--panel-2); border-color: #34343a; }
+.friend.st-offline { opacity: .6; }
+.f-avwrap { position: relative; flex: none; }
+.f-av { width: 52px; height: 52px; border-radius: 12px; object-fit: cover; display: block; }
+.f-init { display: grid; place-items: center; background: var(--panel-3); font-weight: 700; font-size: 20px; }
+.f-badge { position: absolute; right: -3px; bottom: -3px; width: 14px; height: 14px; border-radius: 50%; border: 3px solid var(--panel); background: #55555c; }
+.f-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.f-title { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 6px; }
+.f-linked { color: var(--faint); display: inline-flex; }
+.f-linked .ic { width: 14px; height: 14px; }
+.f-acc { display: flex; align-items: center; gap: 7px; font-size: 12px; min-width: 0; }
+.f-dot { width: 8px; height: 8px; border-radius: 50%; background: #55555c; flex: none; }
+.f-plat { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--src); flex: none; }
+.f-name { color: var(--muted); flex: none; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.f-act { color: #dcdce0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-ingame.f-dot, .st-ingame.f-badge { background: #3ddc84; }
+.st-online.f-dot, .st-online.f-badge { background: #4fa3ff; }
+.st-busy.f-dot, .st-busy.f-badge { background: var(--accent); }
+.st-away.f-dot, .st-away.f-badge { background: #ffd257; }
+.friends-empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+.friends-empty h3 { color: var(--text); margin: 0 0 8px; }
+.picker .f-dot { margin: 0 4px 0 10px; }
+.conn .help { font-size: 12px; color: var(--faint); }

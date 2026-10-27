@@ -7,6 +7,15 @@ const { CoverService } = require('./src/main/covers');
 const { launchItem } = require('./src/main/launch');
 const { Updater } = require('./src/main/updater');
 const { MediaBridge, APPLE_MUSIC_AUMID, APPLE_MUSIC_STORE } = require('./src/main/media');
+const { SteamInfo, readSteamCollections } = require('./src/main/steaminfo');
+const { PlaytimeTracker, minutesPlayed } = require('./src/main/playtime');
+const { getAchievements } = require('./src/main/achievements');
+const { Friends } = require('./src/main/friends');
+const { detectSteamId } = require('./src/main/owned/steam');
+const auth = require('./src/main/auth');
+const { xblAccount } = require('./src/main/xbl');
+
+const XBOX_APP_AUMID = 'Microsoft.GamingApp_8wekyb3d8bbwe!Microsoft.Xbox.App';
 
 // Keep data in the same folder even if the app's display name changes later.
 app.setPath('userData', path.join(app.getPath('appData'), 'library-app'));
@@ -18,6 +27,34 @@ let scanning = false;
 let updater = null;
 let lastOwnedStatus = null;
 let media = null;
+let steamInfo = null;
+let playtime = null;
+let friends = null;
+let collections = [];
+let lastRegistry = {};
+let steamIdCache = null;
+
+// Your SteamID: typed in Settings, found during the last scan, or read from the Steam app.
+async function getSteamId() {
+  const typed = String(store.data.settings.steamId || '').trim().match(/\d{17}/);
+  if (typed) return typed[0];
+  if (steamIdCache) return steamIdCache;
+  steamIdCache = await detectSteamId(lastRegistry).catch(() => null);
+  return steamIdCache;
+}
+
+// Settings sent to the window, without sign-in tokens.
+function publicSettings() {
+  const s = { ...store.data.settings };
+  s.epicConnected = !!(s.epicAuth && s.epicAuth.refreshToken);
+  s.epicName = (s.epicAuth && s.epicAuth.displayName) || '';
+  delete s.epicAuth;
+  return s;
+}
+
+function applyAutoCategories() {
+  if (store.applyAutoCategories((it) => steamInfo.autoCategory(it, collections))) store.changed();
+}
 
 function sendTo(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
@@ -26,15 +63,18 @@ function sendTo(channel, payload) {
 const fileUrl = (p) => (p ? pathToFileURL(p).href : null);
 
 function snapshot() {
+  const running = playtime ? playtime.running : new Set();
   const items = Object.values(store.data.items).map((it) => ({
     ...it,
     coverUrl: fileUrl(it.cover),
     iconUrl: fileUrl(it.icon),
+    minutes: minutesPlayed(it),
+    running: running.has(it.id),
   }));
   return {
     items,
     categories: store.data.categories,
-    settings: store.data.settings,
+    settings: publicSettings(),
     scanning,
     ownedStatus: lastOwnedStatus,
     coverKeyError: covers ? covers.keyError : false,
@@ -67,16 +107,22 @@ async function rescan(silent = false) {
       settings: store.data.settings,
       desktopDirs: [app.getPath('desktop'), path.join(process.env.PUBLIC || 'C:\\Users\\Public', 'Desktop')],
       readShortcut: (p) => shell.readShortcutLink(p),
+      saveSetting: (k, v) => { store.data.settings[k] = v; store.changed(); },
     };
     const { entries, sources, counts, errors, owned, ownedSources, ownedCounts, ownedErrors, detectedSteamId } = await scanAll(ctx);
     store.mergeScan(entries, sources, owned, ownedSources);
+    lastRegistry = ctx.registry || {};
+    if (detectedSteamId) steamIdCache = detectedSteamId;
+    collections = await readSteamCollections(lastRegistry, await getSteamId()).catch(() => []);
+    applyAutoCategories();
+    steamInfo.refresh();
     lastOwnedStatus = { counts: ownedCounts, errors: ownedErrors, steamId: detectedSteamId || null, at: Date.now() };
     store.changed();
     covers.queueAll();
     if (errors.length) console.warn('Scan errors', errors);
     if (!silent) {
       const parts = Object.entries(counts).filter(([, n]) => n > 0).map(([k, n]) => `${SOURCE_LABELS[k] || k} ${n}`);
-      const ownedParts = Object.entries(ownedCounts).map(([k, n]) => `${n} owned on ${SOURCE_LABELS[k] || k}`);
+      const ownedParts = Object.entries(ownedCounts).map(([k, n]) => (k === 'family' ? `${n} from Steam Family` : `${n} owned on ${SOURCE_LABELS[k] || k}`));
       toast(parts.length ? `Scan finished: ${parts.join(', ')}${ownedParts.length ? `. ${ownedParts.join(', ')}` : ''}` : 'Scan finished, nothing new found');
     }
     if (ownedErrors.length) {
@@ -209,7 +255,17 @@ function registerIpc() {
       covers.refetchMissing();
     }
     media.configure({ enabled: store.data.settings.musicEnabled !== false, anyApp: !!store.data.settings.musicAnyApp });
-    const ownedKeys = ['steamApiKey', 'steamId', 'gogOwned'];
+    if (['steamApiKey', 'steamId', 'openXblKey'].some((k) => k in patch && patch[k] !== before[k])) {
+      steamIdCache = null;
+      if ('openXblKey' in patch) delete store.data.settings.xboxXuid;
+      setTimeout(() => friends.refresh(), 500);
+    }
+    if (['genreSort', 'steamCollections'].some((k) => k in patch && patch[k] !== before[k])) {
+      for (const it of Object.values(store.data.items)) if (it.catAuto !== false && it.kind === 'game') it.categoryId = store.resolveCategoryPath(it.defaultCategory || 'Games');
+      applyAutoCategories();
+      store.changed();
+    }
+    const ownedKeys = ['steamApiKey', 'steamId', 'gogOwned', 'openXblKey'];
     if (ownedKeys.some((k) => k in patch && patch[k] !== before[k])) {
       rescan(false);
       return;
@@ -247,6 +303,69 @@ function registerIpc() {
   });
 
   ipcMain.handle('app:version', () => app.getVersion());
+
+  // ---------- connections ----------
+  ipcMain.handle('auth:epicSignIn', async () => {
+    try {
+      const a = await auth.epicSignIn(win);
+      if (!a) return { ok: false };
+      store.data.settings.epicAuth = a;
+      store.changed();
+      rescan(false);
+      return { ok: true, name: a.displayName };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  });
+  ipcMain.handle('auth:epicSignOut', async () => {
+    delete store.data.settings.epicAuth;
+    await auth.epicSignOut().catch(() => {});
+    store.changed();
+  });
+  ipcMain.handle('auth:steamSignIn', async () => {
+    try {
+      const ok = await auth.steamSignIn(win);
+      if (!ok) return { ok: false };
+      store.data.settings.steamFamily = true;
+      store.changed();
+      rescan(false);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  });
+  ipcMain.handle('auth:steamSignOut', async () => {
+    store.data.settings.steamFamily = false;
+    await auth.steamSignOut().catch(() => {});
+    store.changed();
+  });
+  ipcMain.handle('auth:testXbox', async (_e, key) => {
+    try {
+      const acc = await xblAccount(String(key || '').trim());
+      return { ok: true, gamertag: acc.gamertag };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  });
+
+  // ---------- details, friends, remote play ----------
+  ipcMain.handle('item:achievements', async (_e, id) => {
+    const it = item(id);
+    if (!it) return { error: 'Not found' };
+    return getAchievements(store, it, await getSteamId());
+  });
+  ipcMain.handle('friends:get', () => friends.state);
+  ipcMain.handle('friends:refresh', () => friends.refresh());
+  ipcMain.handle('friends:link', (_e, a, b) => friends.link(a, b));
+  ipcMain.handle('friends:unlink', (_e, keys) => friends.unlink(keys));
+  ipcMain.handle('xbox:remotePlay', async (_e, where) => {
+    if (where === 'web') return shell.openExternal('https://www.xbox.com/play/consoles');
+    try {
+      await launchItem({ launch: { type: 'aumid', target: XBOX_APP_AUMID } });
+    } catch {
+      shell.openExternal('https://www.xbox.com/play/consoles');
+    }
+  });
   ipcMain.handle('app:openDataFolder', () => shell.openPath(app.getPath('userData')));
   ipcMain.handle('app:toggleFullscreen', () => win.setFullScreen(!win.isFullScreen()));
   ipcMain.handle('app:copyText', (_e, text) => clipboard.writeText(String(text || '')));
@@ -273,8 +392,13 @@ if (!app.requestSingleInstanceLock()) {
     await covers.init();
     updater = new Updater((s) => sendTo('update:state', s));
     media = new MediaBridge((s) => sendTo('media:state', s));
+    steamInfo = new SteamInfo(store, () => { applyAutoCategories(); store.changed(); });
+    playtime = new PlaytimeTracker(store, () => store.changed());
+    friends = new Friends(store, (s) => sendTo('friends:state', s), getSteamId);
     registerIpc();
     createWindow();
+    playtime.start();
+    setTimeout(() => friends.start(), 4000);
     updater.start();
     media.configure({ enabled: store.data.settings.musicEnabled !== false, anyApp: !!store.data.settings.musicAnyApp });
     covers.queueAll();
@@ -284,6 +408,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on('before-quit', () => {
     if (store) store.saveNow();
     if (media) { media.enabled = false; media.stop(); }
+    if (playtime) playtime.stop();
   });
   app.on('window-all-closed', () => app.quit());
 }

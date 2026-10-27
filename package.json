@@ -1,7 +1,7 @@
 {
   "name": "library-app",
   "productName": "Library",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "One library for all your games and apps",
   "author": "Caden",
   "main": "main.js",
