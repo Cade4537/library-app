@@ -136,13 +136,29 @@ function fmtHours(min) {
 
 const showRemotePlay = () => !!(S.lib.settings.openXblKey || S.lib.settings.xboxConnected || S.lib.items.some((i) => i.source === 'xbox' || (i.launch && /Microsoft\.GamingApp/i.test(i.launch.target || ''))));
 
+// Default: a Crimson Vault window that signs in with your Xbox connection and starts your console.
+// Backup: open the Xbox app and press its remote play buttons automatically.
+async function startRemotePlay(where) {
+  if (where === 'window') showToast('Opening Xbox Remote Play. Your console starts by itself if you have one. Ctrl+W closes it.');
+  if (where === 'appAuto') showToast('Opening the Xbox app and connecting to your console');
+  const r = await api.remotePlay(where);
+  if (r && r.error) showToast(r.error, 'error');
+  else if (r && r.message) showToast(r.message);
+}
+
+function remotePlayMenu(pos) {
+  openMenu([
+    { label: 'Play in Crimson Vault window', run: () => startRemotePlay('window') },
+    { label: 'Open Xbox app and connect', run: () => startRemotePlay('appAuto') },
+    { label: 'Open Xbox app only', run: () => startRemotePlay('app') },
+    { label: 'Open in browser', run: () => startRemotePlay('web') },
+  ], pos);
+}
+
 function remotePlayButton() {
-  const b = h('button', { class: 'nav-btn', title: 'Play games from your Xbox console on this PC' }, icon('gamepad'), h('span', { class: 'label' }, 'Xbox Remote Play'));
-  b.addEventListener('click', () => { showToast('Opening the Xbox app. Pick your console to start streaming.'); api.remotePlay('app'); });
-  b.addEventListener('contextmenu', (e) => { e.preventDefault(); openMenu([
-    { label: 'Open in Xbox app', run: () => api.remotePlay('app') },
-    { label: 'Open in browser', run: () => api.remotePlay('web') },
-  ], { x: e.clientX, y: e.clientY }); });
+  const b = h('button', { class: 'nav-btn nav-action', title: 'Play games from your Xbox console on this PC' }, icon('gamepad'), h('span', { class: 'label' }, 'Xbox Remote Play'));
+  b.addEventListener('click', () => startRemotePlay('window'));
+  b.addEventListener('contextmenu', (e) => { e.preventDefault(); remotePlayMenu({ x: e.clientX, y: e.clientY }); });
   return b;
 }
 
@@ -787,7 +803,7 @@ function openDetails(id) {
   let m;
   const actions = h('div', { class: 'det-actions' },
     h('button', { class: 'btn primary', onclick: () => { m.close(); launch(id); } }, icon(ni ? 'download' : 'play'), ni ? 'Install' : it.kind === 'game' ? 'Play' : 'Open'),
-    it.source === 'xbox' ? h('button', { class: 'btn', onclick: () => api.remotePlay('app') }, icon('gamepad'), 'Stream from console') : null,
+    it.source === 'xbox' ? h('button', { class: 'btn', onclick: () => startRemotePlay('window'), oncontextmenu: (e) => { e.preventDefault(); remotePlayMenu({ x: e.clientX, y: e.clientY }); } }, icon('gamepad'), 'Stream from console') : null,
     h('button', { class: 'btn', onclick: () => { m.close(); coverPicker(id); } }, icon('image'), 'Change cover'),
     it.installDir ? h('button', { class: 'btn', onclick: () => api.openFolder(id) }, icon('folder'), 'Open folder') : null,
     it.installed && !it.manual && it.kind === 'game' ? h('button', { class: 'btn danger', onclick: () => { m.close(); uninstallGame(id); } }, icon('trash'), 'Uninstall') : null);
@@ -1581,11 +1597,18 @@ function focusedCardId() {
   return card ? card.dataset.id : null;
 }
 
+// LB / RB only move between pages (never buttons that do something, like Xbox Remote Play),
+// stop at the first and last page instead of wrapping, and ignore presses closer than 250 ms apart.
+let lastCycle = 0;
 function cycleView(delta) {
-  const btns = [...document.querySelectorAll('#nav .nav-btn, #tree .cat-btn')];
+  const now = performance.now();
+  if (now - lastCycle < 250) return;
+  lastCycle = now;
+  const btns = [...document.querySelectorAll('#nav .nav-btn:not(.nav-action), #tree .cat-btn')];
   const i = btns.findIndex((b) => b.classList.contains('active'));
-  const next = btns[(i + delta + btns.length) % btns.length];
-  if (next) next.click();
+  const j = i < 0 ? 0 : i + delta;
+  if (j < 0 || j >= btns.length) return;
+  btns[j].click();
   setTimeout(() => spatial.focusDefault(), 30);
 }
 
@@ -1600,7 +1623,11 @@ window.padActions = {
   y: () => { const id = focusedCardId(); if (id) { const it = S.byId.get(id); api.updateItem(id, { favorite: !it.favorite }); showToast(it.favorite ? 'Removed from favorites' : 'Added to favorites'); } },
   lb: () => { if (!S.modals.length) cycleView(-1); },
   rb: () => { if (!S.modals.length) cycleView(1); },
-  menu: () => { const id = focusedCardId(); if (id) itemMenu(id, { el: document.activeElement }); },
+  menu: () => {
+    const el = document.activeElement;
+    if (el && el.classList && el.classList.contains('nav-action')) return remotePlayMenu({ el });
+    const id = focusedCardId(); if (id) itemMenu(id, { el });
+  },
   view: () => { if (!S.modals.length) $('#search').focus(); },
   lt: () => $('#content').scrollBy({ top: -innerHeight * 0.7 }),
   rt: () => $('#content').scrollBy({ top: innerHeight * 0.7 }),
