@@ -28,12 +28,14 @@
     </header>
 
     <aside id="sidebar">
-      <nav id="nav"></nav>
-      <div class="side-head" id="catHead">
-        <span>Categories</span>
-        <button id="newCatBtn" class="icon-btn small" title="New category"><span data-icon="plus"></span></button>
+      <div id="sideScroll">
+        <nav id="nav"></nav>
+        <div class="side-head" id="catHead">
+          <span>Categories</span>
+          <button id="newCatBtn" class="icon-btn small" title="New category"><span data-icon="plus"></span></button>
+        </div>
+        <div id="tree"></div>
       </div>
-      <div id="tree"></div>
       <div id="nowPlaying"></div>
       <div id="scanStatus" hidden><span class="spinner"></span><span>Scanning launchers</span></div>
     </aside>
@@ -45,6 +47,7 @@
       <section id="grid"></section>
       <section id="friendsView" hidden></section>
       <section id="launchersView" hidden></section>
+      <section id="storageView" hidden></section>
       <div id="empty" hidden></div>
     </main>
   </div>

@@ -53,7 +53,7 @@ async function scanSteam(ctx) {
         steamAppId: st.appid,
         launch: { type: 'url', target: `steam://rungameid/${st.appid}` },
         installDir: st.installdir ? path.join(appsDir, 'common', st.installdir) : null,
-        meta: { steamPath },
+        meta: { steamPath, ...(Number(st.sizeondisk) ? { sizeBytes: Number(st.sizeondisk), sizeFromLauncher: true } : {}) },
         defaultCategory: isTool ? null : 'Games',
       });
     }

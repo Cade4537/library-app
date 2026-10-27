@@ -532,3 +532,36 @@ body.pad #toasts { bottom: 74px; }
 .l-name { font-weight: 700; font-size: 15px; }
 .l-sub { font-size: 12px; color: var(--muted); }
 .lcard .btn { pointer-events: none; }
+
+/* ---------- pinned music player ---------- */
+#sidebar { overflow: hidden; padding-bottom: 12px; }
+#sideScroll { flex: 1; min-height: 0; overflow-y: auto; margin: 0 -10px; padding: 0 10px 12px; }
+#sideScroll::-webkit-scrollbar { width: 8px; }
+#sideScroll::-webkit-scrollbar-thumb { background: #2a2a2f; border-radius: 8px; }
+#nowPlaying { flex: none; margin-top: 0; padding-top: 10px; border-top: 1px solid var(--line); }
+#nowPlaying:empty { display: none; }
+
+/* ---------- storage ---------- */
+.drives { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.drive { padding: 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; gap: 10px; }
+.drive-top { display: flex; justify-content: space-between; align-items: center; }
+.drive-name { display: inline-flex; gap: 8px; align-items: center; font-weight: 700; }
+.drive-free { font-weight: 700; color: #7be3a4; }
+.drive.low .drive-free { color: #ff8f99; }
+.drive-bar { height: 8px; border-radius: 8px; background: var(--panel-3); overflow: hidden; display: flex; }
+.drive-bar .games { background: var(--accent); }
+.drive-bar .other { background: #55555c; }
+.drive-sub { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+.drive-sub span { display: inline-flex; align-items: center; gap: 6px; }
+.key { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.key.games { background: var(--accent); }
+.slist { display: flex; flex-direction: column; gap: 6px; }
+.srow { display: flex; align-items: center; gap: 12px; padding: 6px 8px 6px 6px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); }
+.srow-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; border: 0; background: none; text-align: left; padding: 0; }
+.srow-thumb { width: 32px; height: 44px; border-radius: 4px; overflow: hidden; flex: none; display: grid; place-items: center; background: var(--panel-3); }
+.srow-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.srow-name { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.srow-src { font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--src); width: 80px; }
+.srow-drive { font-size: 12px; color: var(--faint); width: 26px; }
+.srow-size { width: 90px; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.srow .btn { height: 30px; }

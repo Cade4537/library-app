@@ -155,7 +155,7 @@ class SteamInfo {
     const appid = this.appIdFor(it);
     const info = appid ? this.store.data.appInfo[appid] : null;
     if (DEMO_NAME.test(it.name) || (info && info.type === 'demo')) return 'Games/Demos';
-    if (s.steamCollections !== false && appid) {
+    if (s.steamCollections === true && appid) {
       const c = collections.find((col) => col.appids.includes(Number(appid)));
       if (c) return `Games/${c.name}`;
     }

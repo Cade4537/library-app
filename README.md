@@ -84,7 +84,7 @@ Settings > Connections. Settings > Help has step by step guides for each one.
 
 Games has basic categories (Action, Adventure, RPG, Shooter, Strategy, Simulation, Racing, Sports, Puzzle, Horror, Survival, MMO, Casual, Indie, Demos). Under Games, the "By launcher" folders show every game from one launcher without moving anything. Sort by Name, Category, Last played, Date added or Hours played, and flip the order with the button next to Sort. Sorting by Category groups the cards under headings.
 
-Games you have not placed yourself are sorted automatically: demos and playtests go to Games > Demos, games in a Steam collection you made go to a category with that collection's name, and the rest go by genre (RPG, Strategy, Action, and so on). Both can be turned off in Settings > Library. Moving a game by hand always wins.
+Games you have not placed yourself are sorted automatically: demos and playtests go to Games > Demos and the rest go by genre. Steam collections are not turned into categories. Empty genre folders stay hidden until a game lands in them. Moving a game by hand always wins.
 
 ## Hours played and achievements
 
@@ -93,6 +93,10 @@ Hours come from Steam, Epic, GOG Galaxy and Xbox when connected. For every other
 ## Friends
 
 The Friends page shows Steam, Xbox and Epic friends (Epic only shares when someone was last online), whether they are online, and what they are playing. Friends with the same name on both are shown as one person. Click a friend to link or unlink accounts by hand. Discord is not included because Discord does not let apps read friends lists.
+
+## Storage
+
+The Storage tab shows free space on every drive (with how much your games take) and every installed game by size. Steam and Epic report sizes themselves; other games are measured in the background. Uninstall (also in a game's details and right click menu) starts the launcher's own uninstall: Steam asks to confirm, GOG, Ubisoft, Rockstar and Riot run their uninstaller, Xbox opens Windows Installed apps, and Epic opens its launcher, since Epic only uninstalls from there.
 
 ## Launchers tab
 

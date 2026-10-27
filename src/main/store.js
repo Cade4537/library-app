@@ -16,7 +16,7 @@ const DEFAULT_SETTINGS = {
   steamFamily: false,
   ubisoftOwned: true,
   genreSort: true,
-  steamCollections: true,
+  steamCollections: false,
 };
 
 const ITEM_PATCH_FIELDS = ['customName', 'favorite', 'hidden', 'categoryId', 'kind', 'ungrouped', 'suiteMain'];
@@ -41,6 +41,8 @@ class Store {
     d.settings = { ...DEFAULT_SETTINGS, ...(d.settings || {}) };
     d.coverEpoch = d.coverEpoch || 1;
     d.ensuredPaths = Array.isArray(d.ensuredPaths) ? d.ensuredPaths : [];
+    if (!d.migrations) d.migrations = {};
+    if (!d.migrations.noCollections) { d.settings.steamCollections = false; d.migrations.noCollections = true; }
     this.data = d;
     if (!Array.isArray(d.categories)) {
       d.categories = [];

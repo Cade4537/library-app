@@ -25,6 +25,7 @@ async function scanEpic() {
       launch: { type: 'url', target },
       installDir: m.InstallLocation,
       iconPath: m.LaunchExecutable ? path.join(m.InstallLocation, m.LaunchExecutable) : null,
+      meta: Number(m.InstallSize) ? { sizeBytes: Number(m.InstallSize), sizeFromLauncher: true } : {},
       defaultCategory: isGame ? 'Games' : null,
     });
   }

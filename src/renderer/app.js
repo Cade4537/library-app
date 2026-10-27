@@ -72,6 +72,7 @@ const S = {
   libMode: prefs.get('libMode', 'installed'),
   sortDir: prefs.get('sortDir', 'normal'),
   launchers: null,
+  drives: null,
   modals: [],
   friends: { people: [], errors: [], configured: false },
   menuReturn: null,
@@ -202,6 +203,7 @@ function viewTitle(view = S.view) {
     case 'hidden': return 'Hidden';
     case 'friends': return 'Friends';
     case 'launchers': return 'Launchers';
+    case 'storage': return 'Storage';
     case 'launcher': return `${SOURCES[view.source] || view.source} games`;
     case 'category': return (S.cats.get(view.id) || {}).name || 'Category';
     default: return 'Library';
@@ -294,16 +296,18 @@ function render() {
   renderNowPlaying();
   const fv = S.view.type === 'friends';
   const lv = S.view.type === 'launchers';
+  const sv = S.view.type === 'storage';
   $('#friendsView').hidden = !fv;
   $('#launchersView').hidden = !lv;
-  $('#grid').hidden = fv || lv;
-  $('#filters').hidden = fv || lv;
-  if (fv || lv) {
+  $('#storageView').hidden = !sv;
+  $('#grid').hidden = fv || lv || sv;
+  $('#filters').hidden = fv || lv || sv;
+  if (fv || lv || sv) {
     $('#jump').hidden = true;
     $('#empty').hidden = true;
     renderSidebar();
     renderHeader();
-    if (fv) renderFriends(); else renderLaunchers();
+    if (fv) renderFriends(); else if (lv) renderLaunchers(); else renderStorage();
     $('#scanStatus').hidden = !S.lib.scanning;
     return;
   }
@@ -333,6 +337,16 @@ function navButton(type, label, ic, count) {
   return b;
 }
 
+// Basic genre folders stay out of the way until a game is in them.
+const BASIC = new Set(['action', 'adventure', 'rpg', 'shooter', 'strategy', 'simulation', 'racing', 'sports', 'puzzle', 'horror', 'survival', 'mmo', 'casual', 'indie', 'demos']);
+function hideEmpty(c, counts) {
+  if (!BASIC.has(c.name.toLowerCase())) return false;
+  const parent = c.parentId ? S.cats.get(c.parentId) : null;
+  if (!parent || parent.parentId || !/^games$/i.test(parent.name)) return false;
+  if (S.view.type === 'category' && S.view.id === c.id) return false;
+  return !(counts.get(c.id) > 0) && !childrenOf(c.id).length;
+}
+
 function renderSidebar() {
   const vis = S.lib.items.filter(visible);
   const nav = $('#nav');
@@ -343,6 +357,7 @@ function renderSidebar() {
     navButton('uncategorized', 'Uncategorized', 'inbox', vis.filter((i) => !i.categoryId || !S.cats.has(i.categoryId)).length || null),
     navButton('hidden', 'Hidden', 'eyeOff', S.lib.items.filter((i) => i.hidden).length || null),
     navButton('launchers', 'Launchers', 'rocket', null),
+    navButton('storage', 'Storage', 'drive', S.drives ? fmtBytes(S.drives.reduce((a, d) => a + d.free, 0)) + ' free' : null),
     navButton('friends', 'Friends', 'users', (S.friends.people || []).filter((p) => p.status !== 'offline').length || null),
     showRemotePlay() ? remotePlayButton() : null
   );
@@ -355,7 +370,7 @@ function renderSidebar() {
 
   const tree = $('#tree');
   const build = (parentId) =>
-    childrenOf(parentId).map((c) => {
+    childrenOf(parentId).filter((c) => !hideEmpty(c, counts)).map((c) => {
       const kids = childrenOf(c.id);
       const open = !S.collapsed.has(c.id);
       const active = S.view.type === 'category' && S.view.id === c.id;
@@ -447,9 +462,10 @@ function renderHeader() {
     }
   }
   const total = S.view.type === 'friends' ? (S.friends.people || []).length : viewItems().length;
-  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : `${total} ${total === 1 ? 'item' : 'items'}`)));
+  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : S.view.type === 'storage' ? (S.drives ? `${fmtBytes(S.drives.reduce((a, d) => a + d.free, 0))} free` : '') : `${total} ${total === 1 ? 'item' : 'items'}`)));
   if (S.view.type === 'category' && !S.search) {
-    const subs = childrenOf(S.view.id);
+    const subCounts = new Map(childrenOf(S.view.id).map((c) => [c.id, baseItems({ type: 'category', id: c.id }).length]));
+    const subs = childrenOf(S.view.id).filter((c) => !hideEmpty(c, subCounts));
     const chips = subs.map((c) => {
       const n = baseItems({ type: 'category', id: c.id }).length;
       const chip = h('button', { class: 'chip', onclick: () => setView({ type: 'category', id: c.id }) }, c.name, h('span', { class: 'count' }, n));
@@ -579,6 +595,7 @@ function itemMenu(id, pos) {
     { label: 'Move to category', run: () => pickCategory(it.categoryId).then((c) => { if (c !== undefined) api.updateItem(id, { categoryId: c }); }) },
     { label: `Set as ${it.kind === 'game' ? 'app' : 'game'}`, run: () => api.updateItem(id, { kind: it.kind === 'game' ? 'app' : 'game' }) },
     { label: 'Open install folder', disabled: !it.installDir, run: () => api.openFolder(id) },
+    it.installed && !it.manual && it.kind === 'game' ? { label: 'Uninstall', danger: true, run: () => uninstallGame(id) } : null,
     relatedOf(id).length ? { label: `Related apps (${relatedOf(id).length})`, run: () => relatedModal(id) } : null,
     isGrouped(it) ? { label: 'Show as separate app', run: () => api.updateItem(id, { ungrouped: true }) } : null,
     isGrouped(it) ? { label: 'Make this the main app', run: () => { api.updateItem(id, { suiteMain: true }); showToast(`${displayName(it)} is now the main app`); } } : null,
@@ -772,7 +789,8 @@ function openDetails(id) {
     h('button', { class: 'btn primary', onclick: () => { m.close(); launch(id); } }, icon(ni ? 'download' : 'play'), ni ? 'Install' : it.kind === 'game' ? 'Play' : 'Open'),
     it.source === 'xbox' ? h('button', { class: 'btn', onclick: () => api.remotePlay('app') }, icon('gamepad'), 'Stream from console') : null,
     h('button', { class: 'btn', onclick: () => { m.close(); coverPicker(id); } }, icon('image'), 'Change cover'),
-    it.installDir ? h('button', { class: 'btn', onclick: () => api.openFolder(id) }, icon('folder'), 'Open folder') : null);
+    it.installDir ? h('button', { class: 'btn', onclick: () => api.openFolder(id) }, icon('folder'), 'Open folder') : null,
+    it.installed && !it.manual && it.kind === 'game' ? h('button', { class: 'btn danger', onclick: () => { m.close(); uninstallGame(id); } }, icon('trash'), 'Uninstall') : null);
   const body = h('div', { class: 'det' },
     it.coverUrl ? h('div', { class: 'det-bg', style: { backgroundImage: `url("${it.coverUrl}")` } }) : null,
     h('div', { class: 'det-top' },
@@ -783,6 +801,7 @@ function openDetails(id) {
         h('div', { class: 'det-stats' },
           stat('Played', it.minutes ? fmtHours(it.minutes) : 'Not yet'),
           stat('Last played', it.running ? 'Playing now' : timeAgo(it.lastPlayed)),
+          it.installed && it.meta && it.meta.sizeBytes ? stat('Size', fmtBytes(it.meta.sizeBytes)) : null,
           h('div', { class: 'stat' }, achStat, h('div', { class: 'stat-l' }, 'Achievements'))),
         actions)),
     h('h3', { class: 'section-title', style: { marginTop: '24px' } }, 'Achievements'),
@@ -887,6 +906,69 @@ function setFriends(st) {
   S.friends = st || S.friends;
   if (S.view.type === 'friends') { renderHeader(); renderFriends(); }
   renderSidebar();
+}
+
+// ---------- storage ----------
+function fmtBytes(n) {
+  if (!n) return '0 GB';
+  const gb = n / 1024 ** 3;
+  if (gb >= 1000) return `${(gb / 1024).toFixed(2)} TB`;
+  if (gb >= 10) return `${Math.round(gb)} GB`;
+  if (gb >= 1) return `${gb.toFixed(1)} GB`;
+  return `${Math.max(1, Math.round(n / 1024 ** 2))} MB`;
+}
+
+async function loadDrives() {
+  S.drives = await api.getDrives();
+  renderSidebar();
+  if (S.view.type === 'storage') { renderHeader(); renderStorage(); }
+}
+
+async function uninstallGame(id) {
+  const it = S.byId.get(id);
+  if (!it) return;
+  const size = it.meta && it.meta.sizeBytes ? ` and free about ${fmtBytes(it.meta.sizeBytes)}` : '';
+  const ok = await confirmBox(`Uninstall ${displayName(it)}?`, `This removes the game from this PC${size}. Your saves in the cloud are not touched. ${SOURCES[it.source] || 'The launcher'} may ask you to confirm too.`, 'Uninstall');
+  if (!ok) return;
+  const r = await api.uninstall(id);
+  if (r.ok) showToast(r.message || 'Uninstall started');
+  else showToast(r.error || 'Could not start the uninstall', 'error');
+  setTimeout(loadDrives, 60000);
+}
+
+function renderStorage() {
+  const box = $('#storageView');
+  const drives = S.drives || [];
+  const driveOf = (dir) => (String(dir || '').match(/^[a-z]:/i) || [''])[0].toUpperCase();
+  const games = S.lib.items.filter((it) => it.kind === 'game' && it.installed && !it.manual && it.installDir && !isGrouped(it));
+  const byDrive = {};
+  for (const g of games) { const d = driveOf(g.installDir); byDrive[d] = (byDrive[d] || 0) + ((g.meta && g.meta.sizeBytes) || 0); }
+  const driveCards = drives.map((d) => {
+    const used = d.size - d.free;
+    const pct = d.size ? Math.round((used / d.size) * 100) : 0;
+    const gamesPct = d.size ? Math.min(pct, Math.round(((byDrive[d.id] || 0) / d.size) * 100)) : 0;
+    return h('div', { class: 'drive' + (d.free / d.size < 0.1 ? ' low' : '') },
+      h('div', { class: 'drive-top' }, h('span', { class: 'drive-name' }, icon('drive'), `${d.id} ${d.label ? `(${d.label})` : ''}`), h('span', { class: 'drive-free' }, `${fmtBytes(d.free)} free`)),
+      h('div', { class: 'drive-bar' }, h('span', { class: 'games', style: { width: `${gamesPct}%` } }), h('span', { class: 'other', style: { width: `${pct - gamesPct}%` } })),
+      h('div', { class: 'drive-sub' }, `${fmtBytes(used)} used of ${fmtBytes(d.size)}`, byDrive[d.id] ? h('span', {}, h('i', { class: 'key games' }), `Games ${fmtBytes(byDrive[d.id])}`) : null));
+  });
+  const sized = games.slice().sort((a, b) => ((b.meta && b.meta.sizeBytes) || 0) - ((a.meta && a.meta.sizeBytes) || 0));
+  const pending = sized.filter((g) => !(g.meta && g.meta.sizeBytes)).length;
+  const rows = sized.map((g) => {
+    const sz = g.meta && g.meta.sizeBytes;
+    const thumb = g.coverUrl ? h('img', { src: g.coverUrl, alt: '' }) : h('span', { class: 'rel-initial' }, (displayName(g)[0] || '?').toUpperCase());
+    const row = h('div', { class: 'srow' },
+      h('button', { class: 'srow-main', onclick: () => openDetails(g.id) }, h('span', { class: 'srow-thumb' }, thumb),
+        h('span', { class: 'srow-name' }, displayName(g)), h('span', { class: `srow-src src-${g.source}` }, SOURCES[g.source]), h('span', { class: 'srow-drive' }, driveOf(g.installDir))),
+      h('span', { class: 'srow-size' }, sz ? fmtBytes(sz) : 'Measuring'),
+      h('button', { class: 'btn danger', onclick: () => uninstallGame(g.id) }, 'Uninstall'));
+    return row;
+  });
+  box.replaceChildren(
+    h('div', { class: 'friends-bar' }, h('button', { class: 'chip', onclick: loadDrives }, icon('refresh'), 'Refresh')),
+    h('div', { class: 'drives' }, driveCards.length ? driveCards : h('div', { class: 'loading' }, h('span', { class: 'spinner' }), 'Reading drives')),
+    h('h3', { class: 'section-title', style: { marginTop: '26px' } }, `Installed games by size${pending ? ` (${pending} still measuring)` : ''}`),
+    h('div', { class: 'slist' }, rows));
 }
 
 // ---------- launchers ----------
@@ -1065,7 +1147,6 @@ function openSettings() {
   let gogOwned = s.gogOwned !== false;
   let ubisoftOwned = s.ubisoftOwned !== false;
   let genreSort = s.genreSort !== false;
-  let steamCollections = s.steamCollections !== false;
 
   const sgdb = secretInput(s.steamGridDbKey, 'Paste your SteamGridDB API key');
   const steamKey = secretInput(s.steamApiKey, 'Paste your Steam Web API key');
@@ -1184,7 +1265,6 @@ function openSettings() {
           h('div', { class: 'help' }, 'Cover art for games from other launchers and for apps.'))),
       h('div', { class: 'section-label' }, 'Library'),
       h('div', { class: 'field' }, toggleRow('Sort games by genre', 'Uses Steam store info, like Action, RPG or Racing. Demos and playtests always go to Demos.', genreSort, (v) => { genreSort = v; })),
-      h('div', { class: 'field' }, toggleRow('Import my Steam collections', 'Collections you made in Steam become categories. Dynamic collections stay in Steam.', steamCollections, (v) => { steamCollections = v; })),
       h('div', { class: 'field' }, toggleRow('Include Windows apps', 'Start Menu, Desktop and Microsoft Store apps', includeApps, (v) => { includeApps = v; })),
       h('div', { class: 'field' },
         h('label', {}, 'CurseForge instances folder'),
@@ -1201,7 +1281,7 @@ function openSettings() {
       { label: 'Save', primary: true, run: async () => {
         await api.updateSettings({
           steamGridDbKey: sgdb.input.value.trim(), curseforgeInstancesPath: cf.value.trim(), includeApps, musicEnabled, musicAnyApp,
-          steamApiKey: steamKey.input.value.trim(), steamId: steamId.value.trim(), gogOwned, openXblKey: xblKey.input.value.trim(), genreSort, steamCollections, ubisoftOwned,
+          steamApiKey: steamKey.input.value.trim(), steamId: steamId.value.trim(), gogOwned, openXblKey: xblKey.input.value.trim(), genreSort, ubisoftOwned,
         });
         S.keyErrorShown = false;
         showToast('Settings saved');
@@ -1567,4 +1647,6 @@ function wire() {
   setUpdateState(await api.getUpdate());
   setMediaState(await api.getMedia());
   setFriends(await api.getFriends());
+  loadDrives();
+  setInterval(loadDrives, 5 * 60 * 1000);
 })();

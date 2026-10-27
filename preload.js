@@ -47,6 +47,8 @@ contextBridge.exposeInMainWorld('library', {
   unlinkFriends: call('friends:unlink'),
   remotePlay: call('xbox:remotePlay'),
   getLaunchers: call('launchers:get'),
+  getDrives: call('storage:drives'),
+  uninstall: call('item:uninstall'),
   openLauncher: call('launchers:open'),
   onFriends: (cb) => ipcRenderer.on('friends:state', (_e, s) => cb(s)),
   onUpdate: (cb) => ipcRenderer.on('update:state', (_e, s) => cb(s)),

@@ -16,6 +16,7 @@ const auth = require('./src/main/auth');
 const { XboxLive } = require('./src/main/xboxlive');
 const { EpicClient } = require('./src/main/epicClient');
 const { getLaunchers, openLauncher } = require('./src/main/launchers');
+const { getDrives, SizeTracker, uninstall } = require('./src/main/storage');
 
 const XBOX_APP_AUMID = 'Microsoft.GamingApp_8wekyb3d8bbwe!Microsoft.Xbox.App';
 
@@ -34,6 +35,7 @@ let playtime = null;
 let friends = null;
 let xbox = null;
 let epic = null;
+let sizes = null;
 let collections = [];
 let lastRegistry = {};
 let steamIdCache = null;
@@ -122,9 +124,20 @@ async function rescan(silent = false) {
     store.mergeScan(entries, sources, owned, ownedSources);
     lastRegistry = ctx.registry || {};
     if (detectedSteamId) steamIdCache = detectedSteamId;
-    collections = await readSteamCollections(lastRegistry, await getSteamId()).catch(() => []);
+    // Steam collections are no longer turned into categories. Remove ones made by earlier versions.
+    const cols = await readSteamCollections(lastRegistry, await getSteamId()).catch(() => []);
+    for (const c of cols) {
+      const p = `Games/${c.name}`;
+      if (!store.data.ensuredPaths.includes(p)) continue;
+      const id = store.resolveCategoryPath(p);
+      const cat = id && store.cat(id);
+      if (cat && cat.name.toLowerCase() === c.name.toLowerCase()) store.deleteCategory(id);
+      store.data.ensuredPaths = store.data.ensuredPaths.filter((x) => x !== p);
+    }
+    collections = store.data.settings.steamCollections === true ? cols : [];
     applyAutoCategories();
     steamInfo.refresh();
+    sizes.run();
     lastOwnedStatus = { counts: ownedCounts, errors: ownedErrors, steamId: detectedSteamId || null, at: Date.now() };
     store.changed();
     covers.queueAll();
@@ -377,6 +390,18 @@ function registerIpc() {
     return getAchievements(store, it, await getSteamId(), xbox);
   });
   ipcMain.handle('friends:get', () => friends.state);
+  ipcMain.handle('storage:drives', () => getDrives().catch(() => []));
+  ipcMain.handle('item:uninstall', async (_e, id) => {
+    const it = item(id);
+    if (!it) return { ok: false, error: 'Not found' };
+    try {
+      const msg = await uninstall(it);
+      setTimeout(() => rescan(true), 90 * 1000);
+      return { ok: true, message: msg };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  });
   ipcMain.handle('launchers:get', () => getLaunchers(store, lastRegistry, (p) => app.getFileIcon(p, { size: 'large' })));
   ipcMain.handle('launchers:open', async (_e, id) => openLauncher(store, lastRegistry, id));
   ipcMain.handle('friends:refresh', () => friends.refresh());
@@ -419,6 +444,7 @@ if (!app.requestSingleInstanceLock()) {
     for (const c of BASIC_CATEGORIES) store.ensureCategoryPath(`Games/${c}`);
     steamInfo = new SteamInfo(store, () => { applyAutoCategories(); store.changed(); });
     playtime = new PlaytimeTracker(store, () => store.changed());
+    sizes = new SizeTracker(store, () => store.changed());
     xbox = new XboxLive(store);
     epic = new EpicClient(store);
     friends = new Friends(store, (s) => sendTo('friends:state', s), getSteamId, xbox, epic);
