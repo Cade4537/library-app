@@ -18,6 +18,7 @@ const { EpicClient } = require('./src/main/epicClient');
 const { getLaunchers, openLauncher } = require('./src/main/launchers');
 const { getDrives, SizeTracker, uninstall } = require('./src/main/storage');
 
+const { openRemotePlayWindow, openXboxAppAndConnect } = require('./src/main/remoteplay');
 const XBOX_APP_AUMID = 'Microsoft.GamingApp_8wekyb3d8bbwe!Microsoft.Xbox.App';
 
 // Keep data in the same folder even if the app's display name changes later.
@@ -414,6 +415,8 @@ function registerIpc() {
   });
   ipcMain.handle('xbox:remotePlay', async (_e, where) => {
     if (where === 'web') return shell.openExternal('https://www.xbox.com/play/consoles');
+    if (where === 'window') return openRemotePlayWindow(win);
+    if (where === 'appAuto') return openXboxAppAndConnect();
     try {
       await launchItem({ launch: { type: 'aumid', target: XBOX_APP_AUMID } });
     } catch {
