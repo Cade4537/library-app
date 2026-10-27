@@ -78,6 +78,11 @@ const S = {
   menuReturn: null,
   keyErrorShown: false,
   update: { status: 'dev' },
+  sideCollapsed: prefs.get('sideCollapsed', false),
+  accent: prefs.get('accent', 'crimson'),
+  tv: false,
+  storeInfo: new Map(),
+  friendGames: new Map(),
   version: '',
 };
 
@@ -156,7 +161,7 @@ function remotePlayMenu(pos) {
 }
 
 function remotePlayButton() {
-  const b = h('button', { class: 'nav-btn nav-action', title: 'Play games from your Xbox console on this PC' }, icon('gamepad'), h('span', { class: 'label' }, 'Xbox Remote Play'));
+  const b = h('button', { class: 'nav-btn nav-action', 'data-label': 'Xbox Remote Play', title: 'Play games from your Xbox console on this PC' }, icon('gamepad'), h('span', { class: 'label' }, 'Xbox Remote Play'));
   b.addEventListener('click', () => startRemotePlay('window'));
   b.addEventListener('contextmenu', (e) => { e.preventDefault(); remotePlayMenu({ x: e.clientX, y: e.clientY }); });
   return b;
@@ -220,6 +225,7 @@ function viewTitle(view = S.view) {
     case 'friends': return 'Friends';
     case 'launchers': return 'Launchers';
     case 'storage': return 'Storage';
+    case 'discord': return 'Discord';
     case 'launcher': return `${SOURCES[view.source] || view.source} games`;
     case 'category': return (S.cats.get(view.id) || {}).name || 'Category';
     default: return 'Library';
@@ -239,7 +245,13 @@ function artFor(it) {
   const art = h('div', { class: 'art' + (it.coverFit === 'contain' ? ' contain' : '') });
   if (it.coverUrl) {
     if (it.coverFit === 'contain') art.append(h('img', { class: 'bg', src: it.coverUrl, alt: '', draggable: 'false' }));
-    art.append(h('img', { class: 'cover', src: it.coverUrl, alt: '', draggable: 'false', loading: 'lazy' }));
+    art.classList.add('loading');
+    const img = h('img', { class: 'cover', src: it.coverUrl, alt: '', draggable: 'false', loading: 'lazy' });
+    const done = () => art.classList.remove('loading');
+    img.addEventListener('load', done);
+    img.addEventListener('error', done);
+    if (img.complete) done();
+    art.append(img);
   } else {
     const hue = hashHue(it.name);
     art.style.background = `linear-gradient(155deg, hsl(${hue % 360} 58% 27%), hsl(${(hue + 12) % 360} 35% 8%))`;
@@ -252,11 +264,42 @@ function artFor(it) {
   return art;
 }
 
+// Friends playing a game, matched by the game's name in their status.
+function friendsPlaying(it) {
+  if (it.kind !== 'game' || !S.friendGames.size) return [];
+  const n = norm(displayName(it));
+  if (n.length < 3) return [];
+  return S.friendGames.get(n) || [];
+}
+
+function indexFriendGames() {
+  const m = new Map();
+  for (const p of S.friends.people || []) {
+    if (p.status !== 'ingame') continue;
+    for (const a of p.accounts) {
+      if (a.status !== 'ingame' || !a.activity) continue;
+      const g = norm(String(a.activity).replace(/^playing\s+/i, ''));
+      if (!g) continue;
+      if (!m.has(g)) m.set(g, []);
+      if (!m.get(g).includes(p.name)) m.get(g).push(p.name);
+    }
+  }
+  // Also match when the status has extra words, like "Call of Duty: Black Ops 6 - Multiplayer".
+  for (const it of S.lib.items) {
+    if (it.kind !== 'game') continue;
+    const n = norm(displayName(it));
+    if (n.length < 4 || m.has(n)) continue;
+    for (const [g, names] of m) if (g.startsWith(n + ' ')) { m.set(n, names); break; }
+  }
+  S.friendGames = m;
+}
+
 // ---------- cards ----------
 const cardCache = new Map();
 
 function cardSig(it) {
-  return [displayName(it), it.coverUrl, it.iconUrl, it.coverFit, it.favorite, it.source, it.missing, it.hidden, relatedOf(it.id).length, isGrouped(it), notInstalled(it), Math.round((it.minutes || 0) / 6), it.running].join('|');
+  const ach = it.meta && it.meta.achievements;
+  return [displayName(it), it.coverUrl, it.iconUrl, it.coverFit, it.favorite, it.source, it.missing, it.hidden, relatedOf(it.id).length, isGrouped(it), notInstalled(it), Math.round((it.minutes || 0) / 6), it.running, ach ? `${ach.have}/${ach.total}` : '', friendsPlaying(it).join(',')].join('|');
 }
 
 function buildCard(id) {
@@ -287,6 +330,15 @@ function fillCard(card, it) {
   art.append(more);
   if (notInstalled(it)) art.append(h('span', { class: 'ni-badge' }, icon('download'), 'Not installed'));
   if (it.running) art.append(h('span', { class: 'run-badge' }, h('span', { class: 'dot' }), 'Playing now'));
+  const fp = it.running ? [] : friendsPlaying(it);
+  if (fp.length) art.append(h('span', { class: 'friend-badge', title: `${fp.join(', ')} ${fp.length === 1 ? 'is' : 'are'} playing this` }, icon('users'), fp.length === 1 ? fp[0] : `${fp.length} friends`));
+  const ach = it.meta && it.meta.achievements && it.meta.achievements.total ? it.meta.achievements : null;
+  if (it.minutes || ach) {
+    art.append(h('div', { class: 'hover-stats' },
+      it.minutes ? h('span', {}, icon('clock'), fmtHours(it.minutes)) : null,
+      ach ? h('span', {}, icon('trophy'), `${ach.have}/${ach.total}`) : null,
+      ach ? h('div', { class: 'mini-bar' }, h('span', { style: { width: `${Math.round((ach.have / ach.total) * 100)}%` } })) : null));
+  }
   const pill = h('span', { class: 'pill-btn', role: 'button', title: notInstalled(it) ? 'Install' : 'Play' }, icon(notInstalled(it) ? 'download' : 'play'), notInstalled(it) ? 'Install' : it.kind === 'game' ? 'Play' : 'Open');
   pill.addEventListener('click', (e) => { e.stopPropagation(); launch(it.id); });
   art.append(h('div', { class: 'play-pill' }, pill));
@@ -310,9 +362,20 @@ function cardFor(it) {
 // ---------- rendering ----------
 function render() {
   renderNowPlaying();
+  if (S.tv) renderTV();
   const fv = S.view.type === 'friends';
   const lv = S.view.type === 'launchers';
   const sv = S.view.type === 'storage';
+  const dv = S.view.type === 'discord';
+  document.body.classList.toggle('discord-on', dv);
+  $('#discordView').hidden = !dv;
+  if (dv) {
+    for (const id of ['#friendsView', '#launchersView', '#storageView', '#grid', '#filters', '#jump', '#empty']) $(id).hidden = true;
+    renderSidebar();
+    renderHeader();
+    syncDiscord();
+    return;
+  }
   $('#friendsView').hidden = !fv;
   $('#launchersView').hidden = !lv;
   $('#storageView').hidden = !sv;
@@ -336,11 +399,12 @@ function render() {
   const scanning = !!S.lib.scanning;
   $('#scanStatus').hidden = !scanning;
   $('#rescanBtn').classList.toggle('spinning', scanning);
+  syncDiscord();
 }
 
 function navButton(type, label, ic, count) {
   const active = S.view.type === type;
-  const b = h('button', { class: 'nav-btn' + (active ? ' active' : ''), 'data-nav': type, onclick: () => setView({ type }) },
+  const b = h('button', { class: 'nav-btn' + (active ? ' active' : ''), 'data-nav': type, 'data-label': label, onclick: () => setView({ type }) },
     icon(ic), h('span', { class: 'label' }, label), count != null ? h('span', { class: 'count' }, count) : null);
   if (type === 'favorites' || type === 'hidden') {
     dropTarget(b, {
@@ -375,6 +439,7 @@ function renderSidebar() {
     navButton('launchers', 'Launchers', 'rocket', null),
     navButton('storage', 'Storage', 'drive', S.drives ? fmtBytes(S.drives.reduce((a, d) => a + d.free, 0)) + ' free' : null),
     navButton('friends', 'Friends', 'users', (S.friends.people || []).filter((p) => p.status !== 'offline').length || null),
+    S.lib.settings.discordTab !== false ? navButton('discord', 'Discord', 'chat', null) : null,
     showRemotePlay() ? remotePlayButton() : null
   );
 
@@ -478,7 +543,13 @@ function renderHeader() {
     }
   }
   const total = S.view.type === 'friends' ? (S.friends.people || []).length : viewItems().length;
-  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : S.view.type === 'storage' ? (S.drives ? `${fmtBytes(S.drives.reduce((a, d) => a + d.free, 0))} free` : '') : `${total} ${total === 1 ? 'item' : 'items'}`)));
+  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : S.view.type === 'storage' ? (S.drives ? `${fmtBytes(S.drives.reduce((a, d) => a + d.free, 0))} free` : '') : S.view.type === 'discord' ? '' : `${total} ${total === 1 ? 'item' : 'items'}`)));
+  if (S.view.type === 'discord') {
+    kids.push(h('div', { class: 'discord-bar' },
+      h('span', { class: 'help', style: { flex: 1 } }, 'Discord\'s own app, right here. Voice calls keep going while you switch pages.'),
+      h('button', { class: 'btn', onclick: () => api.discordReload() }, icon('refresh'), 'Reload'),
+      h('button', { class: 'btn', onclick: () => api.discordOpenApp() }, icon('exit'), 'Open Discord app')));
+  }
   if (S.view.type === 'category' && !S.search) {
     const subCounts = new Map(childrenOf(S.view.id).map((c) => [c.id, baseItems({ type: 'category', id: c.id }).length]));
     const subs = childrenOf(S.view.id).filter((c) => !hideEmpty(c, subCounts));
@@ -494,14 +565,56 @@ function renderHeader() {
   head.replaceChildren(...kids);
 }
 
+// Continue playing: your last game as a big banner, then the next few as tiles.
+function heroUrlFor(it, cb) {
+  if (it.kind !== 'game') return null;
+  const cached = S.storeInfo.get(it.id);
+  if (cached !== undefined) return cached && cached.hero;
+  S.storeInfo.set(it.id, null);
+  api.storeInfo(it.id).then((info) => { S.storeInfo.set(it.id, info || null); if (info && cb) cb(info); }).catch(() => {});
+  return null;
+}
+
+function setHeroBg(el, it, info) {
+  const url = info && info.hero;
+  if (!url) return;
+  const img = new Image();
+  img.onload = () => { el.style.backgroundImage = `url("${url}")`; el.classList.add('real'); };
+  img.onerror = () => { if (info.bg) { el.style.backgroundImage = `url("${info.bg}")`; el.classList.add('real'); } };
+  img.src = url;
+}
+
 function renderJump() {
   const sec = $('#jump');
   const recent = S.view.type === 'home' && !S.search && S.source === 'all'
-    ? S.lib.items.filter((it) => visible(it) && it.lastPlayed).sort((a, b) => b.lastPlayed - a.lastPlayed).slice(0, 6)
+    ? S.lib.items.filter((it) => visible(it) && it.lastPlayed).sort((a, b) => (b.running ? 1 : 0) - (a.running ? 1 : 0) || b.lastPlayed - a.lastPlayed).slice(0, 5)
     : [];
   sec.hidden = !recent.length;
   if (!recent.length) return;
-  const tiles = recent.map((it) => {
+  const [first, ...rest] = recent;
+  const key = recent.map((it) => `${it.id}:${it.lastPlayed}:${it.running}:${it.coverUrl}:${Math.round((it.minutes || 0) / 6)}`).join('|');
+  if (sec.dataset.key === key) return;
+  sec.dataset.key = key;
+
+  const bg = h('div', { class: 'hero-bg' + (first.coverUrl ? '' : ' plain'), style: first.coverUrl ? { backgroundImage: `url("${first.coverUrl}")` } : { background: `hsl(${hashHue(first.name) % 360} 50% 18%)` } });
+  const known = heroUrlFor(first, (info) => setHeroBg(bg, first, info));
+  if (known) setHeroBg(bg, first, S.storeInfo.get(first.id));
+  const ach = first.meta && first.meta.achievements && first.meta.achievements.total ? first.meta.achievements : null;
+  const hero = h('div', { class: 'hero' },
+    bg,
+    h('div', { class: 'hero-shade' }),
+    h('div', { class: 'hero-art' }, artFor(first)),
+    h('div', { class: 'hero-info' },
+      h('div', { class: 'hero-kicker' }, first.running ? 'Playing now' : 'Continue playing'),
+      h('div', { class: 'hero-name' }, displayName(first)),
+      h('div', { class: 'hero-sub' }, [SOURCES[first.source], first.running ? null : timeAgo(first.lastPlayed), first.minutes ? fmtHours(first.minutes) + ' played' : null, ach ? `${ach.have} of ${ach.total} achievements` : null].filter(Boolean).join(' · ')),
+      ach ? h('div', { class: 'hero-ach' }, h('span', { style: { width: `${Math.round((ach.have / ach.total) * 100)}%` } })) : null,
+      h('div', { class: 'hero-actions' },
+        h('button', { class: 'btn primary big', onclick: () => launch(first.id) }, icon('play'), first.kind === 'game' ? 'Play' : 'Open'),
+        h('button', { class: 'btn glass', onclick: () => openDetails(first.id) }, 'Details'))));
+  hero.addEventListener('contextmenu', (e) => { e.preventDefault(); itemMenu(first.id, { x: e.clientX, y: e.clientY }); });
+
+  const tiles = rest.map((it) => {
     const t = h('button', { class: 'tile', title: displayName(it) });
     if (it.coverUrl) t.append(h('div', { class: 'tile-bg', style: { backgroundImage: `url("${it.coverUrl}")` } }));
     else t.append(h('div', { class: 'tile-bg', style: { background: `hsl(${hashHue(it.name) % 360} 50% 22%)` } }));
@@ -516,7 +629,7 @@ function renderJump() {
     t.addEventListener('contextmenu', (e) => { e.preventDefault(); itemMenu(it.id, { x: e.clientX, y: e.clientY }); });
     return t;
   });
-  sec.replaceChildren(h('h3', { class: 'section-title' }, 'Jump back in'), h('div', { class: 'jump-row' }, tiles));
+  sec.replaceChildren(hero, tiles.length ? h('div', { class: 'jump-row' }, tiles) : null);
 }
 
 const SORTS = { name: 'Name', category: 'Category', played: 'Last played', added: 'Date added', most: 'Hours played' };
@@ -680,12 +793,14 @@ function openMenu(items, pos) {
   m.style.top = `${Math.max(8, Math.min(y, innerHeight - mh - 8))}px`;
   const first = m.querySelector('button:not([disabled])');
   if (first) first.focus();
+  syncDiscord();
 }
 
 function closeMenu(restore = true) {
   const m = $('#menuRoot .menu');
   if (!m) return false;
   m.remove();
+  setTimeout(syncDiscord, 0);
   if (restore && S.menuReturn && document.contains(S.menuReturn)) S.menuReturn.focus({ preventScroll: true });
   return true;
 }
@@ -702,6 +817,7 @@ function openModal({ title, body, actions = [], cls = '', onClose }) {
     closed = true;
     back.remove();
     S.modals = S.modals.filter((f) => f !== close);
+    syncDiscord();
     if (onClose) onClose();
     if (ret && document.contains(ret)) ret.focus({ preventScroll: true });
   };
@@ -723,6 +839,7 @@ function openModal({ title, body, actions = [], cls = '', onClose }) {
   back.addEventListener('mousedown', (e) => { if (e.target === back) close(); });
   $('#modalRoot').append(back);
   S.modals.push(close);
+  syncDiscord();
   setTimeout(() => {
     const f = panel.querySelector('[autofocus]') || panel.querySelector('.modal-body input, .modal-body button') || panel.querySelector('.btn.primary, button');
     if (f) f.focus();
@@ -807,8 +924,25 @@ function openDetails(id) {
     h('button', { class: 'btn', onclick: () => { m.close(); coverPicker(id); } }, icon('image'), 'Change cover'),
     it.installDir ? h('button', { class: 'btn', onclick: () => api.openFolder(id) }, icon('folder'), 'Open folder') : null,
     it.installed && !it.manual && it.kind === 'game' ? h('button', { class: 'btn danger', onclick: () => { m.close(); uninstallGame(id); } }, icon('trash'), 'Uninstall') : null);
+  const heroBg = h('div', { class: 'det-hero' + (it.coverUrl ? '' : ' plain'), style: it.coverUrl ? { backgroundImage: `url("${it.coverUrl}")` } : { background: `hsl(${hashHue(it.name) % 360} 45% 16%)` } });
+  const about = h('div', { class: 'det-about' });
+  const showInfo = (info) => {
+    if (!info) return;
+    setHeroBg(heroBg, it, info);
+    const facts = [info.date ? ['Released', info.date] : null, info.devs && info.devs.length ? ['Developer', info.devs.join(', ')] : null, info.genres && info.genres.length ? ['Genre', info.genres.join(', ')] : null, info.metacritic ? ['Metacritic', String(info.metacritic)] : null].filter(Boolean);
+    about.replaceChildren(
+      info.desc ? h('p', { class: 'det-desc' }, info.desc) : null,
+      facts.length ? h('div', { class: 'det-facts' }, facts.map(([k, v]) => h('div', {}, h('span', {}, k), v))) : null,
+      info.shots && info.shots.length ? h('div', { class: 'det-shots' }, info.shots.map((sh, i) => h('button', { class: 'shot', onclick: () => openShots(info.shots, i) }, h('img', { src: sh.thumb, alt: '', loading: 'lazy' })))) : null);
+  };
+  if (it.kind === 'game') {
+    const cached = S.storeInfo.get(it.id);
+    if (cached) showInfo(cached);
+    else api.storeInfo(id).then((info) => { S.storeInfo.set(it.id, info || null); showInfo(info); }).catch(() => {});
+  }
   const body = h('div', { class: 'det' },
-    it.coverUrl ? h('div', { class: 'det-bg', style: { backgroundImage: `url("${it.coverUrl}")` } }) : null,
+    heroBg,
+    h('div', { class: 'det-hero-shade' }),
     h('div', { class: 'det-top' },
       h('div', { class: 'det-art' }, artFor(it)),
       h('div', { class: 'det-info' },
@@ -820,6 +954,7 @@ function openDetails(id) {
           it.installed && it.meta && it.meta.sizeBytes ? stat('Size', fmtBytes(it.meta.sizeBytes)) : null,
           h('div', { class: 'stat' }, achStat, h('div', { class: 'stat-l' }, 'Achievements'))),
         actions)),
+    about,
     h('h3', { class: 'section-title', style: { marginTop: '24px' } }, 'Achievements'),
     achBox);
   m = openModal({ title: null, body, cls: 'wide details-modal' });
@@ -843,6 +978,19 @@ function openDetails(id) {
       achBox.replaceChildren(h('div', { class: r.error ? 'note err' : 'loading' }, msg));
     }
   });
+}
+
+// Screenshots, full size. Arrow keys or the controller move between them.
+function openShots(shots, start) {
+  let i = start;
+  const img = h('img', { class: 'shot-full', alt: '' });
+  const counter = h('span', { class: 'count' });
+  const show = () => { img.src = shots[i].full; counter.textContent = `${i + 1} / ${shots.length}`; };
+  const prev = h('button', { class: 'btn', onclick: () => { i = (i + shots.length - 1) % shots.length; show(); } }, 'Previous');
+  const next = h('button', { class: 'btn', onclick: () => { i = (i + 1) % shots.length; show(); } }, 'Next');
+  show();
+  openModal({ title: null, body: h('div', { class: 'shot-view' }, img, h('div', { class: 'row', style: { justifyContent: 'center', gap: '10px', marginTop: '12px' } }, prev, counter, next)), cls: 'wide shots-modal' });
+  setTimeout(() => next.focus(), 0);
 }
 
 // ---------- friends ----------
@@ -934,7 +1082,10 @@ function pickFriendToLink(p) {
 
 function setFriends(st) {
   S.friends = st || S.friends;
+  const before = [...S.friendGames.keys()].join('|');
+  indexFriendGames();
   if (S.view.type === 'friends') { renderHeader(); renderFriends(); }
+  else if (before !== [...S.friendGames.keys()].join('|') && !['launchers', 'storage', 'discord'].includes(S.view.type)) renderGrid();
   renderSidebar();
 }
 
@@ -1177,6 +1328,24 @@ function openSettings() {
   let gogOwned = s.gogOwned !== false;
   let ubisoftOwned = s.ubisoftOwned !== false;
   let genreSort = s.genreSort !== false;
+  let discordTab = s.discordTab !== false;
+  let discordPresence = s.discordPresence !== false;
+  let discordBrowsing = !!s.discordBrowsing;
+  let tvOnStart = !!s.tvOnStart;
+  const dcId = h('input', { class: 'text-input', value: s.discordClientId || '', placeholder: 'Application ID, like 1234567890123456789', spellcheck: 'false' });
+  const dcTest = h('button', { class: 'btn', onclick: async () => {
+    await api.updateSettings({ discordClientId: dcId.value.trim() });
+    const r = await api.discordTestPresence();
+    showToast(r.ok ? 'Sent a test status. Check your Discord profile in a few seconds.' : 'Paste a valid Application ID first.', r.ok ? 'info' : 'error');
+  } }, 'Test');
+  const accentRow = h('div', { class: 'swatches' }, Object.entries(ACCENTS).map(([k, a]) => {
+    const b = h('button', { class: 'swatch' + (S.accent === k ? ' on' : ''), title: a.name, style: { background: a.c }, onclick: () => {
+      applyAccent(k); accentRow.querySelectorAll('.swatch').forEach((x) => x.classList.toggle('on', x === b));
+    } }, h('span', {}, a.name));
+    return b;
+  }));
+  const sizeRange = h('input', { type: 'range', min: '120', max: '260', step: '10', value: String(S.size) });
+  sizeRange.addEventListener('input', () => { S.size = +sizeRange.value; prefs.set('size', S.size); document.documentElement.style.setProperty('--card-w', `${S.size}px`); renderFilters(); });
 
   const sgdb = secretInput(s.steamGridDbKey, 'Paste your SteamGridDB API key');
   const steamKey = secretInput(s.steamApiKey, 'Paste your Steam Web API key');
@@ -1300,6 +1469,18 @@ function openSettings() {
         h('label', {}, 'CurseForge instances folder'),
         h('div', { class: 'row' }, cf, cfBrowse),
         h('div', { class: 'help' }, 'Only needed if you moved CurseForge\'s Minecraft folder.')),
+      h('div', { class: 'section-label' }, 'Discord'),
+      h('div', { class: 'field' }, toggleRow('Discord tab', 'Discord\'s own app inside Crimson Vault, in the sidebar', discordTab, (v) => { discordTab = v; })),
+      connBlock('Rich Presence', !!s.discordClientId && discordPresence, s.discordClientId ? (discordPresence ? 'On' : 'Off') : 'Not set up', 'discord',
+        h('div', { class: 'help' }, 'Shows the game you are playing on your Discord profile, with its cover. Needs the Discord app running on this PC.'),
+        h('div', { class: 'field', style: { marginTop: '10px' } }, h('label', {}, 'Discord Application ID'), h('div', { class: 'row' }, dcId, dcTest)),
+        toggleRow('Show what I play', null, discordPresence, (v) => { discordPresence = v; }),
+        toggleRow('Show when browsing the library', 'Shows "Browsing the library" when no game is running', discordBrowsing, (v) => { discordBrowsing = v; }),
+        h('button', { class: 'link-btn', style: { marginTop: '6px' }, onclick: async () => { if (await confirmBox('Sign out of the Discord tab?', 'This signs out the Discord tab only. Your Discord app is not touched.', 'Sign out')) { await api.discordSignOut(); showToast('Signed out of the Discord tab'); } } }, 'Sign out of the Discord tab')),
+      h('div', { class: 'section-label' }, 'Look'),
+      h('div', { class: 'field' }, h('label', {}, 'Accent color'), accentRow),
+      h('div', { class: 'field' }, h('label', {}, 'Card size'), h('label', { class: 'size-ctl wide' }, icon('image'), sizeRange)),
+      h('div', { class: 'field' }, toggleRow('Start in controller mode', 'Opens the full screen controller layout when Crimson Vault starts', tvOnStart, (v) => { tvOnStart = v; })),
       h('div', { class: 'section-label' }, 'Music'),
       h('div', { class: 'field' }, toggleRow('Apple Music player', 'Shows what is playing in the sidebar with play, pause and skip', musicEnabled, (v) => { musicEnabled = v; })),
       h('div', { class: 'field' }, toggleRow('Other music apps too', 'Falls back to Spotify, a browser, or whatever is playing when Apple Music is closed', musicAnyApp, (v) => { musicAnyApp = v; }))),
@@ -1312,6 +1493,7 @@ function openSettings() {
         await api.updateSettings({
           steamGridDbKey: sgdb.input.value.trim(), curseforgeInstancesPath: cf.value.trim(), includeApps, musicEnabled, musicAnyApp,
           steamApiKey: steamKey.input.value.trim(), steamId: steamId.value.trim(), gogOwned, openXblKey: xblKey.input.value.trim(), genreSort, ubisoftOwned,
+          discordTab, discordPresence, discordBrowsing, discordClientId: dcId.value.trim(), tvOnStart,
         });
         S.keyErrorShown = false;
         showToast('Settings saved');
@@ -1379,6 +1561,13 @@ function openConnectionsHelp(focus) {
     ]),
     helpSection('gog', 'GOG', null, [
       'Nothing to set up. If GOG Galaxy is installed and signed in on this PC, your GOG games show up automatically.',
+    ]),
+    helpSection('discord', 'Discord Rich Presence: show what you play', 'Discord needs an "application" to show a status. It is free, takes a minute, and its name is what your profile shows, like "Playing Crimson Vault".', [
+      ['Open the Discord Developer Portal and sign in with your Discord account. ', linkBtn('Open Developer Portal', 'https://discord.com/developers/applications')],
+      'Click New Application in the top right, name it Crimson Vault, tick the box and click Create.',
+      'On the General Information page, copy the Application ID.',
+      'Paste it into Settings > Discord > Discord Application ID, click Test, then Save.',
+      'Make sure Discord is running on this PC and that Settings > Activity Privacy > "Share your detected activities with others" is on in Discord.',
     ]),
     helpSection('music', 'Apple Music', null, [
       'Nothing to set up. Play something in Apple Music and it shows in the sidebar.',
@@ -1616,19 +1805,21 @@ window.padActions = {
   a: () => { const el = document.activeElement; if (el && el !== document.body && el.click) el.click(); else spatial.focusDefault(); },
   b: () => {
     if (closeTopLayer()) return;
+    if (S.tv) return;
     const el = document.activeElement;
     if (el && !el.closest('#grid')) spatial.focusDefault();
   },
   x: () => { if (!S.modals.length) surprise(); },
   y: () => { const id = focusedCardId(); if (id) { const it = S.byId.get(id); api.updateItem(id, { favorite: !it.favorite }); showToast(it.favorite ? 'Removed from favorites' : 'Added to favorites'); } },
-  lb: () => { if (!S.modals.length) cycleView(-1); },
-  rb: () => { if (!S.modals.length) cycleView(1); },
+  lb: () => { if (S.modals.length) return; if (S.tv) tvJumpRow(-1); else cycleView(-1); },
+  rb: () => { if (S.modals.length) return; if (S.tv) tvJumpRow(1); else cycleView(1); },
   menu: () => {
     const el = document.activeElement;
     if (el && el.classList && el.classList.contains('nav-action')) return remotePlayMenu({ el });
-    const id = focusedCardId(); if (id) itemMenu(id, { el });
+    const id = focusedCardId(); if (id) itemMenu(id, { el }); else if (!S.tv && !S.modals.length) setTV(true);
   },
-  view: () => { if (!S.modals.length) $('#search').focus(); },
+  // View button: leaves controller mode, or jumps to search.
+  view: () => { if (S.modals.length) return; if (S.tv) setTV(false); else $('#search').focus(); },
   lt: () => $('#content').scrollBy({ top: -innerHeight * 0.7 }),
   rt: () => $('#content').scrollBy({ top: innerHeight * 0.7 }),
 };

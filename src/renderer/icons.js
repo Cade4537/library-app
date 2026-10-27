@@ -1,6 +1,11 @@
 // Small inline line icons. Use <span data-icon="name"></span> or icon('name').
 (function () {
   const P = {
+    chat: '<path d="M4 5h16v11H9l-4 4v-4H4z"/><path d="M8 9.5h8M8 12.5h5"/>',
+    tv: '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/>',
+    sidebar: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',
+    exit: '<path d="M15 4h4v16h-4"/><path d="M10 8l-4 4 4 4M6 12h10"/>',
+    monitor: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M9 20h6"/>',
     search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
     dice: '<rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.2" fill="currentColor"/>',
     chevron: '<path d="m6 9 6 6 6-6"/>',

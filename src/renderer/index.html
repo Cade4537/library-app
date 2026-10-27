@@ -9,6 +9,7 @@
 <body>
   <div id="app">
     <header id="topbar">
+      <button id="sideToggle" class="icon-btn" title="Shrink the sidebar to icons"><span data-icon="sidebar"></span></button>
       <div class="brand"><span class="brand-mark"></span><span class="brand-name">Crimson Vault</span></div>
       <div class="search-wrap">
         <span class="search-icon" data-icon="search"></span>
@@ -20,6 +21,7 @@
           <button id="surpriseBtn" class="btn primary"><span data-icon="dice"></span><span>Surprise me</span></button>
           <button id="surpriseMode" class="btn primary caret" aria-label="Surprise me options"><span data-icon="chevron"></span></button>
         </div>
+        <button id="tvBtn" class="icon-btn" title="Controller mode (full screen)"><span data-icon="tv"></span></button>
         <button id="addBtn" class="icon-btn" title="Add a game or app"><span data-icon="plus"></span></button>
         <button id="rescanBtn" class="icon-btn" title="Rescan launchers"><span data-icon="refresh"></span></button>
         <button id="settingsBtn" class="icon-btn" title="Settings"><span data-icon="gear"></span></button>
@@ -48,6 +50,7 @@
       <section id="friendsView" hidden></section>
       <section id="launchersView" hidden></section>
       <section id="storageView" hidden></section>
+      <section id="discordView" hidden><div id="discordHost"><div class="discord-loading"><span class="spinner"></span>Loading Discord</div></div></section>
       <div id="empty" hidden></div>
     </main>
   </div>
@@ -61,12 +64,33 @@
     <span><b class="pb sh">LB</b><b class="pb sh">RB</b>Switch view</span>
   </div>
 
+  <div id="tv" hidden>
+    <div class="tv-bg"></div>
+    <div class="tv-shade"></div>
+    <header class="tv-top">
+      <div class="brand"><span class="brand-mark"></span><span class="brand-name">Crimson Vault</span></div>
+      <span class="tv-clock"></span>
+      <button id="tvExit" class="btn glass"><span data-icon="exit"></span><span>Exit controller mode</span></button>
+    </header>
+    <div class="tv-feature"></div>
+    <div class="tv-rows"></div>
+    <footer class="tv-hints">
+      <span><b class="pb a">A</b>Details</span>
+      <span><b class="pb b">B</b>Back</span>
+      <span><b class="pb x">X</b>Surprise me</span>
+      <span><b class="pb y">Y</b>Favorite</span>
+      <span><b class="pb sh">LB</b><b class="pb sh">RB</b>Change row</span>
+      <span><b class="pb m">&#9783;</b>Exit controller mode</span>
+    </footer>
+  </div>
+
   <div id="modalRoot"></div>
   <div id="menuRoot"></div>
   <div id="toasts"></div>
 
   <script src="icons.js"></script>
   <script src="gamepad.js"></script>
+  <script src="features.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

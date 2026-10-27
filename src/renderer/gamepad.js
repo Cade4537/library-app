@@ -6,6 +6,8 @@
     if (menu) return menu;
     const modals = document.querySelectorAll('#modalRoot .modal');
     if (modals.length) return modals[modals.length - 1];
+    const tv = document.getElementById('tv');
+    if (tv && !tv.hidden) return tv;
     return document.getElementById('app');
   }
 
@@ -26,7 +28,7 @@
 
   function focusDefault() {
     const layer = activeLayer();
-    const first = layer.querySelector('.card') || layer.querySelector('.tile') || focusables(layer)[0];
+    const first = layer.querySelector('.card') || layer.querySelector('.tile') || layer.querySelector('.hero .btn') || focusables(layer)[0];
     focusEl(first);
   }
 
@@ -146,7 +148,8 @@
       let ry = 0;
       for (const g of pads) { const v = g.axes[3] || 0; if (Math.abs(v) > 0.25) ry = v; }
       if (ry) {
-        const scroller = document.querySelector('#modalRoot .modal-body') || document.getElementById('content');
+        const tv = document.getElementById('tv');
+        const scroller = document.querySelector('#modalRoot .modal-body') || (tv && !tv.hidden ? tv.querySelector('.tv-rows') : null) || document.getElementById('content');
         scroller.scrollBy({ top: ry * 22, behavior: 'auto' });
       }
     }

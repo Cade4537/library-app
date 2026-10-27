@@ -45,6 +45,12 @@ Settings > Connections. Settings > Help has step by step guides, including the D
 
 Owned games that are not installed show when the Installed / All owned switch above the cards is set to All owned. They are greyed out with a Not installed tag, and clicking Install opens the right launcher.
 
+## Home and details
+
+- **Continue playing:** the top of Home shows your last game as a big banner with its art, hours and achievement progress, plus the next four as tiles.
+- **Details:** clicking a card opens its page with the game's wide art, description, release date, developer, genres and screenshots from the Steam store (click a screenshot to see it full size), plus hours, size and achievements.
+- **Cards:** hover a card to see hours played and achievement progress. A green tag shows when a friend is playing that game. Covers shimmer while they load.
+
 ## Library
 
 - **Cards:** clicking a card opens its details (hours, last played, size, achievements, Play, Change cover, Open folder, Uninstall). The Play button on a card launches straight away.
@@ -67,6 +73,19 @@ Hours come from Steam, Epic, GOG Galaxy and Xbox when connected. For every other
 
 Steam, Xbox and Epic friends, sorted into Playing, Online, Away and Offline. Epic only shares when someone was last online. The same person on more than one platform is matched by name automatically; click a friend to link or unlink accounts by hand.
 
+## Discord
+
+- **Discord tab:** Discord's own web app in the sidebar, signed in once and kept. Voice calls keep going while you switch pages, and screen share asks which screen or window to share. Turn the tab off in Settings > Discord.
+- **Rich Presence:** shows the game you are playing on your Discord profile with its cover, for every launcher (including Xbox and Epic games Discord does not detect). Needs a free Discord Application ID; Settings > Help > Discord walks through it in a minute.
+
+## Controller mode
+
+The TV button in the top bar (or Menu on a controller with no card selected) opens a full screen layout made for the couch: big covers in rows (Continue playing, Favorites, each genre, Apps), with the focused game's art behind. A opens details, LB / RB jump between rows, X is Surprise me, Y favorites, and View (or Esc) leaves. Settings can open it on start.
+
+## Look
+
+Settings > Look has six accent colors and the card size. The button left of the logo shrinks the sidebar to icons.
+
 ## Storage
 
 The Storage tab shows free space on every drive (and how much your games use) and every installed game by size. Steam and Epic report sizes themselves; other games are measured in the background. Uninstall starts the launcher's own uninstall: Steam asks to confirm, GOG, Ubisoft, Rockstar and Riot run their uninstaller, Xbox opens Windows Installed apps, and Epic games use their Windows uninstaller when one exists, otherwise the Epic launcher opens so you can uninstall there.
@@ -77,7 +96,9 @@ Shows which game launchers are installed and how many games each has. Click one 
 
 ## Xbox Remote Play
 
-The sidebar button opens the Xbox app so you can stream games from your console to this PC. Right click it to open remote play in a browser instead.
+The sidebar button (or Stream from console in an Xbox game's details) opens Xbox Remote Play in its own full screen Crimson Vault window, signed in with your Xbox connection. If you have one console it starts streaming by itself; with more than one, pick the console. F11 leaves full screen and Ctrl+W closes the window.
+
+Right click the button (or press Menu on a controller) for other ways: open the Xbox app and let Crimson Vault press its remote play buttons for you, open the Xbox app only, or open remote play in your browser.
 
 ## Apple Music
 
@@ -93,7 +114,8 @@ The player at the bottom of the sidebar reads what is playing from Windows media
 | Surprise me | Button in top bar | X |
 | Favorite | Right click menu | Y |
 | Card options | Right click | Menu |
-| Switch view | Sidebar | LB / RB |
+| Switch page | Sidebar | LB / RB (stops at the first and last page) |
+| Controller mode | TV button | Menu (no card selected); View leaves |
 | Search | Ctrl+F or / | View |
 | Scroll | Wheel | Right stick, LT / RT |
 | Fullscreen | F11 | |
@@ -119,6 +141,6 @@ One time setup (already done): the public repo `Cade4537/library-app` and a GitH
 
 Every release:
 
-1. Raise `version` in package.json (for example 0.9.1 to 0.9.2). Releasing the same version again only overwrites it, and installed copies will not update.
+1. Raise `version` in package.json (for example 0.9.5 to 0.9.6. Use three numbers only; a fourth number (like 0.9.4.5) breaks updates). Releasing the same version again only overwrites it, and installed copies will not update.
 2. Commit and push in GitHub Desktop.
 3. Run `npm run release` in a terminal opened after `GH_TOKEN` was set.

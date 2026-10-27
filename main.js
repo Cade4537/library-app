@@ -1,4 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, clipboard } = require('electron');
+const { DiscordView } = require('./src/main/discordView');
+const { DiscordRpc } = require('./src/main/discordRpc');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { Store } = require('./src/main/store');
@@ -40,6 +42,27 @@ let sizes = null;
 let collections = [];
 let lastRegistry = {};
 let steamIdCache = null;
+let discordView = null;
+const rpc = new DiscordRpc();
+const runningSince = new Map();
+const pendingSource = new Map();
+const APP_ICON_URL = 'https://raw.githubusercontent.com/Cade4537/library-app/main/assets/icon.png';
+
+// Shows the game you are playing on Discord (when Rich Presence is set up in Settings).
+function updatePresence() {
+  const s = store.data.settings;
+  rpc.configure(s.discordClientId, s.discordPresence !== false);
+  const now = playtime ? playtime.running : new Set();
+  for (const id of [...runningSince.keys()]) if (!now.has(id)) runningSince.delete(id);
+  for (const id of now) if (!runningSince.has(id)) runningSince.set(id, Date.now());
+  const it = [...now].map((id) => store.data.items[id]).find((x) => x && x.kind === 'game');
+  if (!it) { rpc.set(s.discordBrowsing ? { details: 'Browsing the library', image: APP_ICON_URL, imageText: 'Crimson Vault' } : null); return; }
+  const appid = it.steamAppId || (steamInfo && steamInfo.appIdFor(it));
+  const image = appid ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/library_600x900.jpg`
+    : /^https:\/\//.test(it.coverHint || '') ? it.coverHint : APP_ICON_URL;
+  const LABELS = { steam: 'Steam', epic: 'Epic Games', gog: 'GOG', ubisoft: 'Ubisoft Connect', xbox: 'Xbox', rockstar: 'Rockstar', riot: 'Riot', curseforge: 'CurseForge' };
+  rpc.set({ details: it.customName || it.name, state: LABELS[it.source] ? `via ${LABELS[it.source]}` : undefined, start: runningSince.get(it.id), image, imageText: it.customName || it.name });
+}
 
 // Your SteamID: typed in Settings, found during the last scan, or read from the Steam app.
 async function getSteamId() {
@@ -60,6 +83,46 @@ function publicSettings() {
   s.xboxGamertag = (s.xboxLive && s.xboxLive.gamertag) || '';
   delete s.xboxLive;
   return s;
+}
+
+// Description, release date and screenshots from the Steam store, for the details page.
+const storeInfoMem = new Map();
+async function storeInfo(it) {
+  if (!it || it.kind !== 'game') return null;
+  const appid = it.steamAppId || (steamInfo && steamInfo.appIdFor(it));
+  if (!appid) return null;
+  if (!store.data.storeExtra) store.data.storeExtra = {};
+  const cached = store.data.storeExtra[appid];
+  if (cached && Date.now() - cached.t < 30 * 86400000) return cached;
+  if (storeInfoMem.has(appid)) return storeInfoMem.get(appid);
+  const p = (async () => {
+    try {
+      const res = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appid}&l=english&cc=US`, { signal: AbortSignal.timeout(15000) });
+      const d = ((await res.json())[appid] || {}).data;
+      if (!d) return null;
+      const out = {
+        t: Date.now(),
+        appid: String(appid),
+        desc: String(d.short_description || '').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim(),
+        date: d.release_date && !d.release_date.coming_soon ? d.release_date.date : d.release_date && d.release_date.date ? `Coming ${d.release_date.date}` : '',
+        devs: (d.developers || []).slice(0, 2),
+        genres: (d.genres || []).map((g) => g.description).slice(0, 4),
+        hero: `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/library_hero.jpg`,
+        bg: d.background_raw || d.background || d.header_image || '',
+        shots: (d.screenshots || []).slice(0, 8).map((s) => ({ thumb: s.path_thumbnail, full: s.path_full })),
+        metacritic: d.metacritic && d.metacritic.score ? d.metacritic.score : null,
+      };
+      store.data.storeExtra[appid] = out;
+      store.changed();
+      return out;
+    } catch {
+      return null;
+    } finally {
+      setTimeout(() => storeInfoMem.delete(appid), 60000);
+    }
+  })();
+  storeInfoMem.set(appid, p);
+  return p;
 }
 
 function applyAutoCategories() {
@@ -268,9 +331,23 @@ function registerIpc() {
     return ok;
   });
 
+  ipcMain.handle('discord:bounds', (_e, b) => { if (discordView) discordView.set(b); });
+  ipcMain.handle('discord:reload', () => discordView && discordView.reload());
+  ipcMain.handle('discord:signOut', () => discordView && discordView.signOut());
+  ipcMain.handle('discord:openApp', () => shell.openExternal('discord://'));
+  ipcMain.handle('discord:source', (_e, id, sourceId) => { const r = pendingSource.get(id); if (r) { pendingSource.delete(id); r(sourceId || null); } });
+  ipcMain.handle('discord:testPresence', () => {
+    rpc.configure(store.data.settings.discordClientId, true);
+    rpc.set({ details: 'Testing Crimson Vault', state: 'Rich Presence works', image: APP_ICON_URL, imageText: 'Crimson Vault', start: Date.now() });
+    setTimeout(updatePresence, 15000);
+    return { ok: !!rpc.clientId, connected: rpc.ready };
+  });
+  ipcMain.handle('item:storeInfo', (_e, id) => storeInfo(store.data.items[id]));
+
   ipcMain.handle('settings:update', (_e, patch) => {
     const before = store.data.settings;
     store.data.settings = { ...before, ...patch };
+    if (['discordClientId', 'discordPresence', 'discordBrowsing'].some((k) => k in patch)) updatePresence();
     const keyChanged = 'steamGridDbKey' in patch && patch.steamGridDbKey !== before.steamGridDbKey;
     store.changed();
     if (keyChanged) {
@@ -415,8 +492,16 @@ function registerIpc() {
   });
   ipcMain.handle('xbox:remotePlay', async (_e, where) => {
     if (where === 'web') return shell.openExternal('https://www.xbox.com/play/consoles');
-    if (where === 'window') return openRemotePlayWindow(win);
-    if (where === 'appAuto') return openXboxAppAndConnect();
+    let consoleName = '';
+    if (where === 'window' || where === 'appAuto') {
+      try {
+        const list = await xbox.consoles();
+        const pick = list.find((c) => /^on$/i.test(c.power || '')) || list[0];
+        consoleName = (pick && pick.name) || '';
+      } catch {}
+    }
+    if (where === 'window') return openRemotePlayWindow(win, consoleName);
+    if (where === 'appAuto') return openXboxAppAndConnect(consoleName);
     try {
       await launchItem({ launch: { type: 'aumid', target: XBOX_APP_AUMID } });
     } catch {
@@ -425,6 +510,7 @@ function registerIpc() {
   });
   ipcMain.handle('app:openDataFolder', () => shell.openPath(app.getPath('userData')));
   ipcMain.handle('app:toggleFullscreen', () => win.setFullScreen(!win.isFullScreen()));
+  ipcMain.handle('app:setFullscreen', (_e, v) => win.setFullScreen(!!v));
   ipcMain.handle('app:copyText', (_e, text) => clipboard.writeText(String(text || '')));
   ipcMain.handle('app:openExternal', (_e, url) => {
     if (/^https:\/\//.test(url)) shell.openExternal(url);
@@ -451,7 +537,7 @@ if (!app.requestSingleInstanceLock()) {
     media = new MediaBridge((s) => sendTo('media:state', s));
     for (const c of BASIC_CATEGORIES) store.ensureCategoryPath(`Games/${c}`);
     steamInfo = new SteamInfo(store, () => { applyAutoCategories(); store.changed(); });
-    playtime = new PlaytimeTracker(store, () => store.changed());
+    playtime = new PlaytimeTracker(store, () => { store.changed(); updatePresence(); });
     sizes = new SizeTracker(store, () => store.changed());
     xbox = new XboxLive(store);
     epic = new EpicClient(store);
@@ -459,6 +545,13 @@ if (!app.requestSingleInstanceLock()) {
     registerIpc();
     createWindow();
     playtime.start();
+    discordView = new DiscordView(() => win, (list) => new Promise((resolve) => {
+      const id = Math.random().toString(36).slice(2);
+      pendingSource.set(id, resolve);
+      sendTo('discord:pickSource', { id, list });
+      setTimeout(() => { if (pendingSource.has(id)) { pendingSource.delete(id); resolve(null); } }, 120000);
+    }));
+    updatePresence();
     setTimeout(() => friends.start(), 4000);
     updater.start();
     media.configure({ enabled: store.data.settings.musicEnabled !== false, anyApp: !!store.data.settings.musicAnyApp });
@@ -467,6 +560,7 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.on('before-quit', () => {
+    rpc.set(null); rpc.close();
     if (store) store.saveNow();
     if (media) { media.enabled = false; media.stop(); }
     if (playtime) playtime.stop();
