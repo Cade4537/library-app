@@ -45,6 +45,7 @@ contextBridge.exposeInMainWorld('library', {
   refreshFriends: call('friends:refresh'),
   linkFriends: call('friends:link'),
   unlinkFriends: call('friends:unlink'),
+  removeFriend: call('friends:remove'),
   remotePlay: call('xbox:remotePlay'),
   getLaunchers: call('launchers:get'),
   getDrives: call('storage:drives'),

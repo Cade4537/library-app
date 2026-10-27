@@ -189,6 +189,26 @@ class Friends {
     this.relink();
   }
 
+  // Removes one friend account on its platform. Steam has no public call for this, so its profile opens instead.
+  async remove(key) {
+    const i = String(key).indexOf(':');
+    const platform = key.slice(0, i), id = key.slice(i + 1);
+    if (platform === 'steam') return { openProfile: `steam://url/SteamIDPage/${id}` };
+    try {
+      if (platform === 'xbox') await this.xbox.removeFriend(id);
+      else if (platform === 'epic') {
+        if (!this.epic || !this.epic.connected) throw new Error('Sign in to Epic in Settings first.');
+        if (!/^[0-9a-f]+$/i.test(id)) throw new Error('Unknown Epic friend');
+        await this.epic.remove(`https://friends-public-service-prod.ol.epicgames.com/friends/api/v1/${this.epic.accountId}/friends/${id}`);
+      } else throw new Error('This friend cannot be removed from here.');
+    } catch (e) {
+      return { error: e.message };
+    }
+    this.accounts = (this.accounts || []).filter((a) => a.key !== key);
+    this.relink();
+    return { ok: true };
+  }
+
   // Splits a person back into separate accounts and stops them being matched again automatically.
   unlink(keys) {
     const L = this.store.data.friendLinks;

@@ -1,4 +1,4 @@
-# Library (working name)
+# Crimson Vault
 
 One launcher for every game and app on this PC: installed and owned games from every store, cover art, genre categories, friends, hours played, achievements, storage and an Apple Music player. Red and black, works with mouse, keyboard or controller.
 
@@ -69,7 +69,7 @@ Steam, Xbox and Epic friends, sorted into Playing, Online, Away and Offline. Epi
 
 ## Storage
 
-The Storage tab shows free space on every drive (and how much your games use) and every installed game by size. Steam and Epic report sizes themselves; other games are measured in the background. Uninstall starts the launcher's own uninstall: Steam asks to confirm, GOG, Ubisoft, Rockstar and Riot run their uninstaller, Xbox opens Windows Installed apps, and Epic opens its launcher, since Epic only uninstalls from there.
+The Storage tab shows free space on every drive (and how much your games use) and every installed game by size. Steam and Epic report sizes themselves; other games are measured in the background. Uninstall starts the launcher's own uninstall: Steam asks to confirm, GOG, Ubisoft, Rockstar and Riot run their uninstaller, Xbox opens Windows Installed apps, and Epic games use their Windows uninstaller when one exists, otherwise the Epic launcher opens so you can uninstall there.
 
 ## Launchers tab
 
@@ -109,7 +109,7 @@ npm install
 npm run dist
 ```
 
-The installer lands in `dist\Library-Setup-<version>.exe`. The exe is not code signed, so Windows may show "Windows protected your PC" the first time: click More info, then Run anyway. If the build fails with "Cannot create symbolic link", turn on Developer Mode in Windows settings once.
+The installer lands in `dist\Crimson-Vault-Setup-<version>.exe`. The exe is not code signed, so Windows may show "Windows protected your PC" the first time: click More info, then Run anyway. If the build fails with "Cannot create symbolic link", turn on Developer Mode in Windows settings once.
 
 ## Updates
 
@@ -119,6 +119,6 @@ One time setup (already done): the public repo `Cade4537/library-app` and a GitH
 
 Every release:
 
-1. Raise `version` in package.json (for example 0.9.0 to 0.9.1). Releasing the same version again only overwrites it, and installed copies will not update.
+1. Raise `version` in package.json (for example 0.9.1 to 0.9.2). Releasing the same version again only overwrites it, and installed copies will not update.
 2. Commit and push in GitHub Desktop.
 3. Run `npm run release` in a terminal opened after `GH_TOKEN` was set.

@@ -57,21 +57,31 @@ async function xboxAchievements(xbox, titleId) {
 
 // Epic: the same GraphQL service the Epic store's achievement pages use. Definitions are public;
 // your unlocks are read with your Epic sign in.
-const EPIC_GQL = 'https://graphql.epicgames.com/ue/graphql';
+const EPIC_GQL = ['https://launcher.store.epicgames.com/graphql', 'https://graphql.epicgames.com/ue/graphql'];
+const EPIC_UA = 'EpicGamesLauncher/14.0.8-22004686+++Portal+Release-Live';
 const Q_DEFS = `query Achievement($sandboxId: String!, $locale: String!) { Achievement { productAchievementsRecordBySandbox(sandboxId: $sandboxId, locale: $locale) { totalAchievements achievements { achievement { name hidden unlockedDisplayName lockedDisplayName unlockedDescription lockedDescription unlockedIconLink lockedIconLink XP rarity { percent } } } } } }`;
-const Q_PLAYER = `query PlayerAchievement($epicAccountId: String!, $sandboxId: String!) { PlayerAchievement { playerAchievementGameRecordsBySandbox(epicAccountId: $epicAccountId, sandboxId: $sandboxId) { records { totalXP totalUnlocked playerAchievements { playerAchievement { achievementName unlocked unlockDate progress XP } } } } } }`;
+const Q_PLAYER = `query PlayerAchievement($epicAccountId: String!, $sandboxId: String!) { PlayerAchievement { playerAchievementGameRecordsBySandbox(epicAccountId: $epicAccountId, sandboxId: $sandboxId) { records { playerAchievements { playerAchievement { achievementName unlocked unlockDate } } } } } }`;
 const DEFS_HASH = '7d54399ad8b8b5538bc2d93ee66b07014432b5488945cda35fe0b1fc70eea83a';
 
 async function gql(body, token) {
-  const res = await fetch(EPIC_GQL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(20000),
-  });
-  const j = await res.json().catch(() => null);
-  if (!res.ok || !j || (j.errors && !j.data)) throw new Error(`Epic achievements error ${res.status}`);
-  return j.data;
+  // The store's launcher endpoint answers player data for the launcher's own token; fall back to the older one.
+  let last;
+  for (const url of EPIC_GQL) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'User-Agent': EPIC_UA, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(20000),
+      });
+      const j = await res.json().catch(() => null);
+      if (!res.ok || !j || !j.data || (Array.isArray(j.errors) && j.errors.length)) throw new Error(`Epic achievements error ${res.status}${j && j.errors && j.errors[0] ? `: ${j.errors[0].message}` : ''}`);
+      return j.data;
+    } catch (e) {
+      last = e;
+    }
+  }
+  throw last;
 }
 
 async function epicAchievements(epic, it) {
@@ -95,9 +105,12 @@ async function epicAchievements(epic, it) {
     const records = (p && p.PlayerAchievement && p.PlayerAchievement.playerAchievementGameRecordsBySandbox && p.PlayerAchievement.playerAchievementGameRecordsBySandbox.records) || [];
     for (const r of records) for (const pa of r.playerAchievements || []) {
       const a = pa.playerAchievement;
-      if (a && a.achievementName) got.set(a.achievementName, a);
+      if (!a || !a.achievementName) continue;
+      const prev = got.get(a.achievementName);
+      if (!prev || !prev.unlocked) got.set(a.achievementName, a); // the same achievement can repeat; keep the unlocked one
     }
   } catch (e) {
+    console.warn('[epic achievements]', e.message);
     playerError = 'Could not read your Epic unlocks right now, showing the full list.';
   }
   const list = defs.map((d) => {
@@ -108,7 +121,7 @@ async function epicAchievements(epic, it) {
       description: unlocked ? d.unlockedDescription : d.lockedDescription || (d.hidden ? 'Hidden achievement' : d.unlockedDescription),
       icon: unlocked ? d.unlockedIconLink : d.lockedIconLink || d.unlockedIconLink,
       unlocked,
-      unlockTime: g && g.unlockDate ? Date.parse(g.unlockDate) || 0 : 0,
+      unlockTime: unlocked && g.unlockDate ? Date.parse(g.unlockDate) || 0 : 0,
       xp: Number(d.XP) || 0,
       rarity: d.rarity && d.rarity.percent,
     };

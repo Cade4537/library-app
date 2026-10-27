@@ -37,6 +37,12 @@ class EpicClient {
     if (!res.ok) throw new Error(`Epic error ${res.status}`);
     return res.json();
   }
+
+  async remove(url) {
+    const res = await fetch(url, { method: 'DELETE', headers: { Authorization: `Bearer ${await this.token()}` }, signal: AbortSignal.timeout(20000) });
+    if (res.status === 401) { this.access = null; throw new Error('Epic sign in expired. Sign in again in Settings.'); }
+    if (!res.ok && res.status !== 404) throw new Error(`Epic error ${res.status}`);
+  }
 }
 
 module.exports = { EpicClient };

@@ -879,10 +879,23 @@ function friendCard(p) {
     '-',
     { label: 'Link with another friend', run: () => pickFriendToLink(p) },
     p.accounts.length > 1 ? { label: 'Unlink accounts', run: async () => { await api.unlinkFriends(p.accounts.map((a) => a.key)); showToast('Accounts unlinked'); } } : null,
+    '-',
+    ...p.accounts.map((a) => ({ label: a.platform === 'steam' ? 'Remove on Steam (opens profile)' : `Remove ${a.name} from ${PLAT[a.platform] || a.platform} friends`, danger: true, run: () => removeFriend(a) })),
   ].filter(Boolean), pos);
   card.addEventListener('click', () => menu({ el: card }));
   card.addEventListener('contextmenu', (e) => { e.preventDefault(); menu({ x: e.clientX, y: e.clientY }); });
   return card;
+}
+
+async function removeFriend(a) {
+  const plat = PLAT[a.platform] || a.platform;
+  if (a.platform !== 'steam') {
+    const ok = await confirmBox(`Remove ${a.name}?`, `${a.name} will be removed from your ${plat} friends. This happens on ${plat} itself, so you would need to add them again to undo it.`, 'Remove friend');
+    if (!ok) return;
+  }
+  const r = await api.removeFriend(a.key);
+  if (r && r.ok) showToast(r.message || `Removed ${a.name} from ${plat} friends`);
+  else showToast((r && r.error) || 'Could not remove that friend', 'error');
 }
 
 function pickFriendToLink(p) {
@@ -1229,7 +1242,7 @@ function openSettings() {
     const btn = u.status === 'ready'
       ? h('button', { class: 'btn primary', onclick: () => api.installUpdate() }, 'Restart to update')
       : h('button', { class: 'btn', disabled: u.status === 'dev' || u.status === 'checking' || u.status === 'downloading', onclick: () => api.checkUpdate() }, 'Check for updates');
-    about.replaceChildren(h('div', {}, h('b', {}, `Library ${S.version ? 'v' + S.version : ''}`), h('small', {}, status)), btn);
+    about.replaceChildren(h('div', {}, h('b', {}, `Crimson Vault ${S.version ? 'v' + S.version : ''}`), h('small', {}, status)), btn);
   };
   fillAbout();
   S.refreshAbout = () => { if (document.contains(about)) fillAbout(); };

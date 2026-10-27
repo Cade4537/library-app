@@ -167,7 +167,7 @@ function createWindow() {
     minWidth: 900,
     minHeight: 600,
     backgroundColor: '#0a0a0b',
-    title: 'Library',
+    title: 'Crimson Vault',
     icon: path.join(__dirname, 'assets', 'icon.ico'),
     titleBarStyle: 'hidden',
     titleBarOverlay: { color: '#0a0a0b', symbolColor: '#d6d6da', height: 44 },
@@ -407,6 +407,11 @@ function registerIpc() {
   ipcMain.handle('friends:refresh', () => friends.refresh());
   ipcMain.handle('friends:link', (_e, a, b) => friends.link(a, b));
   ipcMain.handle('friends:unlink', (_e, keys) => friends.unlink(keys));
+  ipcMain.handle('friends:remove', async (_e, key) => {
+    const r = await friends.remove(String(key || ''));
+    if (r.openProfile) { shell.openExternal(r.openProfile); return { ok: true, message: 'Steam opened their profile. Use the ... menu there and pick Remove Friend.' }; }
+    return r;
+  });
   ipcMain.handle('xbox:remotePlay', async (_e, where) => {
     if (where === 'web') return shell.openExternal('https://www.xbox.com/play/consoles');
     try {

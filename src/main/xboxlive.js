@@ -147,7 +147,15 @@ class XboxLive {
     });
     if (res.status === 401) { this.xsts = null; throw new Error('Xbox sign in expired. Sign in again in Settings.'); }
     if (!res.ok) throw new Error(`Xbox error ${res.status}`);
-    return res.json();
+    const text = await res.text();
+    return text ? JSON.parse(text) : {};
+  }
+
+  // Unfollows a friend on Xbox (needs the Microsoft sign in, OpenXBL keys cannot do it).
+  async removeFriend(xuid) {
+    if (!this.signedIn) throw new Error('Sign in with Microsoft in Settings to remove Xbox friends from here.');
+    if (!/^\d+$/.test(String(xuid))) throw new Error('Unknown Xbox friend');
+    await this.request(`https://social.xboxlive.com/users/me/people/xuid(${xuid})`, 1, { method: 'DELETE' });
   }
 
   // ---------- data, from Xbox Live when signed in, otherwise OpenXBL ----------
