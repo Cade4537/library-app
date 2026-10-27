@@ -407,3 +407,13 @@ body.pad #toasts { bottom: 74px; }
 .np-ctrls .ic { width: 16px; height: 16px; }
 .np-open { width: 100%; justify-content: center; }
 #scanStatus { margin-top: 0; }
+
+/* ---------- owned but not installed ---------- */
+.card.not-installed .art img.cover, .card.not-installed .fallback { filter: grayscale(.85) brightness(.6); transition: filter .2s; }
+.card.not-installed:hover .art img.cover, .card.not-installed:focus .art img.cover { filter: grayscale(.2) brightness(.85); }
+.card.not-installed .title { color: var(--muted); }
+.ni-badge { position: absolute; left: 8px; bottom: 8px; display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 6px; background: rgba(10,10,11,.85); font-size: 11px; font-weight: 600; color: #d6d6da; transition: opacity .15s; }
+.ni-badge .ic { width: 12px; height: 12px; }
+.card:hover .ni-badge, .card:focus .ni-badge { opacity: 0; }
+#filters .seg { margin-right: 6px; }
+.section-label { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); margin: 22px 0 10px; }

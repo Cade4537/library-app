@@ -69,6 +69,7 @@ const S = {
   size: prefs.get('size', 170),
   collapsed: new Set(prefs.get('collapsed', [])),
   surprisePool: prefs.get('surprisePool', 'installed'),
+  libMode: prefs.get('libMode', 'installed'),
   modals: [],
   menuReturn: null,
   keyErrorShown: false,
@@ -116,7 +117,9 @@ function isGrouped(it) {
   const p = S.byId.get(it.parentId);
   return !!(p && !p.missing && p.installed !== false);
 }
-const shown = (it) => !it.hidden && (it.installed || it.manual);
+// Owned on Steam or GOG but not installed on this PC.
+const notInstalled = (it) => !it.installed && !it.manual && !!it.owned;
+const shown = (it) => !it.hidden && (it.installed || it.manual || (S.libMode === 'all' && !!it.owned));
 const visible = (it) => shown(it) && !isGrouped(it);
 const relatedOf = (id) => (S.related && S.related.get(id)) || [];
 
@@ -195,7 +198,7 @@ function artFor(it) {
 const cardCache = new Map();
 
 function cardSig(it) {
-  return [displayName(it), it.coverUrl, it.iconUrl, it.coverFit, it.favorite, it.source, it.missing, it.hidden, relatedOf(it.id).length, isGrouped(it)].join('|');
+  return [displayName(it), it.coverUrl, it.iconUrl, it.coverFit, it.favorite, it.source, it.missing, it.hidden, relatedOf(it.id).length, isGrouped(it), notInstalled(it)].join('|');
 }
 
 function buildCard(id) {
@@ -216,13 +219,15 @@ function fillCard(card, it) {
   if (card.dataset.sig === sig) return;
   card.dataset.sig = sig;
   card.classList.toggle('missing', !!it.missing);
+  card.classList.toggle('not-installed', notInstalled(it));
   const art = artFor(it);
   art.append(h('span', { class: `badge src-${it.source}` }, SOURCES[it.source] || it.source));
   if (it.favorite) art.append(h('span', { class: 'fav-mark' }, icon('star')));
   const more = h('span', { class: 'more-btn', title: 'Options' }, icon('more'));
   more.addEventListener('click', (e) => { e.stopPropagation(); itemMenu(it.id, { el: card }); });
   art.append(more);
-  art.append(h('div', { class: 'play-pill' }, h('span', {}, icon('play'), it.kind === 'game' ? 'Play' : 'Open')));
+  if (notInstalled(it)) art.append(h('span', { class: 'ni-badge' }, icon('download'), 'Not installed'));
+  art.append(h('div', { class: 'play-pill' }, h('span', {}, icon(notInstalled(it) ? 'download' : 'play'), notInstalled(it) ? 'Install' : it.kind === 'game' ? 'Play' : 'Open')));
   const rel = relatedOf(it.id).length;
   const sub = rel ? h('span', { class: 'sub related-link', role: 'button', onclick: (e) => { e.stopPropagation(); relatedModal(it.id); } }, `+${rel} related ${rel === 1 ? 'app' : 'apps'}`)
     : isGrouped(it) ? h('div', { class: 'sub' }, `Part of ${(S.byId.get(it.parentId) || {}).name || 'a suite'}`) : null;
@@ -411,7 +416,11 @@ function renderFilters() {
     document.documentElement.style.setProperty('--card-w', `${S.size}px`);
     prefs.set('size', S.size);
   });
-  $('#filters').replaceChildren(...chips, h('span', { class: 'spacer' }),
+  const anyOwned = S.lib.items.some((it) => notInstalled(it) && !it.hidden);
+  const modeSeg = anyOwned ? h('div', { class: 'seg' },
+    h('button', { class: S.libMode === 'installed' ? 'on' : '', onclick: () => { S.libMode = 'installed'; prefs.set('libMode', 'installed'); render(); } }, 'Installed'),
+    h('button', { class: S.libMode === 'all' ? 'on' : '', onclick: () => { S.libMode = 'all'; prefs.set('libMode', 'all'); render(); } }, 'All owned')) : null;
+  $('#filters').replaceChildren(...[modeSeg].filter(Boolean), ...chips, h('span', { class: 'spacer' }),
     h('div', { class: 'row', style: { gap: '14px' } }, sortBtn, h('label', { class: 'size-ctl', title: 'Card size' }, icon('image'), range)));
 }
 
@@ -442,7 +451,8 @@ function renderGrid() {
 async function launch(id) {
   const it = S.byId.get(id);
   if (!it) return;
-  showToast(`${it.kind === 'game' ? 'Launching' : 'Opening'} ${displayName(it)}`);
+  if (notInstalled(it)) showToast(`Opening ${SOURCES[it.source] || 'the launcher'} to install ${displayName(it)}`);
+  else showToast(`${it.kind === 'game' ? 'Launching' : 'Opening'} ${displayName(it)}`);
   const r = await api.launch(id);
   if (!r || !r.ok) showToast(`Could not launch: ${(r && r.error) || 'unknown error'}`, 'error');
 }
@@ -451,7 +461,7 @@ function itemMenu(id, pos) {
   const it = S.byId.get(id);
   if (!it) return;
   openMenu([
-    { label: it.kind === 'game' ? 'Play' : 'Open', run: () => launch(id) },
+    { label: notInstalled(it) ? 'Install' : it.kind === 'game' ? 'Play' : 'Open', run: () => launch(id) },
     { label: it.favorite ? 'Remove from favorites' : 'Add to favorites', run: () => api.updateItem(id, { favorite: !it.favorite }) },
     '-',
     { label: 'Change cover', run: () => coverPicker(id) },
@@ -461,6 +471,7 @@ function itemMenu(id, pos) {
     { label: 'Open install folder', disabled: !it.installDir, run: () => api.openFolder(id) },
     relatedOf(id).length ? { label: `Related apps (${relatedOf(id).length})`, run: () => relatedModal(id) } : null,
     isGrouped(it) ? { label: 'Show as separate app', run: () => api.updateItem(id, { ungrouped: true }) } : null,
+    isGrouped(it) ? { label: 'Make this the main app', run: () => { api.updateItem(id, { suiteMain: true }); showToast(`${displayName(it)} is now the main app`); } } : null,
     it.parentId && it.ungrouped && S.byId.has(it.parentId) ? { label: `Group under ${displayName(S.byId.get(it.parentId))}`, run: () => api.updateItem(id, { ungrouped: false }) } : null,
     '-',
     { label: it.hidden ? 'Unhide' : 'Hide', run: () => api.updateItem(id, { hidden: !it.hidden }) },
@@ -766,6 +777,14 @@ function openSettings() {
   const cfBrowse = h('button', { class: 'btn', onclick: async () => { const f = await api.pickFolder(); if (f) cf.value = f; } }, 'Browse');
   let includeApps = s.includeApps !== false;
   let musicEnabled = s.musicEnabled !== false;
+  let gogOwned = s.gogOwned !== false;
+  const os = S.lib.ownedStatus || {};
+  const steamKey = h('input', { class: 'text-input', type: 'password', value: s.steamApiKey || '', placeholder: 'Paste your Steam Web API key', spellcheck: 'false' });
+  const steamShow = h('button', { class: 'btn', onclick: () => { steamKey.type = steamKey.type === 'password' ? 'text' : 'password'; } }, 'Show');
+  const steamId = h('input', { class: 'text-input', value: s.steamId || '', placeholder: os.steamId ? `Found automatically: ${os.steamId}` : 'Leave empty to detect from Steam', spellcheck: 'false' });
+  const ownedLine = [];
+  if (os.counts && Object.keys(os.counts).length) ownedLine.push(Object.entries(os.counts).map(([k, n]) => `${n} games on ${SOURCES[k] || k}`).join(', '));
+  if (os.errors && os.errors.length) ownedLine.push(os.errors.join(' '));
   let musicAnyApp = !!s.musicAnyApp;
   const about = h('div', { class: 'about' });
   const fillAbout = () => {
@@ -799,6 +818,19 @@ function openSettings() {
         h('label', {}, 'CurseForge instances folder'),
         h('div', { class: 'row' }, cf, cfBrowse),
         h('div', { class: 'help' }, 'Only needed if you moved CurseForge\'s Minecraft folder.')),
+      h('div', { class: 'section-label' }, 'Owned games'),
+      ownedLine.length ? h('div', { class: os.errors && os.errors.length ? 'note err' : 'note' }, ownedLine.join(' ')) : null,
+      h('div', { class: 'field' },
+        h('label', {}, 'Steam Web API key'),
+        h('div', { class: 'row' }, steamKey, steamShow),
+        h('div', { class: 'help' }, 'Free. Lists every game on your Steam account, installed or not. Your Steam profile\'s Game details must be set to Public. ',
+          h('button', { class: 'link-btn', onclick: () => api.openExternal('https://steamcommunity.com/dev/apikey') }, 'Get a key'))),
+      h('div', { class: 'field' },
+        h('label', {}, 'SteamID or profile link'),
+        steamId,
+        h('div', { class: 'help' }, 'Optional. Only needed if the wrong Steam account is picked up.')),
+      h('div', { class: 'field' }, toggleRow('GOG library', 'Reads owned GOG games from GOG Galaxy on this PC', gogOwned, (v) => { gogOwned = v; })),
+      h('div', { class: 'section-label' }, 'Apps and music'),
       h('div', { class: 'field' }, toggleRow('Include Windows apps', 'Start Menu, Desktop and Microsoft Store apps', includeApps, (v) => { includeApps = v; })),
       h('div', { class: 'field' }, toggleRow('Apple Music player', 'Shows what is playing in the sidebar with play, pause and skip', musicEnabled, (v) => { musicEnabled = v; })),
       h('div', { class: 'field' }, toggleRow('Other music apps too', 'Falls back to Spotify, a browser, or whatever is playing when Apple Music is closed', musicAnyApp, (v) => { musicAnyApp = v; }))),
@@ -807,7 +839,7 @@ function openSettings() {
       { label: 'Open data folder', left: true, run: () => { api.openDataFolder(); return false; } },
       { label: 'Cancel' },
       { label: 'Save', primary: true, run: async () => {
-        await api.updateSettings({ steamGridDbKey: key.value.trim(), curseforgeInstancesPath: cf.value.trim(), includeApps, musicEnabled, musicAnyApp });
+        await api.updateSettings({ steamGridDbKey: key.value.trim(), curseforgeInstancesPath: cf.value.trim(), includeApps, musicEnabled, musicAnyApp, steamApiKey: steamKey.value.trim(), steamId: steamId.value.trim(), gogOwned });
         S.keyErrorShown = false;
         showToast('Settings saved');
       } },
@@ -820,10 +852,13 @@ function surprisePool() {
   const isGame = (it) => it.kind === 'game';
   const installedOnly = S.surprisePool === 'installed';
   const ok = (it) => isGame(it) && (!installedOnly || it.installed || it.manual);
+  const savedMode = S.libMode;
+  if (!installedOnly) S.libMode = 'all';
   let pool = viewItems().filter(ok);
+  S.libMode = savedMode;
   let from = S.search ? 'your search' : viewTitle();
   if (S.view.type === 'home' && !S.search && S.source === 'all') from = 'your games';
-  if (!pool.length) { pool = S.lib.items.filter((it) => visible(it) && ok(it)); from = 'your games'; }
+  if (!pool.length) { pool = S.lib.items.filter((it) => !it.hidden && !isGrouped(it) && (it.installed || it.manual || (!installedOnly && it.owned)) && ok(it)); from = 'your games'; }
   return { pool, from };
 }
 
@@ -849,6 +884,7 @@ function surprise() {
     const cat = it.categoryId ? catPath(it.categoryId).map((c) => c.name).join(' › ') : 'No category';
     meta.textContent = `${SOURCES[it.source] || it.source} · ${cat} · ${timeAgo(it.lastPlayed)}`;
     bg.style.backgroundImage = it.coverUrl ? `url("${it.coverUrl}")` : 'none';
+    playBtn.replaceChildren(icon(notInstalled(it) ? 'download' : 'play'), notInstalled(it) ? 'Install' : 'Play');
   };
   const roll = () => {
     const panel = m.panel;
@@ -878,7 +914,7 @@ function surprise() {
 function surpriseModeMenu(e) {
   openMenu([
     { label: 'Installed games', hint: S.surprisePool === 'installed' ? '✓' : '', run: () => { S.surprisePool = 'installed'; prefs.set('surprisePool', 'installed'); showToast('Surprise me picks from installed games'); } },
-    { label: 'All owned games', hint: 'Phase 2', disabled: true, run: () => {} },
+    { label: 'All owned games', hint: S.surprisePool === 'owned' ? '✓' : '', run: () => { S.surprisePool = 'owned'; prefs.set('surprisePool', 'owned'); showToast('Surprise me picks from every game you own, installed or not'); } },
   ], { el: e.currentTarget });
 }
 

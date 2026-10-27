@@ -16,6 +16,7 @@ let store = null;
 let covers = null;
 let scanning = false;
 let updater = null;
+let lastOwnedStatus = null;
 let media = null;
 
 function sendTo(channel, payload) {
@@ -35,6 +36,7 @@ function snapshot() {
     categories: store.data.categories,
     settings: store.data.settings,
     scanning,
+    ownedStatus: lastOwnedStatus,
     coverKeyError: covers ? covers.keyError : false,
   };
 }
@@ -66,14 +68,19 @@ async function rescan(silent = false) {
       desktopDirs: [app.getPath('desktop'), path.join(process.env.PUBLIC || 'C:\\Users\\Public', 'Desktop')],
       readShortcut: (p) => shell.readShortcutLink(p),
     };
-    const { entries, sources, counts, errors } = await scanAll(ctx);
-    store.mergeScan(entries, sources);
+    const { entries, sources, counts, errors, owned, ownedSources, ownedCounts, ownedErrors, detectedSteamId } = await scanAll(ctx);
+    store.mergeScan(entries, sources, owned, ownedSources);
+    lastOwnedStatus = { counts: ownedCounts, errors: ownedErrors, steamId: detectedSteamId || null, at: Date.now() };
     store.changed();
     covers.queueAll();
     if (errors.length) console.warn('Scan errors', errors);
     if (!silent) {
       const parts = Object.entries(counts).filter(([, n]) => n > 0).map(([k, n]) => `${SOURCE_LABELS[k] || k} ${n}`);
-      toast(parts.length ? `Scan finished: ${parts.join(', ')}` : 'Scan finished, nothing new found');
+      const ownedParts = Object.entries(ownedCounts).map(([k, n]) => `${n} owned on ${SOURCE_LABELS[k] || k}`);
+      toast(parts.length ? `Scan finished: ${parts.join(', ')}${ownedParts.length ? `. ${ownedParts.join(', ')}` : ''}` : 'Scan finished, nothing new found');
+    }
+    if (ownedErrors.length) {
+      toast(ownedErrors.join(' '), 'error');
     }
     return counts;
   } catch (e) {
@@ -202,6 +209,11 @@ function registerIpc() {
       covers.refetchMissing();
     }
     media.configure({ enabled: store.data.settings.musicEnabled !== false, anyApp: !!store.data.settings.musicAnyApp });
+    const ownedKeys = ['steamApiKey', 'steamId', 'gogOwned'];
+    if (ownedKeys.some((k) => k in patch && patch[k] !== before[k])) {
+      rescan(false);
+      return;
+    }
     if (('includeApps' in patch && patch.includeApps !== before.includeApps) || ('curseforgeInstancesPath' in patch && patch.curseforgeInstancesPath !== before.curseforgeInstancesPath)) {
       rescan(true);
     }

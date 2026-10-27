@@ -9,9 +9,12 @@ const DEFAULT_SETTINGS = {
   includeApps: true,
   musicEnabled: true,
   musicAnyApp: false,
+  steamApiKey: '',
+  steamId: '',
+  gogOwned: true,
 };
 
-const ITEM_PATCH_FIELDS = ['customName', 'favorite', 'hidden', 'categoryId', 'kind', 'ungrouped'];
+const ITEM_PATCH_FIELDS = ['customName', 'favorite', 'hidden', 'categoryId', 'kind', 'ungrouped', 'suiteMain'];
 
 const newId = () => crypto.randomUUID();
 
@@ -172,9 +175,12 @@ class Store {
   }
 
   // ---------- items ----------
-  mergeScan(entries, scannedSources) {
+  // owned: games found in account libraries (Steam, GOG) that may or may not be installed.
+  // ownedSources: which account libraries were read successfully this time.
+  mergeScan(entries, scannedSources, owned = [], ownedSources = new Set()) {
     const now = Date.now();
     const seen = new Set();
+    const installedIds = new Set(entries.map((e) => e.id));
     for (const e of entries) if (e.suiteId && e.defaultCategory) this.ensureCategoryPath(e.defaultCategory);
     for (const e of entries) {
       seen.add(e.id);
@@ -240,11 +246,55 @@ class Store {
         };
       }
     }
-    for (const it of Object.values(this.data.items)) {
-      if (!it.manual && scannedSources.has(it.source) && !seen.has(it.id)) {
-        it.installed = false;
-        it.missing = true;
+    const ownedIds = new Set();
+    for (const o of owned) {
+      ownedIds.add(o.id);
+      const ex = this.data.items[o.id];
+      if (ex) {
+        ex.owned = true;
+        if (o.meta) ex.meta = { ...(ex.meta || {}), ...o.meta };
+        if (o.lastPlayed && o.lastPlayed > (ex.lastPlayed || 0)) ex.lastPlayed = o.lastPlayed;
+        if (!installedIds.has(o.id) && (scannedSources.has(o.source) || !ex.installed)) {
+          // Owned but not installed: clicking it opens the store's install page.
+          Object.assign(ex, { name: ex.name || o.name, launch: o.launch, installed: false, missing: false });
+          if (o.coverHint && !ex.coverHint) ex.coverHint = o.coverHint;
+          if (o.steamAppId) ex.steamAppId = o.steamAppId;
+        }
+        continue;
       }
+      const categoryId = this.resolveCategoryPath('Games');
+      this.data.items[o.id] = {
+        id: o.id, source: o.source, kind: 'game', name: o.name, customName: null,
+        launch: o.launch, installDir: null, iconPath: null,
+        steamAppId: o.steamAppId || null, coverHint: o.coverHint || null, coverHintFit: o.coverHintFit || null,
+        meta: o.meta || {}, installed: false, owned: true, missing: false, manual: false,
+        categoryId, catAuto: true, parentId: null, suiteName: null, suiteId: null, ungrouped: false,
+        favorite: false, hidden: false, addedAt: now, lastPlayed: o.lastPlayed || 0, playCount: 0,
+        cover: null, coverFit: 'cover', coverLocked: false, coverTried: 0, icon: null,
+      };
+    }
+    for (const it of Object.values(this.data.items)) {
+      if (it.manual) continue;
+      if (ownedSources.has(it.source)) it.owned = ownedIds.has(it.id);
+      if (scannedSources.has(it.source) && !seen.has(it.id)) {
+        it.installed = false;
+        it.missing = !it.owned;
+      }
+    }
+    this.applyPromotions();
+  }
+
+  // The user can pick which app in a group is the main one (for example DaVinci Resolve over its tools).
+  applyPromotions() {
+    const items = Object.values(this.data.items);
+    for (const it of items) {
+      if (!it.suiteMain || !it.parentId) continue;
+      const oldMain = it.parentId;
+      for (const other of items) if (other.parentId === oldMain && other !== it) other.parentId = it.id;
+      const om = this.data.items[oldMain];
+      if (om) { om.parentId = it.id; om.suiteName = it.suiteName; }
+      it.parentId = null;
+      it.ungrouped = false;
     }
   }
 
@@ -255,6 +305,7 @@ class Store {
       if (k in patch) it[k] = patch[k];
     }
     if ('categoryId' in patch) it.catAuto = false;
+    if (patch.suiteMain) this.applyPromotions();
     if ('categoryId' in patch && !('kind' in patch)) it.kind = this.kindForCategory(patch.categoryId, it.kind);
     if (it.customName !== null && !String(it.customName || '').trim()) it.customName = null;
     return it;

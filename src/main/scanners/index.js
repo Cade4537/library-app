@@ -8,6 +8,7 @@ const { scanRiot } = require('./riot');
 const { scanCurseForge } = require('./curseforge');
 const { scanShortcuts, scanStoreApps } = require('./apps');
 const { applySuites } = require('../suites');
+const { scanOwned } = require('../owned');
 
 // One PowerShell call that reads every registry key the scanners need.
 const REGISTRY_SCRIPT = `
@@ -57,6 +58,7 @@ async function scanAll(ctx) {
   const counts = {};
   const errors = [];
 
+  const ownedP = scanOwned(ctx);
   const results = await Promise.all(
     Object.entries(gameScanners).map(async ([k, fn]) => {
       try { return [k, await fn(ctx)]; } catch (e) { errors.push(`${k}: ${e.message}`); return [k, null]; }
@@ -95,7 +97,9 @@ async function scanAll(ctx) {
     sources.add('msstore');
   }
 
-  return { entries, sources, counts, errors };
+  const ownedRes = await ownedP;
+  errors.push(...ownedRes.errors);
+  return { entries, sources, counts, errors, owned: ownedRes.owned, ownedSources: ownedRes.ownedSources, ownedCounts: ownedRes.counts, ownedErrors: ownedRes.errors, detectedSteamId: ctx.detectedSteamId };
 }
 
 module.exports = { scanAll };

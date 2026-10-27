@@ -57,6 +57,15 @@ Without a key, non Steam games still try to match against the Steam store. Anyth
 
 Drag cards onto a category in the sidebar to move them, or onto Favorites / Hidden. Drag categories onto each other to nest them, or onto the top quarter of a category to reorder.
 
+## Games you own but haven't installed
+
+Settings > Owned games:
+
+- **Steam**: paste a free Steam Web API key (https://steamcommunity.com/dev/apikey, any domain name works). Your SteamID is picked up from the Steam app automatically. Your Steam profile's privacy setting for Game details has to be Public.
+- **GOG**: read from GOG Galaxy on this PC. Nothing to set up.
+
+Use the Installed / All owned switch above the cards to show them. Clicking a game that isn't installed opens Steam or GOG Galaxy to install it. Surprise me can pick from all owned games using the arrow next to it.
+
 ## Data
 
 Everything is saved in `%APPDATA%\library-app` (`library.json` plus cached covers). Settings > Open data folder opens it. A backup of the library file is made each session.

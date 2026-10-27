@@ -13,7 +13,7 @@ const KNOWN = [
     mode: 'merge',
     category: 'Apps/Creative/Video',
     test: (e) => /davinci|blackmagic|fairlight|fusion (render|studio)/i.test(e.name) || /\\blackmagic design\\/i.test(e.target) || /^blackmagic design/i.test(e.folder),
-    main: (e) => /\\resolve\.exe$/i.test(e.target) || /^davinci resolve( studio)?( \d+)?$/i.test(e.name),
+    main: (e) => /\\resolve\.exe$/i.test(e.target) || (/davinci resolve/i.test(e.name) && !HELPER_WORDS.test(e.name) && !/project server|remote|monitor|panels|keyboard|speed editor/i.test(e.name)),
   },
   {
     id: 'adobe',
