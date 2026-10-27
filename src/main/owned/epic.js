@@ -39,6 +39,7 @@ async function scanEpicOwned(ctx) {
         name: info.title || r.appName,
         launch: { type: 'url', target: `com.epicgames.launcher://apps/${encodeURIComponent(r.namespace)}%3A${encodeURIComponent(r.catalogItemId)}%3A${encodeURIComponent(r.appName)}?action=install` },
         coverHint: tall ? tall.url : null,
+        meta: { epicNamespace: r.namespace },
       });
     });
   }

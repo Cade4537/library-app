@@ -1,4 +1,4 @@
-// Achievements for the details view: Steam (Web API key) and Xbox (OpenXBL).
+// Achievements for the details view: Steam (Web API key), Xbox (sign in or OpenXBL) and Epic (sign in).
 
 const cache = new Map();
 const TTL = 10 * 60 * 1000;
@@ -55,13 +55,75 @@ async function xboxAchievements(xbox, titleId) {
   return list.length ? { list } : { none: true };
 }
 
-async function getAchievements(store, it, steamId, xbox) {
+// Epic: the same GraphQL service the Epic store's achievement pages use. Definitions are public;
+// your unlocks are read with your Epic sign in.
+const EPIC_GQL = 'https://graphql.epicgames.com/ue/graphql';
+const Q_DEFS = `query Achievement($sandboxId: String!, $locale: String!) { Achievement { productAchievementsRecordBySandbox(sandboxId: $sandboxId, locale: $locale) { totalAchievements achievements { achievement { name hidden unlockedDisplayName lockedDisplayName unlockedDescription lockedDescription unlockedIconLink lockedIconLink XP rarity { percent } } } } } }`;
+const Q_PLAYER = `query PlayerAchievement($epicAccountId: String!, $sandboxId: String!) { PlayerAchievement { playerAchievementGameRecordsBySandbox(epicAccountId: $epicAccountId, sandboxId: $sandboxId) { records { totalXP totalUnlocked playerAchievements { playerAchievement { achievementName unlocked unlockDate progress XP } } } } } }`;
+const DEFS_HASH = '7d54399ad8b8b5538bc2d93ee66b07014432b5488945cda35fe0b1fc70eea83a';
+
+async function gql(body, token) {
+  const res = await fetch(EPIC_GQL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(20000),
+  });
+  const j = await res.json().catch(() => null);
+  if (!res.ok || !j || (j.errors && !j.data)) throw new Error(`Epic achievements error ${res.status}`);
+  return j.data;
+}
+
+async function epicAchievements(epic, it) {
+  if (!epic || !epic.connected) return { error: 'Sign in to Epic in Settings to see Epic achievements.' };
+  const sandboxId = it.meta && it.meta.epicNamespace;
+  if (!sandboxId) return { error: 'Rescan once so the app learns this game\'s Epic ID.' };
+  const token = await epic.token().catch(() => null);
+  let defsData;
+  try {
+    defsData = await gql({ operationName: 'Achievement', query: Q_DEFS, variables: { sandboxId, locale: 'en' } }, token);
+  } catch {
+    defsData = await gql({ operationName: 'Achievement', variables: { sandboxId, locale: 'en' }, extensions: { persistedQuery: { version: 1, sha256Hash: DEFS_HASH } } });
+  }
+  const rec = defsData && defsData.Achievement && defsData.Achievement.productAchievementsRecordBySandbox;
+  const defs = ((rec && rec.achievements) || []).map((a) => a.achievement).filter(Boolean);
+  if (!defs.length) return { none: true };
+  const got = new Map();
+  let playerError = null;
+  try {
+    const p = await gql({ operationName: 'PlayerAchievement', query: Q_PLAYER, variables: { epicAccountId: epic.accountId, sandboxId } }, token);
+    const records = (p && p.PlayerAchievement && p.PlayerAchievement.playerAchievementGameRecordsBySandbox && p.PlayerAchievement.playerAchievementGameRecordsBySandbox.records) || [];
+    for (const r of records) for (const pa of r.playerAchievements || []) {
+      const a = pa.playerAchievement;
+      if (a && a.achievementName) got.set(a.achievementName, a);
+    }
+  } catch (e) {
+    playerError = 'Could not read your Epic unlocks right now, showing the full list.';
+  }
+  const list = defs.map((d) => {
+    const g = got.get(d.name);
+    const unlocked = !!(g && g.unlocked);
+    return {
+      name: unlocked || !d.hidden ? d.unlockedDisplayName || d.lockedDisplayName || d.name : d.lockedDisplayName || 'Hidden achievement',
+      description: unlocked ? d.unlockedDescription : d.lockedDescription || (d.hidden ? 'Hidden achievement' : d.unlockedDescription),
+      icon: unlocked ? d.unlockedIconLink : d.lockedIconLink || d.unlockedIconLink,
+      unlocked,
+      unlockTime: g && g.unlockDate ? Date.parse(g.unlockDate) || 0 : 0,
+      xp: Number(d.XP) || 0,
+      rarity: d.rarity && d.rarity.percent,
+    };
+  });
+  return playerError ? { list, notice: playerError } : { list };
+}
+
+async function getAchievements(store, it, steamId, xbox, epic) {
   const k = it.id;
   const hit = cache.get(k);
   if (hit && Date.now() - hit.t < TTL) return hit.v;
   let v;
   try {
     if (it.source === 'xbox' && it.meta && it.meta.xboxTitleId) v = await xboxAchievements(xbox, it.meta.xboxTitleId);
+    else if (it.source === 'epic') v = await epicAchievements(epic, it);
     else if (it.steamAppId) v = await steamAchievements(store.data.settings, steamId, it.steamAppId);
     else v = { unsupported: true };
   } catch (e) {

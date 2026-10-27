@@ -387,7 +387,7 @@ function registerIpc() {
   ipcMain.handle('item:achievements', async (_e, id) => {
     const it = item(id);
     if (!it) return { error: 'Not found' };
-    return getAchievements(store, it, await getSteamId(), xbox);
+    return getAchievements(store, it, await getSteamId(), xbox, epic);
   });
   ipcMain.handle('friends:get', () => friends.state);
   ipcMain.handle('storage:drives', () => getDrives().catch(() => []));

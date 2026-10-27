@@ -814,15 +814,16 @@ function openDetails(id) {
       const pct = r.total ? Math.round((r.have / r.total) * 100) : 0;
       achStat.textContent = `${r.have} / ${r.total}`;
       achBox.replaceChildren(
+        r.notice ? h('div', { class: 'note' }, r.notice) : '',
         h('div', { class: 'ach-bar' }, h('span', { style: { width: `${pct}%` } })),
         h('div', { class: 'ach-sum' }, `${pct}% complete`),
         h('div', { class: 'ach-list' }, r.list.map((a) => h('div', { class: 'ach-row' + (a.unlocked ? ' got' : '') },
           a.icon ? h('img', { src: a.icon, alt: '', loading: 'lazy' }) : h('span', { class: 'ach-ic' }, icon('trophy')),
           h('div', { class: 'ach-text' }, h('div', { class: 'ach-name' }, a.name), h('div', { class: 'ach-desc' }, a.description || '')),
-          h('div', { class: 'ach-when' }, a.unlocked ? (a.unlockTime ? new Date(a.unlockTime).toLocaleDateString() : 'Unlocked') : a.gamerscore ? `${a.gamerscore} G` : 'Locked')))));
+          h('div', { class: 'ach-when' }, a.unlocked ? (a.unlockTime ? new Date(a.unlockTime).toLocaleDateString() : 'Unlocked') : a.gamerscore ? `${a.gamerscore} G` : a.xp ? `${a.xp} XP` : 'Locked')))));
     } else {
       achStat.textContent = r.none || r.unsupported ? 'None' : '?';
-      const msg = r.error || (r.none ? 'This game has no achievements.' : 'Achievements are available for Steam and Xbox games.');
+      const msg = r.error || (r.none ? 'This game has no achievements.' : 'Achievements are available for Steam, Xbox and Epic games.');
       achBox.replaceChildren(h('div', { class: r.error ? 'note err' : 'loading' }, msg));
     }
   });
