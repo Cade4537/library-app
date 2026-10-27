@@ -1,22 +1,14 @@
 // Every game on the signed-in Epic account (installed or not).
-const { epicAccess } = require('../auth');
-
-async function get(url, token) {
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(20000) });
-  if (!res.ok) throw new Error(`Epic error ${res.status}`);
-  return res.json();
-}
 
 async function scanEpicOwned(ctx) {
-  const auth = ctx.settings.epicAuth;
-  if (!auth || !auth.refreshToken) return { skipped: true };
-  const { accessToken, auth: next } = await epicAccess(auth);
-  ctx.saveSetting('epicAuth', next);
+  const epic = ctx.epic;
+  if (!epic || !epic.connected) return { skipped: true };
+  const get = (url) => epic.get(url);
 
   const records = [];
   let cursor = '';
   for (let page = 0; page < 30; page++) {
-    const j = await get(`https://library-service.live.use1a.on.epicgames.com/library/api/public/items?includeMetadata=true${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, accessToken);
+    const j = await get(`https://library-service.live.use1a.on.epicgames.com/library/api/public/items?includeMetadata=true${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
     records.push(...(j.records || []));
     cursor = j.responseMetadata && j.responseMetadata.nextCursor;
     if (!cursor) break;
@@ -29,7 +21,7 @@ async function scanEpicOwned(ctx) {
     const batch = games.slice(i, i + 8);
     const infos = await Promise.all(batch.map(async (r) => {
       try {
-        const j = await get(`https://catalog-public-service-prod06.ol.epicgames.com/catalog/api/shared/namespace/${encodeURIComponent(r.namespace)}/bulk/items?id=${encodeURIComponent(r.catalogItemId)}&includeDLCDetails=true&includeMainGameDetails=true&country=US&locale=en-US`, accessToken);
+        const j = await get(`https://catalog-public-service-prod06.ol.epicgames.com/catalog/api/shared/namespace/${encodeURIComponent(r.namespace)}/bulk/items?id=${encodeURIComponent(r.catalogItemId)}&includeDLCDetails=true&includeMainGameDetails=true&country=US&locale=en-US`);
         return j[r.catalogItemId] || null;
       } catch {
         return null;
@@ -50,6 +42,15 @@ async function scanEpicOwned(ctx) {
       });
     });
   }
+  // Hours played, as tracked by the Epic launcher.
+  try {
+    const pt = await get(`https://library-service.live.use1a.on.epicgames.com/library/api/public/playtime/account/${epic.accountId}/all`);
+    const mins = new Map((Array.isArray(pt) ? pt : []).map((p) => [p.artifactId, Math.round((Number(p.totalTime) || 0) / 60)]));
+    for (const e of out) {
+      const m = mins.get(e.id.slice(5));
+      if (m) e.meta = { ...(e.meta || {}), epicMinutes: m };
+    }
+  } catch {}
   return { entries: out };
 }
 

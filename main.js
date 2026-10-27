@@ -7,13 +7,15 @@ const { CoverService } = require('./src/main/covers');
 const { launchItem } = require('./src/main/launch');
 const { Updater } = require('./src/main/updater');
 const { MediaBridge, APPLE_MUSIC_AUMID, APPLE_MUSIC_STORE } = require('./src/main/media');
-const { SteamInfo, readSteamCollections } = require('./src/main/steaminfo');
+const { SteamInfo, readSteamCollections, BASIC_CATEGORIES } = require('./src/main/steaminfo');
 const { PlaytimeTracker, minutesPlayed } = require('./src/main/playtime');
 const { getAchievements } = require('./src/main/achievements');
 const { Friends } = require('./src/main/friends');
 const { detectSteamId } = require('./src/main/owned/steam');
 const auth = require('./src/main/auth');
 const { XboxLive } = require('./src/main/xboxlive');
+const { EpicClient } = require('./src/main/epicClient');
+const { getLaunchers, openLauncher } = require('./src/main/launchers');
 
 const XBOX_APP_AUMID = 'Microsoft.GamingApp_8wekyb3d8bbwe!Microsoft.Xbox.App';
 
@@ -31,6 +33,7 @@ let steamInfo = null;
 let playtime = null;
 let friends = null;
 let xbox = null;
+let epic = null;
 let collections = [];
 let lastRegistry = {};
 let steamIdCache = null;
@@ -113,6 +116,7 @@ async function rescan(silent = false) {
       readShortcut: (p) => shell.readShortcutLink(p),
       saveSetting: (k, v) => { store.data.settings[k] = v; store.changed(); },
       xbox,
+      epic,
     };
     const { entries, sources, counts, errors, owned, ownedSources, ownedCounts, ownedErrors, detectedSteamId } = await scanAll(ctx);
     store.mergeScan(entries, sources, owned, ownedSources);
@@ -315,7 +319,9 @@ function registerIpc() {
       const a = await auth.epicSignIn(win);
       if (!a) return { ok: false };
       store.data.settings.epicAuth = a;
+      epic.reset();
       store.changed();
+      setTimeout(() => friends.refresh(), 1500);
       rescan(false);
       return { ok: true, name: a.displayName };
     } catch (e) {
@@ -324,6 +330,8 @@ function registerIpc() {
   });
   ipcMain.handle('auth:epicSignOut', async () => {
     delete store.data.settings.epicAuth;
+    epic.reset();
+    setTimeout(() => friends.refresh(), 200);
     await auth.epicSignOut().catch(() => {});
     store.changed();
   });
@@ -369,6 +377,8 @@ function registerIpc() {
     return getAchievements(store, it, await getSteamId(), xbox);
   });
   ipcMain.handle('friends:get', () => friends.state);
+  ipcMain.handle('launchers:get', () => getLaunchers(store, lastRegistry, (p) => app.getFileIcon(p, { size: 'large' })));
+  ipcMain.handle('launchers:open', async (_e, id) => openLauncher(store, lastRegistry, id));
   ipcMain.handle('friends:refresh', () => friends.refresh());
   ipcMain.handle('friends:link', (_e, a, b) => friends.link(a, b));
   ipcMain.handle('friends:unlink', (_e, keys) => friends.unlink(keys));
@@ -406,10 +416,12 @@ if (!app.requestSingleInstanceLock()) {
     await covers.init();
     updater = new Updater((s) => sendTo('update:state', s));
     media = new MediaBridge((s) => sendTo('media:state', s));
+    for (const c of BASIC_CATEGORIES) store.ensureCategoryPath(`Games/${c}`);
     steamInfo = new SteamInfo(store, () => { applyAutoCategories(); store.changed(); });
     playtime = new PlaytimeTracker(store, () => store.changed());
     xbox = new XboxLive(store);
-    friends = new Friends(store, (s) => sendTo('friends:state', s), getSteamId, xbox);
+    epic = new EpicClient(store);
+    friends = new Friends(store, (s) => sendTo('friends:state', s), getSteamId, xbox, epic);
     registerIpc();
     createWindow();
     playtime.start();

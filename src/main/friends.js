@@ -53,8 +53,10 @@ async function xboxFriends(xbox) {
 }
 
 const RANK = { ingame: 0, online: 1, busy: 2, away: 3, offline: 4 };
+const sameName = (a, b) => normName(a.name) === normName(b.name) || similarity(a.name, b.name) >= 0.8 ||
+  (a.altName && normName(a.altName) === normName(b.name)) || (b.altName && normName(b.altName) === normName(a.name));
 
-// Groups accounts into people: manual links first, then automatic name matches.
+// Groups accounts into people: manual links first, then automatic name matches (one account per platform).
 function combine(accounts, links) {
   const manual = links.groups || [];
   const blocked = new Set((links.unlinked || []).map((p) => p.slice().sort().join('|')));
@@ -67,16 +69,19 @@ function combine(accounts, links) {
     accs.forEach((a) => used.add(a.key));
     people.push({ accounts: accs, manual: true });
   }
-  const steam = accounts.filter((a) => a.platform === 'steam' && !used.has(a.key));
-  const xbox = accounts.filter((a) => a.platform === 'xbox' && !used.has(a.key));
-  for (const s of steam) {
-    const match = xbox.find((x) => !used.has(x.key) && !blocked.has([s.key, x.key].sort().join('|')) &&
-      (normName(x.name) === normName(s.name) || similarity(x.name, s.name) >= 0.8 || (x.altName && normName(x.altName) === normName(s.name))));
-    used.add(s.key);
-    if (match) { used.add(match.key); people.push({ accounts: [s, match], auto: true }); }
-    else people.push({ accounts: [s] });
+  const order = ['steam', 'xbox', 'epic'];
+  const rest = accounts.filter((a) => !used.has(a.key)).sort((a, b) => order.indexOf(a.platform) - order.indexOf(b.platform));
+  for (const a of rest) {
+    if (used.has(a.key)) continue;
+    used.add(a.key);
+    const group = [a];
+    for (const b of rest) {
+      if (used.has(b.key) || group.some((g) => g.platform === b.platform)) continue;
+      if (group.some((g) => blocked.has([g.key, b.key].sort().join('|')))) continue;
+      if (group.some((g) => sameName(g, b))) { used.add(b.key); group.push(b); }
+    }
+    people.push(group.length > 1 ? { accounts: group, auto: true } : { accounts: group });
   }
-  for (const x of xbox) if (!used.has(x.key)) people.push({ accounts: [x] });
   for (const p of people) {
     p.accounts.sort((a, b) => RANK[a.status] - RANK[b.status]);
     p.id = p.accounts.map((a) => a.key).join('+');
@@ -87,9 +92,51 @@ function combine(accounts, links) {
   return people.sort((a, b) => RANK[a.status] - RANK[b.status] || a.name.localeCompare(b.name));
 }
 
+// Epic shares your friends list but not live status, so this shows when each friend was last online.
+async function epicFriends(epic) {
+  if (!epic || !epic.connected) return null;
+  const me = epic.accountId;
+  const sum = await epic.get(`https://friends-public-service-prod.ol.epicgames.com/friends/api/v1/${me}/summary`);
+  const ids = (sum.friends || []).map((f) => f.accountId).filter(Boolean);
+  const names = new Map();
+  for (const f of sum.friends || []) if (f.displayName) names.set(f.accountId, f.displayName);
+  for (let i = 0; i < ids.length; i += 100) {
+    const missing = ids.slice(i, i + 100).filter((id) => !names.has(id));
+    if (!missing.length) continue;
+    try {
+      const list = await epic.get(`https://account-public-service-prod.ol.epicgames.com/account/api/public/account?${missing.map((id) => `accountId=${id}`).join('&')}`);
+      for (const a of list || []) names.set(a.id, a.displayName || (a.externalAuths && Object.values(a.externalAuths)[0] && Object.values(a.externalAuths)[0].externalDisplayName) || '');
+    } catch {}
+  }
+  let lastOnline = {};
+  try { lastOnline = await epic.get(`https://presence-public-service-prod.ol.epicgames.com/presence/api/v1/_/${me}/last-online`); } catch {}
+  return ids.map((id) => {
+    const lo = lastOnline[id] && lastOnline[id][0] && Date.parse(lastOnline[id][0].last_online);
+    const recent = lo && Date.now() - lo < 10 * 60 * 1000;
+    return {
+      key: `epic:${id}`,
+      platform: 'epic',
+      name: names.get(id) || 'Epic friend',
+      avatar: '',
+      status: recent ? 'online' : 'offline',
+      activity: lo ? (recent ? 'Online recently' : `Last online ${ago(lo)}`) : '',
+      profile: 'https://store.epicgames.com/',
+    };
+  });
+}
+
+function ago(t) {
+  const m = Math.round((Date.now() - t) / 60000);
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  if (h < 48) return `${h} hr ago`;
+  return `${Math.round(h / 24)} days ago`;
+}
+
 class Friends {
-  constructor(store, send, getSteamId, xbox) {
+  constructor(store, send, getSteamId, xbox, epic) {
     this.xbox = xbox;
+    this.epic = epic;
     this.store = store;
     this.send = send;
     this.getSteamId = getSteamId;
@@ -115,6 +162,7 @@ class Friends {
     const results = await Promise.all([
       steamFriends(s, steamId).catch((e) => { errors.push(`Steam: ${e.message}`); return []; }),
       xboxFriends(this.xbox).catch((e) => { errors.push(`Xbox: ${e.message}`); return []; }),
+      epicFriends(this.epic).catch((e) => { errors.push(`Epic: ${e.message}`); return []; }),
     ]);
     const configured = results.some((r) => r !== null);
     for (const r of results) if (r) accounts = accounts.concat(r);

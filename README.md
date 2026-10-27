@@ -74,23 +74,29 @@ Settings > Connections. Settings > Help has step by step guides for each one.
 |---|---|---|
 | Steam | Owned games, hours played, achievements, friends | Free Steam Web API key |
 | Steam Family | Games shared with you | Sign in to the Steam store once |
-| Xbox | PC games you own, achievements, friends | Sign in with Microsoft (or an OpenXBL key) |
+| Xbox | PC games you own, hours played, achievements, friends | Sign in with Microsoft (or an OpenXBL key) |
 | Ubisoft | Owned Ubisoft games | Automatic from Ubisoft Connect on this PC |
-| Epic Games | Every game on your account | Sign in on Epic's page |
-| GOG | Owned GOG games | Automatic from GOG Galaxy |
+| Epic Games | Every game on your account, hours played, friends | Sign in on Epic's page |
+| GOG | Owned GOG games, hours played | Automatic from GOG Galaxy |
 | SteamGridDB | Cover art for everything else | Free API key |
 
 ## Sorting
+
+Games has basic categories (Action, Adventure, RPG, Shooter, Strategy, Simulation, Racing, Sports, Puzzle, Horror, Survival, MMO, Casual, Indie, Demos). Under Games, the "By launcher" folders show every game from one launcher without moving anything. Sort by Name, Category, Last played, Date added or Hours played, and flip the order with the button next to Sort. Sorting by Category groups the cards under headings.
 
 Games you have not placed yourself are sorted automatically: demos and playtests go to Games > Demos, games in a Steam collection you made go to a category with that collection's name, and the rest go by genre (RPG, Strategy, Action, and so on). Both can be turned off in Settings > Library. Moving a game by hand always wins.
 
 ## Hours played and achievements
 
-Hours come from Steam for Steam games. For every other game, the app checks every 30 seconds which programs are running and counts time while a game's files are in use. Click a game's card to see hours, last played and achievements (Steam and Xbox).
+Hours come from Steam, Epic, GOG Galaxy and Xbox when connected. For every other game, the app checks every 30 seconds which programs are running and counts time while a game's files are in use. Click a game's card to see hours, last played and achievements (Steam and Xbox).
 
 ## Friends
 
-The Friends page shows Steam and Xbox friends, whether they are online, and what they are playing. Friends with the same name on both are shown as one person. Click a friend to link or unlink accounts by hand. Discord is not included because Discord does not let apps read friends lists.
+The Friends page shows Steam, Xbox and Epic friends (Epic only shares when someone was last online), whether they are online, and what they are playing. Friends with the same name on both are shown as one person. Click a friend to link or unlink accounts by hand. Discord is not included because Discord does not let apps read friends lists.
+
+## Launchers tab
+
+Shows which game launchers are installed. Click one to open it, or to go to its download page if it is not installed.
 
 ## Xbox Remote Play
 

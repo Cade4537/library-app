@@ -514,3 +514,21 @@ body.pad #toasts { bottom: 74px; }
 .alt-key { margin-top: 10px; }
 .alt-key summary { cursor: pointer; font-size: 12px; color: var(--muted); }
 .alt-key summary:hover { color: var(--text); }
+
+/* ---------- launcher folders, grouping, launchers tab ---------- */
+.launcher-sep { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); margin: 8px 0 2px 24px; }
+.cat-btn.virtual { color: var(--faint); }
+.cat-btn.virtual:hover, .cat-btn.virtual.active { color: var(--text); }
+.vdot { width: 8px; height: 8px; border-radius: 50%; background: var(--src); margin: 0 4px; flex: none; }
+.grid-head { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 10px; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: 8px; margin-top: 6px; }
+.grid-head:first-child { margin-top: 0; }
+.launcher-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.lcard { display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); text-align: left; transition: background .12s, border-color .12s; }
+.lcard:hover, .lcard:focus { background: var(--panel-2); border-color: #34343a; }
+.lcard.missing { opacity: .7; }
+.l-icon { width: 44px; height: 44px; border-radius: 10px; object-fit: contain; flex: none; }
+.l-init { display: grid; place-items: center; background: var(--panel-3); font-weight: 700; font-size: 18px; }
+.l-body { flex: 1; min-width: 0; }
+.l-name { font-weight: 700; font-size: 15px; }
+.l-sub { font-size: 12px; color: var(--muted); }
+.lcard .btn { pointer-events: none; }

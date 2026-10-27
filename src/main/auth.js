@@ -75,7 +75,7 @@ async function epicSignIn(parent) {
 // Returns a fresh access token and the (possibly rotated) refresh token.
 async function epicAccess(auth) {
   const t = await epicToken({ grant_type: 'refresh_token', refresh_token: auth.refreshToken });
-  return { accessToken: t.access_token, auth: { ...auth, refreshToken: t.refresh_token, displayName: t.displayName || auth.displayName } };
+  return { accessToken: t.access_token, expiresAt: Date.now() + (Number(t.expires_in) || 7200) * 1000, auth: { ...auth, refreshToken: t.refresh_token, displayName: t.displayName || auth.displayName } };
 }
 
 // ---------- Steam store (Steam Family) ----------

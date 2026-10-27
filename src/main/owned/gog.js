@@ -46,6 +46,11 @@ async function scanGogOwned(ctx) {
       if (!info.has(p.k)) info.set(p.k, {});
       info.get(p.k)[p.t] = parse(p.v);
     }
+    // GOG Galaxy keeps its own play time per game.
+    const minutes = new Map();
+    try {
+      for (const r of rows(db, "SELECT releaseKey, minutesInGame FROM GameTimes")) minutes.set(r.releaseKey, Number(r.minutesInGame) || 0);
+    } catch {}
     const out = [];
     for (const k of keys) {
       if (dlc.has(k)) continue;
@@ -60,6 +65,7 @@ async function scanGogOwned(ctx) {
         name,
         launch: { type: 'url', target: `goggalaxy://openGameView/${k}` },
         coverHint: imgs.verticalCover || null,
+        meta: minutes.get(k) ? { gogMinutes: minutes.get(k) } : undefined,
       });
     }
     return { entries: out };

@@ -4,13 +4,26 @@ const { fsp, normName, similarity } = require('./util');
 const { findSteamPath } = require('./scanners/steam');
 const { detectSteamId } = require('./owned/steam');
 
+// Basic categories every library gets under Games.
+const BASIC_CATEGORIES = ['Action', 'Adventure', 'RPG', 'Shooter', 'Strategy', 'Simulation', 'Racing', 'Sports', 'Puzzle', 'Horror', 'Survival', 'MMO', 'Casual', 'Indie', 'Demos'];
+// Community tags that are more specific than Steam's store genres (from SteamSpy).
+const TAG_MAP = [
+  [/^(fps|shooter|third-person shooter|looter shooter|hero shooter|arena shooter|tactical shooter)$/i, 'Shooter'],
+  [/^(horror|survival horror|psychological horror)$/i, 'Horror'],
+  [/^(puzzle|puzzle platformer)$/i, 'Puzzle'],
+  [/^(survival|open world survival craft)$/i, 'Survival'],
+  [/^(racing|driving)$/i, 'Racing'],
+];
 // More specific genres first, so a game tagged Action + RPG lands in RPG.
 const GENRE_ORDER = ['RPG', 'Strategy', 'Simulation', 'Racing', 'Sports', 'Massively Multiplayer', 'Action', 'Adventure', 'Casual', 'Indie'];
+const GENRE_NAME = { 'Massively Multiplayer': 'MMO' };
 const DEMO_NAME = /\b(demo|playtest|prologue demo)\b/i;
 
-function pickGenre(genres) {
+function pickGenre(genres, tags) {
+  // The top few community tags win when they name a clear category like Shooter or Horror.
+  for (const t of (tags || []).slice(0, 5)) for (const [re, cat] of TAG_MAP) if (re.test(t)) return cat;
   const names = (genres || []).map((g) => (typeof g === 'string' ? g : g.description)).filter(Boolean);
-  for (const g of GENRE_ORDER) if (names.includes(g)) return g;
+  for (const g of GENRE_ORDER) if (names.includes(g)) return GENRE_NAME[g] || g;
   return null;
 }
 
@@ -63,7 +76,8 @@ class SteamInfo {
     for (const it of Object.values(this.store.data.items)) {
       if (it.kind !== 'game' || it.manual) continue;
       if (it.steamAppId) {
-        if (!this.store.data.appInfo[it.steamAppId]) this.push({ appid: String(it.steamAppId) });
+        const info = this.store.data.appInfo[it.steamAppId];
+        if (!info || (info.v || 1) < 2) this.push({ appid: String(it.steamAppId) });
       } else if (!(normName(it.name) in this.store.data.appMatch)) {
         this.push({ name: it.name });
       }
@@ -113,7 +127,7 @@ class SteamInfo {
     }
     this.store.data.appMatch[key] = best && score >= 0.75 ? String(best.id) : null;
     const id = this.store.data.appMatch[key];
-    if (id && !this.store.data.appInfo[id]) await this.fetchDetails(id);
+    if (id && (!this.store.data.appInfo[id] || (this.store.data.appInfo[id].v || 1) < 2)) await this.fetchDetails(id);
   }
 
   async fetchDetails(appid) {
@@ -122,9 +136,17 @@ class SteamInfo {
     if (!res.ok) return;
     const j = await res.json();
     const d = j && j[appid] && j[appid].success ? j[appid].data : null;
+    let tags = [];
+    try {
+      const r = await fetch(`https://steamspy.com/api.php?request=appdetails&appid=${appid}`, { signal: AbortSignal.timeout(15000) });
+      if (r.ok) {
+        const t = (await r.json()).tags;
+        if (t && typeof t === 'object' && !Array.isArray(t)) tags = Object.entries(t).sort((a, b) => b[1] - a[1]).map(([k]) => k);
+      }
+    } catch {}
     this.store.data.appInfo[appid] = d
-      ? { type: d.type || 'game', genres: (d.genres || []).map((g) => g.description), t: Date.now() }
-      : { type: 'unknown', genres: [], t: Date.now() };
+      ? { v: 2, type: d.type || 'game', genres: (d.genres || []).map((g) => g.description), tags: tags.slice(0, 10), t: Date.now() }
+      : { v: 2, type: 'unknown', genres: [], tags: tags.slice(0, 10), t: Date.now() };
   }
 
   // Where a game should go when the user has not placed it themselves.
@@ -138,11 +160,11 @@ class SteamInfo {
       if (c) return `Games/${c.name}`;
     }
     if (s.genreSort !== false && info) {
-      const g = pickGenre(info.genres);
+      const g = pickGenre(info.genres, info.tags);
       if (g) return `Games/${g}`;
     }
     return 'Games';
   }
 }
 
-module.exports = { SteamInfo, readSteamCollections, pickGenre };
+module.exports = { SteamInfo, readSteamCollections, pickGenre, BASIC_CATEGORIES };

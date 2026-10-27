@@ -28,6 +28,10 @@ async function scanXboxOwned(ctx) {
       },
     });
   }
+  try {
+    const mins = await ctx.xbox.minutesPlayed(out.map((e) => e.meta.xboxTitleId));
+    for (const e of out) if (mins[e.meta.xboxTitleId]) e.meta.xboxMinutes = mins[e.meta.xboxTitleId];
+  } catch {}
   return { entries: out };
 }
 

@@ -211,7 +211,7 @@ class Store {
           steamAppId: e.steamAppId || ex.steamAppId || null,
           coverHint: e.coverHint || null,
           coverHintFit: e.coverHintFit || null,
-          meta: e.meta || {},
+          meta: { ...(ex.meta || {}), ...(e.meta || {}) },
           installed: true,
           missing: false,
         });

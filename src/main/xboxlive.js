@@ -1,20 +1,36 @@
 // Direct Xbox Live sign in with a Microsoft account (no third party service).
-// Uses the Microsoft account desktop sign in flow that open source Xbox tools use, then
-// exchanges it for Xbox Live tokens. Falls back to an OpenXBL key if one is set instead.
+// Uses the Microsoft account desktop sign in flow with the Minecraft Launcher's public sign in ID
+// (the same one many open source game launchers use), then exchanges it for Xbox Live tokens.
+// Falls back to an OpenXBL key if one is set instead.
 const { BrowserWindow, session } = require('electron');
 const { xbl } = require('./xbl');
 
-const CLIENT_ID = '0000000048093EE3';
+const CLIENT_ID = '00000000402b5328';
 const REDIRECT = 'https://login.live.com/oauth20_desktop.srf';
 const SCOPE = 'service::user.auth.xboxlive.com::MBI_SSL';
 const PARTITION = 'persist:xbox';
 
-function parseFragment(url) {
-  const i = url.indexOf('#');
-  if (i < 0) return null;
-  const p = new URLSearchParams(url.slice(i + 1));
-  if (!p.get('access_token')) return null;
-  return { accessToken: p.get('access_token'), refreshToken: p.get('refresh_token'), expiresAt: Date.now() + Number(p.get('expires_in') || 3600) * 1000 };
+async function liveToken(params) {
+  const res = await fetch('https://login.live.com/oauth20_token.srf', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ client_id: CLIENT_ID, scope: SCOPE, redirect_uri: REDIRECT, ...params }).toString(),
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!res.ok) throw new Error(`Microsoft sign in failed (${res.status})`);
+  const j = await res.json();
+  return { accessToken: j.access_token, refreshToken: j.refresh_token, expiresAt: Date.now() + Number(j.expires_in || 3600) * 1000 };
+}
+
+// The sign in page finishes on the desktop redirect with ?code=... (or #access_token=... on older flows).
+async function tokensFromRedirect(url) {
+  const u = new URL(url);
+  const code = u.searchParams.get('code');
+  if (code) return liveToken({ grant_type: 'authorization_code', code });
+  const p = new URLSearchParams(u.hash.slice(1));
+  if (p.get('access_token')) return { accessToken: p.get('access_token'), refreshToken: p.get('refresh_token'), expiresAt: Date.now() + Number(p.get('expires_in') || 3600) * 1000 };
+  if (u.searchParams.get('error')) throw new Error(u.searchParams.get('error_description') || 'Sign in was cancelled');
+  return null;
 }
 
 async function postJson(url, body, headers = {}) {
@@ -40,15 +56,17 @@ class XboxLive {
 
   signIn(parent) {
     return new Promise((resolve) => {
-      const url = `https://login.live.com/oauth20_authorize.srf?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT)}&response_type=token&display=touch&scope=${encodeURIComponent(SCOPE)}&locale=en`;
+      const url = `https://login.live.com/oauth20_authorize.srf?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT)}&response_type=code&prompt=select_account&scope=${encodeURIComponent(SCOPE)}`;
       const win = new BrowserWindow({ width: 500, height: 720, parent, modal: !!parent, title: 'Sign in with Microsoft', autoHideMenuBar: true, backgroundColor: '#ffffff', webPreferences: { partition: PARTITION } });
       let done = false;
-      const finish = async (tokens) => {
+      const finish = async (redirectUrl) => {
         if (done) return;
         done = true;
         if (!win.isDestroyed()) win.close();
-        if (!tokens) return resolve({ ok: false });
+        if (!redirectUrl) return resolve({ ok: false });
         try {
+          const tokens = await tokensFromRedirect(redirectUrl);
+          if (!tokens) throw new Error('Microsoft did not return a sign in code');
           this.store.data.settings.xboxLive = tokens;
           this.xsts = null;
           const a = await this.auth();
@@ -60,7 +78,7 @@ class XboxLive {
           resolve({ ok: false, error: e.message });
         }
       };
-      const check = (u) => { if (u && u.startsWith(REDIRECT)) { const t = parseFragment(u); finish(t); } };
+      const check = (u) => { if (u && u.startsWith(REDIRECT)) finish(u); };
       win.webContents.on('will-redirect', (_e, u) => check(u));
       win.webContents.on('did-navigate', (_e, u) => check(u));
       win.webContents.on('did-redirect-navigation', (_e, u) => check(u));
@@ -78,15 +96,9 @@ class XboxLive {
 
   async refreshLive() {
     const l = this.live;
-    const res = await fetch('https://login.live.com/oauth20_token.srf', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ client_id: CLIENT_ID, grant_type: 'refresh_token', refresh_token: l.refreshToken, scope: SCOPE, redirect_uri: REDIRECT }).toString(),
-      signal: AbortSignal.timeout(20000),
-    });
-    if (!res.ok) throw new Error('Xbox sign in expired. Sign in again in Settings.');
-    const j = await res.json();
-    this.store.data.settings.xboxLive = { ...l, accessToken: j.access_token, refreshToken: j.refresh_token || l.refreshToken, expiresAt: Date.now() + (j.expires_in || 3600) * 1000 };
+    let t;
+    try { t = await liveToken({ grant_type: 'refresh_token', refresh_token: l.refreshToken }); } catch { throw new Error('Xbox sign in expired. Sign in again in Settings.'); }
+    this.store.data.settings.xboxLive = { ...l, ...t, refreshToken: t.refreshToken || l.refreshToken };
     this.store.changed();
   }
 
@@ -158,6 +170,22 @@ class XboxLive {
   async friends() {
     if (this.signedIn) return this.request('https://peoplehub.xboxlive.com/users/me/people/social/decoration/detail,preferredColor,presenceDetail', 5);
     return xbl(this.key(), '/friends');
+  }
+
+  // Minutes played per title, from Xbox Live stats (only when signed in directly).
+  async minutesPlayed(titleIds) {
+    if (!this.signedIn || !titleIds.length) return {};
+    const a = await this.auth();
+    const out = {};
+    for (let i = 0; i < titleIds.length; i += 50) {
+      const j = await this.request('https://userstats.xboxlive.com/batch', 2, {
+        method: 'POST',
+        body: { arrangebyfield: 'xuid', xuids: [a.xuid], stats: titleIds.slice(i, i + 50).map((t) => ({ name: 'MinutesPlayed', titleid: String(t) })) },
+      });
+      const stats = (((j.statlistscollection || [])[0] || {}).stats) || [];
+      for (const s of stats) if (s.titleid && s.value) out[String(s.titleid)] = Number(s.value) || 0;
+    }
+    return out;
   }
 
   async achievements(titleId) {

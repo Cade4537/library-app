@@ -70,6 +70,8 @@ const S = {
   collapsed: new Set(prefs.get('collapsed', [])),
   surprisePool: prefs.get('surprisePool', 'installed'),
   libMode: prefs.get('libMode', 'installed'),
+  sortDir: prefs.get('sortDir', 'normal'),
+  launchers: null,
   modals: [],
   friends: { people: [], errors: [], configured: false },
   menuReturn: null,
@@ -156,6 +158,7 @@ function baseItems(view = S.view) {
       list = list.filter((it) => set.has(it.categoryId));
       break;
     }
+    case 'launcher': list = list.filter((it) => it.kind === 'game' && it.source === view.source); break;
   }
   return list;
 }
@@ -169,11 +172,25 @@ function viewItems() {
   }
   const byName = (a, b) => displayName(a).localeCompare(displayName(b), undefined, { sensitivity: 'base', numeric: true });
   const sort = S.view.type === 'recent' ? 'played' : S.sort;
-  if (sort === 'played') list.sort((a, b) => (b.lastPlayed || 0) - (a.lastPlayed || 0) || byName(a, b));
-  else if (sort === 'added') list.sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0) || byName(a, b));
-  else if (sort === 'most') list.sort((a, b) => (b.minutes || 0) - (a.minutes || 0) || (b.playCount || 0) - (a.playCount || 0) || byName(a, b));
-  else list.sort(byName);
+  const flip = S.sortDir === 'reverse' ? -1 : 1;
+  if (sort === 'played') list.sort((a, b) => flip * ((b.lastPlayed || 0) - (a.lastPlayed || 0)) || byName(a, b));
+  else if (sort === 'added') list.sort((a, b) => flip * ((b.addedAt || 0) - (a.addedAt || 0)) || byName(a, b));
+  else if (sort === 'most') list.sort((a, b) => flip * ((b.minutes || 0) - (a.minutes || 0) || (b.playCount || 0) - (a.playCount || 0)) || byName(a, b));
+  else if (sort === 'category') list.sort((a, b) => flip * catLabel(a).localeCompare(catLabel(b), undefined, { sensitivity: 'base' }) || byName(a, b));
+  else list.sort((a, b) => flip * byName(a, b));
   return list;
+}
+
+// Category name used for grouping, relative to the current view (Games › RPG shows as RPG inside Games).
+function catLabel(it) {
+  if (!it.categoryId || !S.cats.has(it.categoryId)) return 'No category';
+  let parts = catPath(it.categoryId).map((c) => c.name);
+  if (S.view.type === 'category') {
+    const base = catPath(S.view.id).length;
+    parts = parts.slice(base);
+    if (!parts.length) return (S.cats.get(S.view.id) || {}).name || 'Other';
+  }
+  return parts.join(' › ');
 }
 
 function viewTitle(view = S.view) {
@@ -184,6 +201,8 @@ function viewTitle(view = S.view) {
     case 'uncategorized': return 'Uncategorized';
     case 'hidden': return 'Hidden';
     case 'friends': return 'Friends';
+    case 'launchers': return 'Launchers';
+    case 'launcher': return `${SOURCES[view.source] || view.source} games`;
     case 'category': return (S.cats.get(view.id) || {}).name || 'Category';
     default: return 'Library';
   }
@@ -274,15 +293,17 @@ function cardFor(it) {
 function render() {
   renderNowPlaying();
   const fv = S.view.type === 'friends';
+  const lv = S.view.type === 'launchers';
   $('#friendsView').hidden = !fv;
-  $('#grid').hidden = fv;
-  $('#filters').hidden = fv;
-  if (fv) {
+  $('#launchersView').hidden = !lv;
+  $('#grid').hidden = fv || lv;
+  $('#filters').hidden = fv || lv;
+  if (fv || lv) {
     $('#jump').hidden = true;
     $('#empty').hidden = true;
     renderSidebar();
     renderHeader();
-    renderFriends();
+    if (fv) renderFriends(); else renderLaunchers();
     $('#scanStatus').hidden = !S.lib.scanning;
     return;
   }
@@ -321,6 +342,7 @@ function renderSidebar() {
     navButton('recent', 'Recently played', 'clock', null),
     navButton('uncategorized', 'Uncategorized', 'inbox', vis.filter((i) => !i.categoryId || !S.cats.has(i.categoryId)).length || null),
     navButton('hidden', 'Hidden', 'eyeOff', S.lib.items.filter((i) => i.hidden).length || null),
+    navButton('launchers', 'Launchers', 'rocket', null),
     navButton('friends', 'Friends', 'users', (S.friends.people || []).filter((p) => p.status !== 'offline').length || null),
     showRemotePlay() ? remotePlayButton() : null
   );
@@ -358,10 +380,30 @@ function renderSidebar() {
         },
       });
       const wrap = h('div', { class: 'cat-node' }, row);
-      if (kids.length && open) wrap.append(h('div', { class: 'cat-children' }, build(c.id)));
+      const isGamesRoot = !c.parentId && /^games$/i.test(c.name);
+      if ((kids.length || isGamesRoot) && open) {
+        const children = h('div', { class: 'cat-children' }, build(c.id));
+        if (isGamesRoot) children.append(...launcherFolders());
+        wrap.append(children);
+      }
       return wrap;
     });
   tree.replaceChildren(...build(null));
+}
+
+// Filter folders under Games: every game from one launcher, wherever it is categorized.
+function launcherFolders() {
+  const counts = {};
+  for (const it of S.lib.items) if (it.kind === 'game' && visible(it)) counts[it.source] = (counts[it.source] || 0) + 1;
+  const sources = SOURCE_ORDER.filter((src) => counts[src]);
+  if (!sources.length) return [];
+  return [h('div', { class: 'launcher-sep' }, 'By launcher'), ...sources.map((src) => {
+    const active = S.view.type === 'launcher' && S.view.source === src;
+    const b = h('button', { class: 'cat-btn virtual' + (active ? ' active' : ''), title: `Every ${SOURCES[src]} game` },
+      h('span', { class: `vdot src-${src}` }), h('span', { class: 'label' }, SOURCES[src]), h('span', { class: 'count' }, counts[src]));
+    b.addEventListener('click', () => setView({ type: 'launcher', source: src }));
+    return h('div', { class: 'cat-row' }, h('span', { class: 'twisty none' }), b);
+  })];
 }
 
 // Handles drops of cards and categories. For categories, the top quarter of a row means "place before".
@@ -392,6 +434,10 @@ function dropTarget(el, handlers) {
 function renderHeader() {
   const head = $('#viewHeader');
   const kids = [];
+  if (S.view.type === 'launcher') {
+    const games = childrenOf(null).find((c) => /^games$/i.test(c.name));
+    if (games) kids.push(h('div', { class: 'crumbs' }, h('button', { onclick: () => setView({ type: 'category', id: games.id }) }, games.name), h('span', {}, '›')));
+  }
   if (S.view.type === 'category') {
     const path = catPath(S.view.id);
     if (path.length > 1) {
@@ -401,7 +447,7 @@ function renderHeader() {
     }
   }
   const total = S.view.type === 'friends' ? (S.friends.people || []).length : viewItems().length;
-  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : `${total} ${total === 1 ? 'item' : 'items'}`)));
+  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : `${total} ${total === 1 ? 'item' : 'items'}`)));
   if (S.view.type === 'category' && !S.search) {
     const subs = childrenOf(S.view.id);
     const chips = subs.map((c) => {
@@ -441,7 +487,8 @@ function renderJump() {
   sec.replaceChildren(h('h3', { class: 'section-title' }, 'Jump back in'), h('div', { class: 'jump-row' }, tiles));
 }
 
-const SORTS = { name: 'Name A to Z', played: 'Recently played', added: 'Recently added', most: 'Most played' };
+const SORTS = { name: 'Name', category: 'Category', played: 'Last played', added: 'Date added', most: 'Hours played' };
+const DIR_LABELS = { name: ['A to Z', 'Z to A'], category: ['A to Z', 'Z to A'], played: ['Newest first', 'Oldest first'], added: ['Newest first', 'Oldest first'], most: ['Most first', 'Least first'] };
 
 function renderFilters() {
   const base = baseItems();
@@ -452,7 +499,10 @@ function renderFilters() {
       key !== 'all' ? h('span', { class: `dot src-${key}`, style: { background: 'var(--src)' } }) : null, label, h('span', { class: 'count' }, n));
   const chips = present.length > 1 ? [chip('all', 'All', base.length), ...present.map((s) => chip(s, SOURCES[s], base.filter((it) => it.source === s).length))] : [];
   const sortBtn = h('button', { class: 'chip', onclick: (e) => openMenu(Object.entries(SORTS).map(([k, v]) => ({ label: v, hint: S.sort === k ? '✓' : '', run: () => { S.sort = k; prefs.set('sort', k); render(); } })), { el: e.currentTarget }) },
-    'Sort: ', S.view.type === 'recent' ? SORTS.played : SORTS[S.sort], icon('chevron'));
+    'Sort: ', S.view.type === 'recent' ? SORTS.played : SORTS[S.sort] || SORTS.name, icon('chevron'));
+  const sortKey = S.view.type === 'recent' ? 'played' : S.sort in SORTS ? S.sort : 'name';
+  const dirBtn = h('button', { class: 'chip', title: 'Flip the order', onclick: () => { S.sortDir = S.sortDir === 'reverse' ? 'normal' : 'reverse'; prefs.set('sortDir', S.sortDir); render(); } },
+    icon('sort'), DIR_LABELS[sortKey][S.sortDir === 'reverse' ? 1 : 0]);
   const range = h('input', { type: 'range', min: '120', max: '260', step: '10', value: String(S.size), title: 'Card size' });
   range.addEventListener('input', () => {
     S.size = +range.value;
@@ -464,13 +514,29 @@ function renderFilters() {
     h('button', { class: S.libMode === 'installed' ? 'on' : '', onclick: () => { S.libMode = 'installed'; prefs.set('libMode', 'installed'); render(); } }, 'Installed'),
     h('button', { class: S.libMode === 'all' ? 'on' : '', onclick: () => { S.libMode = 'all'; prefs.set('libMode', 'all'); render(); } }, 'All owned')) : null;
   $('#filters').replaceChildren(...[modeSeg].filter(Boolean), ...chips, h('span', { class: 'spacer' }),
-    h('div', { class: 'row', style: { gap: '14px' } }, sortBtn, h('label', { class: 'size-ctl', title: 'Card size' }, icon('image'), range)));
+    h('div', { class: 'row', style: { gap: '8px' } }, sortBtn, dirBtn, h('label', { class: 'size-ctl', title: 'Card size' }, icon('image'), range)));
+}
+
+const headerCache = new Map();
+function groupHeader(label, n) {
+  let el = headerCache.get(label);
+  if (!el) { el = h('div', { class: 'grid-head' }); headerCache.set(label, el); }
+  el.replaceChildren(h('span', {}, label), h('span', { class: 'count' }, n));
+  return el;
 }
 
 function renderGrid() {
   const list = viewItems();
   const grid = $('#grid');
-  const want = list.map(cardFor);
+  const want = [];
+  let lastGroup = null;
+  for (const it of list) {
+    if (S.sort === 'category' && S.view.type !== 'recent') {
+      const g = catLabel(it);
+      if (g !== lastGroup) { want.push(groupHeader(g, list.filter((x) => catLabel(x) === g).length)); lastGroup = g; }
+    }
+    want.push(cardFor(it));
+  }
   const keep = new Set(want);
   for (const c of [...grid.children]) if (!keep.has(c)) c.remove();
   want.forEach((c, i) => { if (grid.children[i] !== c) grid.insertBefore(c, grid.children[i] || null); });
@@ -744,6 +810,7 @@ function openDetails(id) {
 }
 
 // ---------- friends ----------
+const PLAT = { steam: 'Steam', xbox: 'Xbox', epic: 'Epic' };
 const STATUS_LABEL = { ingame: 'In game', online: 'Online', busy: 'Busy', away: 'Away', offline: 'Offline' };
 
 function renderFriends() {
@@ -755,7 +822,7 @@ function renderFriends() {
   if (f.errors && f.errors.length) kids.push(h('div', { class: 'note err' }, f.errors.join(' ')));
   if (!f.configured) {
     kids.push(h('div', { class: 'friends-empty' },
-      h('h3', {}, 'Connect Steam or Xbox to see friends'),
+      h('h3', {}, 'Connect Steam, Xbox or Epic to see friends'),
       h('p', {}, 'Add a Steam Web API key or an OpenXBL key in Settings. Friends with the same name on both are matched automatically.'),
       h('div', { class: 'row', style: { justifyContent: 'center' } },
         h('button', { class: 'btn primary', onclick: openSettings }, 'Open Settings'),
@@ -779,7 +846,7 @@ function friendCard(p) {
   const av = p.avatar ? h('img', { class: 'f-av', src: p.avatar, alt: '' }) : h('div', { class: 'f-av f-init' }, (p.name[0] || '?').toUpperCase());
   const acc = p.accounts.map((a) => h('div', { class: 'f-acc' },
     h('span', { class: `f-dot st-${a.status}` }),
-    h('span', { class: `f-plat src-${a.platform}` }, a.platform === 'steam' ? 'Steam' : 'Xbox'),
+    h('span', { class: `f-plat src-${a.platform}` }, PLAT[a.platform] || a.platform),
     h('span', { class: 'f-name' }, a.name),
     h('span', { class: 'f-act' }, a.activity || STATUS_LABEL[a.status])));
   const card = h('button', { class: `friend st-${p.status}` },
@@ -788,7 +855,7 @@ function friendCard(p) {
       h('div', { class: 'f-title' }, p.name, p.accounts.length > 1 ? h('span', { class: 'f-linked', title: p.manual ? 'Linked by you' : 'Matched by name' }, icon('link')) : null),
       acc));
   const menu = (pos) => openMenu([
-    ...p.accounts.map((a) => ({ label: `Open ${a.platform === 'steam' ? 'Steam' : 'Xbox'} profile`, run: () => api.openExternal(a.profile) })),
+    ...p.accounts.map((a) => ({ label: `Open ${PLAT[a.platform] || a.platform} profile`, run: () => api.openExternal(a.profile) })),
     '-',
     { label: 'Link with another friend', run: () => pickFriendToLink(p) },
     p.accounts.length > 1 ? { label: 'Unlink accounts', run: async () => { await api.unlinkFriends(p.accounts.map((a) => a.key)); showToast('Accounts unlinked'); } } : null,
@@ -808,7 +875,7 @@ function pickFriendToLink(p) {
     const q = norm(input.value);
     const rows = others.filter((o) => !q || o.accounts.some((a) => norm(a.name).includes(q))).slice(0, 60).map((o) =>
       h('button', { onclick: async () => { m.close(); await api.linkFriends(p.accounts.map((a) => a.key), o.accounts.map((a) => a.key)); showToast(`Linked ${p.name} and ${o.name}`); } },
-        h('span', { class: `f-dot st-${o.status}` }), `${o.name}`, h('span', { class: 'count', style: { marginLeft: 'auto' } }, o.accounts.map((a) => (a.platform === 'steam' ? 'Steam' : 'Xbox')).join(', '))));
+        h('span', { class: `f-dot st-${o.status}` }), `${o.name}`, h('span', { class: 'count', style: { marginLeft: 'auto' } }, o.accounts.map((a) => (PLAT[a.platform] || a.platform)).join(', '))));
     list.replaceChildren(...(rows.length ? rows : [h('div', { class: 'loading' }, 'No one else to link with')]));
   };
   input.addEventListener('input', fill);
@@ -820,6 +887,36 @@ function setFriends(st) {
   S.friends = st || S.friends;
   if (S.view.type === 'friends') { renderHeader(); renderFriends(); }
   renderSidebar();
+}
+
+// ---------- launchers ----------
+async function renderLaunchers() {
+  const box = $('#launchersView');
+  if (!S.launchers) {
+    box.replaceChildren(h('div', { class: 'loading' }, h('span', { class: 'spinner' }), 'Checking which launchers are installed'));
+    S.launchers = await api.getLaunchers();
+    if (S.view.type !== 'launchers') return;
+    renderHeader();
+  }
+  const list = S.launchers.slice().sort((a, b) => Number(b.installed) - Number(a.installed) || b.games - a.games || a.name.localeCompare(b.name));
+  const card = (l) => {
+    const b = h('button', { class: 'lcard' + (l.installed ? '' : ' missing') },
+      l.icon ? h('img', { class: 'l-icon', src: l.icon, alt: '' }) : h('div', { class: 'l-icon l-init' }, l.name[0]),
+      h('div', { class: 'l-body' },
+        h('div', { class: 'l-name' }, l.name),
+        h('div', { class: 'l-sub' }, l.installed ? `Installed${l.games ? ` · ${l.games} ${l.games === 1 ? 'game' : 'games'}` : ''}` : 'Not installed')),
+      h('span', { class: 'btn' + (l.installed ? ' primary' : '') }, l.installed ? 'Open' : 'Get it'));
+    b.addEventListener('click', async () => {
+      const r = await api.openLauncher(l.id);
+      if (r && r.download) showToast(`Opening the ${l.name} download page`);
+      else if (r && !r.ok) showToast(r.error || `Could not open ${l.name}`, 'error');
+      else showToast(`Opening ${l.name}`);
+    });
+    return b;
+  };
+  box.replaceChildren(
+    h('div', { class: 'friends-bar' }, h('button', { class: 'chip', onclick: () => { S.launchers = null; renderLaunchers(); } }, icon('refresh'), 'Check again')),
+    h('div', { class: 'launcher-grid' }, list.map(card)));
 }
 
 // ---------- related apps ----------
