@@ -58,9 +58,8 @@ body.fullscreen #topbar { padding-right: 16px; }
 .brand { display: flex; align-items: center; gap: 10px; width: calc(var(--side) - 32px); -webkit-app-region: drag; }
 .brand-name { font-weight: 700; letter-spacing: .14em; text-transform: uppercase; font-size: 12px; color: var(--muted); }
 .brand-mark {
-  width: 18px; height: 22px; border-radius: 4px; position: relative;
-  background: linear-gradient(160deg, #ff3b4b, #b3101e);
-  box-shadow: -5px 3px 0 -1px #6b1019, -9px 6px 0 -2px #3a0a0f;
+  width: 22px; height: 20px; flex: none;
+  background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='380 500 1288 1140'><polygon points='588,520 1460,520 1668,880 1024,1620 380,880' fill='%23e11d2e'/><polygon points='588,520 1024,520 824,880 380,880' fill='%23ff5a64'/><polygon points='1024,520 1460,520 1668,880 1224,880' fill='%23f03240'/><polygon points='824,880 1024,520 1224,880' fill='%23ff7880'/><polygon points='380,880 824,880 1024,1620' fill='%23be1020'/><polygon points='824,880 1224,880 1024,1620' fill='%23e11d2e'/><polygon points='1224,880 1668,880 1024,1620' fill='%23960a18'/></svg>") center / contain no-repeat;
 }
 .search-wrap { position: relative; flex: 1; max-width: 520px; }
 .search-icon, .search-wrap > .ic { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--faint); width: 16px; height: 16px; pointer-events: none; }
