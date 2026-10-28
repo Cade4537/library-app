@@ -3,6 +3,9 @@ const fs = require('fs');
 const fsp = fs.promises;
 const crypto = require('crypto');
 
+// How many short PowerShell jobs are running right now (shown in Settings > Health).
+const psStats = { active: 0, started: 0, timedOut: 0 };
+
 // Runs a PowerShell script and returns its text output (or null on failure).
 function runPowerShell(script, timeoutMs = 45000) {
   return new Promise((resolve) => {
@@ -19,15 +22,20 @@ function runPowerShell(script, timeoutMs = 45000) {
     } catch {
       return resolve(null);
     }
+    psStats.active++; psStats.started++;
+    let done = false;
+    const finish = () => { if (!done) { done = true; psStats.active--; } };
     const chunks = [];
-    ps.stdout.on('data', (d) => chunks.push(d));
+    ps.stdout.on('data', (d) => { if (chunks.length < 4000) chunks.push(d); });
     ps.stderr.on('data', () => {});
     const timer = setTimeout(() => {
+      psStats.timedOut++;
       try { ps.kill(); } catch {}
+      finish();
       resolve(null);
     }, timeoutMs);
-    ps.on('error', () => { clearTimeout(timer); resolve(null); });
-    ps.on('close', () => { clearTimeout(timer); resolve(Buffer.concat(chunks).toString('utf8').trim()); });
+    ps.on('error', () => { clearTimeout(timer); finish(); resolve(null); });
+    ps.on('close', () => { clearTimeout(timer); finish(); resolve(Buffer.concat(chunks).toString('utf8').trim()); });
   });
 }
 
@@ -86,4 +94,5 @@ function splitArgs(str) {
   return out;
 }
 
-module.exports = { runPowerShell, runPowerShellJson, exists, readJson, listDir, hash, asArray, normName, similarity, splitArgs, fsp };
+module.exports = {
+  psStats, runPowerShell, runPowerShellJson, exists, readJson, listDir, hash, asArray, normName, similarity, splitArgs, fsp };

@@ -182,6 +182,12 @@ The player at the bottom of the sidebar reads what is playing from Windows media
 
 Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpers restart themselves every few hours, song artwork and achievement caches are capped, cards for removed games are dropped, and the music player only sends updates when something changes. The Discord tab and the Remote Play stream are the heavy parts; Close tab and End stream free them.
 
+## Health and safety
+
+- **Health:** Settings > Health shows how much memory Crimson Vault uses (window, GPU, helpers), how long it has been running, and any recent crashes or hangs. Copy report copies it for troubleshooting. Everything is also written to `diagnostics.log` in the data folder, with a memory check every 30 minutes.
+- **Never stuck full screen:** if the window crashes or hangs, or is hidden to the tray, it leaves full screen first so the taskbar and desktop come back. The show / hide shortcut (Ctrl+Alt+Space) also leaves full screen. Xbox Remote Play no longer takes over Windows keys, so Alt+Tab and the Windows key always work.
+- **Background:** animations and trailers pause while another app (like a game) has focus.
+
 ## Data
 
 Everything is saved in `%APPDATA%\library-app` (library, covers, settings and sign-ins). Settings > Open data folder opens it. A backup of the library file is made each session.

@@ -24,7 +24,8 @@ const { XboxLive } = require('./src/main/xboxlive');
 const { EpicClient } = require('./src/main/epicClient');
 const { getLaunchers, openLauncher } = require('./src/main/launchers');
 const { getDrives, SizeTracker, uninstall } = require('./src/main/storage');
-const { runPowerShell } = require('./src/main/util');
+const { runPowerShell, psStats } = require('./src/main/util');
+const diag = require('./src/main/diag');
 
 const { openRemotePlayWindow, openXboxAppAndConnect } = require('./src/main/remoteplay');
 const XBOX_APP_AUMID = 'Microsoft.GamingApp_8wekyb3d8bbwe!Microsoft.Xbox.App';
@@ -301,13 +302,35 @@ function createWindow() {
     if (/^https:\/\//.test(url)) shell.openExternal(url);
     return { action: 'deny' };
   });
-  if (startHidden && store.data.settings.closeToTray !== false) win.once('ready-to-show', () => win.hide());
+  if (startHidden && store.data.settings.closeToTray !== false) win.once('ready-to-show', () => hideWindow());
   // Closing the window keeps Crimson Vault running in the tray (unless turned off in Settings).
   win.on('close', (e) => {
-    if (!quitting && store.data.settings.closeToTray !== false && tray) { e.preventDefault(); win.hide(); }
+    if (!quitting && store.data.settings.closeToTray !== false && tray) { e.preventDefault(); hideWindow(); }
   });
+  // Never leave a stuck full screen window over the desktop: if the page crashes or hangs,
+  // leave full screen (so the taskbar and desktop come back) and reload it.
+  win.webContents.on('render-process-gone', (_e, d) => {
+    diag.log('window-crashed', d);
+    leaveFullScreen();
+    if (d && d.reason !== 'clean-exit') setTimeout(() => { if (win && !win.isDestroyed()) win.webContents.reload(); }, 1500);
+  });
+  win.on('unresponsive', () => { diag.log('window-unresponsive'); leaveFullScreen(); });
+  win.on('responsive', () => diag.log('window-responsive'));
+  win.webContents.on('did-fail-load', (_e, code, desc) => diag.log('load-failed', { code, desc }));
   win.on('enter-full-screen', () => win.webContents.send('fullscreen', true));
   win.on('leave-full-screen', () => win.webContents.send('fullscreen', false));
+}
+
+function leaveFullScreen() {
+  try { if (streamView && streamView.full) streamView.setFull(false); } catch {}
+  try { if (win && !win.isDestroyed() && win.isFullScreen()) win.setFullScreen(false); } catch {}
+}
+
+// Hiding to the tray leaves full screen first, so a hidden window never keeps Windows in full screen mode.
+function hideWindow() {
+  if (!win || win.isDestroyed()) return;
+  leaveFullScreen();
+  setTimeout(() => { if (win && !win.isDestroyed()) win.hide(); }, win.isFullScreen() ? 300 : 0);
 }
 
 function showWindow() {
@@ -329,7 +352,7 @@ function setupTray() {
     { label: 'Quit', click: () => { quitting = true; app.quit(); } },
   ]);
   tray.setContextMenu(menu());
-  tray.on('click', () => { if (win && win.isVisible() && win.isFocused()) win.hide(); else showWindow(); });
+  tray.on('click', () => { if (win && win.isVisible() && win.isFocused()) hideWindow(); else showWindow(); });
 }
 
 // Start with Windows (quietly in the tray) and the show/hide hotkey.
@@ -340,7 +363,11 @@ function applyStartup() {
   const key = s.hotkey === undefined ? 'Control+Alt+Space' : s.hotkey;
   if (key) {
     try {
-      globalShortcut.register(key, () => { if (win && win.isVisible() && win.isFocused()) win.hide(); else showWindow(); });
+      // In full screen the shortcut first leaves full screen, so it is always a way out.
+      globalShortcut.register(key, () => {
+        if (win && win.isFullScreen()) { leaveFullScreen(); showWindow(); return; }
+        if (win && win.isVisible() && win.isFocused()) hideWindow(); else showWindow();
+      });
     } catch {}
   }
 }
@@ -746,8 +773,10 @@ function registerIpc() {
     }
   });
   ipcMain.handle('app:openDataFolder', () => shell.openPath(app.getPath('userData')));
-  ipcMain.handle('app:toggleFullscreen', () => win.setFullScreen(!win.isFullScreen()));
-  ipcMain.handle('app:setFullscreen', (_e, v) => win.setFullScreen(!!v));
+  ipcMain.handle('app:toggleFullscreen', () => { if (win.isFullScreen()) leaveFullScreen(); else if (win.isVisible()) win.setFullScreen(true); });
+  // Only a visible window may go full screen.
+  ipcMain.handle('app:setFullscreen', (_e, v) => { if (!v) leaveFullScreen(); else if (win.isVisible() && !win.isMinimized()) win.setFullScreen(true); });
+  ipcMain.handle('diag:get', () => ({ ...diag.snapshot({ powershell: { ...psStats }, helpers: { music: !!(media && media.proc), playtime: !!(playtime && playtime.proc) }, discordOpen: !!(discordView && discordView.view), streamOpen: !!(streamView && streamView.open), sessions: (store.data.sessions || []).length, items: Object.keys(store.data.items).length }), log: diag.tail(30), file: diag.logFile() }));
   ipcMain.handle('app:copyText', (_e, text) => clipboard.writeText(String(text || '')));
   ipcMain.handle('app:openExternal', (_e, url) => {
     if (/^https:\/\//.test(url)) shell.openExternal(url);
@@ -775,6 +804,10 @@ if (!app.requestSingleInstanceLock()) {
     epic = new EpicClient(store);
     ubisoft = new UbisoftActivity(store);
     friends = new Friends(store, (s) => sendTo('friends:state', s), getSteamId, xbox, epic);
+    diag.log('start', { version: app.getVersion(), hidden: startHidden });
+    app.on('child-process-gone', (_e, d) => { diag.log('process-gone', d); if (d && d.type === 'GPU') leaveFullScreen(); });
+    // Memory every 30 minutes, so a slow leak shows up in the log.
+    setInterval(() => diag.log('health', diag.snapshot({ ps: psStats.active, psTimedOut: psStats.timedOut })), 30 * 60 * 1000);
     registerIpc();
     createWindow();
     setupTray();
@@ -802,6 +835,7 @@ if (!app.requestSingleInstanceLock()) {
 
   app.on('before-quit', () => {
     quitting = true;
+    diag.log('quit');
     globalShortcut.unregisterAll();
     if (remote) remote.stop();
     if (playtime) playtime.flushSessions();

@@ -73,6 +73,7 @@ contextBridge.exposeInMainWorld('library', {
   pickExe: call('app:pickExe'),
   openUrl: call('app:openUrl'),
   power: call('app:power'),
+  diag: call('diag:get'),
   onCommand: (cb) => ipcRenderer.on('app:command', (_e, c) => cb(c)),
   ubisoftSignIn: call('auth:ubisoftSignIn'),
   ubisoftSignOut: call('auth:ubisoftSignOut'),

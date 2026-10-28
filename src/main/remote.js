@@ -10,6 +10,20 @@ const crypto = require('crypto');
 
 const PORT = 47820;
 
+// Compares secrets without leaking how much matched.
+function safeEq(a, b) {
+  const x = Buffer.from(String(a || ''));
+  const y = Buffer.from(String(b || ''));
+  return x.length === y.length && x.length > 0 && crypto.timingSafeEqual(x, y);
+}
+// Only plain IP addresses or localhost may be used to reach the remote. This blocks web pages
+// that point their own domain name at your PC (DNS rebinding) from talking to it.
+function hostOk(host) {
+  const h = String(host || '').replace(/:\d+$/, '').replace(/^\[|\]$/g, '');
+  return h === 'localhost' || /^\d{1,3}(\.\d{1,3}){3}$/.test(h) || /^[0-9a-f:]+$/i.test(h);
+}
+const fails = new Map(); // ip -> { n, until }
+
 // Your PC's address on the home network. Virtual adapters (Hyper-V, WSL, VirtualBox, VMware,
 // VPNs) also have private addresses, but a phone can't reach them, so they go last.
 const VIRTUAL = /vethernet|virtual|vmware|vbox|hyper-v|wsl|loopback|tailscale|zerotier|hamachi|radmin|nordlynx|wireguard|tap|tun|docker|bluetooth/i;
@@ -63,6 +77,9 @@ class RemoteServer {
     srv.on('error', (e) => { this.error = e.code === 'EADDRINUSE' ? `Port ${PORT} is busy` : e.message; this.server = null; });
     srv.listen(PORT, '0.0.0.0');
     srv.keepAliveTimeout = 5000;
+    srv.headersTimeout = 10000;
+    srv.requestTimeout = 20000;
+    srv.maxHeadersCount = 40;
     this.server = srv;
     return this.info();
   }
@@ -72,11 +89,20 @@ class RemoteServer {
     this.server = null;
   }
 
+  fail(ip) {
+    const f = fails.get(ip) || { n: 0, until: 0, first: Date.now() };
+    if (Date.now() - f.first > 10 * 60 * 1000) { f.n = 0; f.first = Date.now(); }
+    if (++f.n >= 15) { f.until = Date.now() + 10 * 60 * 1000; f.n = 0; f.first = Date.now(); }
+    fails.set(ip, f);
+    if (fails.size > 200) fails.delete(fails.keys().next().value);
+  }
+
   authed(req) {
     const t = this.token;
     const cookie = String(req.headers.cookie || '').split(';').map((x) => x.trim()).find((x) => x.startsWith('cv_t='));
-    const given = (cookie && decodeURIComponent(cookie.slice(5))) || req.headers['x-cv-token'] || '';
-    return given.length === t.length && crypto.timingSafeEqual(Buffer.from(given), Buffer.from(t));
+    let given = req.headers['x-cv-token'] || '';
+    if (!given && cookie) { try { given = decodeURIComponent(cookie.slice(5)); } catch { given = ''; } }
+    return safeEq(given, t);
   }
 
   send(res, code, body, type = 'application/json; charset=utf-8', extra = {}) {
@@ -85,14 +111,20 @@ class RemoteServer {
   }
 
   async handle(req, res) {
-    if (!isPrivate(req.socket.remoteAddress)) return this.send(res, 403, { error: 'Only your home network can use this.' });
+    const ip = String(req.socket.remoteAddress || '');
+    if (!isPrivate(ip)) return this.send(res, 403, { error: 'Only your home network can use this.' });
+    if (!hostOk(req.headers.host)) return this.send(res, 403, { error: 'Open this with the address shown in Crimson Vault.' });
+    // Too many wrong codes from one device: wait 10 minutes.
+    const f = fails.get(ip);
+    if (f && f.until > Date.now()) return this.send(res, 429, { error: 'Too many tries. Wait a few minutes.' });
     const url = new URL(req.url, 'http://x');
     // Pairing: the QR link carries the secret once; it is kept in a cookie after that.
     if (url.pathname === '/' && url.searchParams.get('t')) {
-      if (url.searchParams.get('t') !== this.token) return this.send(res, 403, '<h3 style="font-family:sans-serif">This pairing link is old. Scan the QR code in Crimson Vault again.</h3>', 'text/html; charset=utf-8');
+      if (!safeEq(url.searchParams.get('t'), this.token)) { this.fail(ip); return this.send(res, 403, '<h3 style="font-family:sans-serif">This pairing link is old. Scan the QR code in Crimson Vault again.</h3>', 'text/html; charset=utf-8'); }
       return this.send(res, 302, '', 'text/plain', { Location: '/', 'Set-Cookie': `cv_t=${encodeURIComponent(this.token)}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict` });
     }
     if (!this.authed(req)) {
+      if (req.headers['x-cv-token'] || /cv_t=/.test(String(req.headers.cookie || ''))) this.fail(ip);
       if (url.pathname === '/') return this.send(res, 401, PAIR_PAGE, 'text/html; charset=utf-8');
       return this.send(res, 401, { error: 'Not paired' });
     }

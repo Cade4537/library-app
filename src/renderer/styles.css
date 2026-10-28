@@ -1379,3 +1379,11 @@ body.guide-open #guide { transform: none; }
 .sp-row > label { font-weight: 700; font-size: 13px; color: var(--muted); }
 .sp-hist { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 14px; }
 @media (max-width: 1000px) { .sp-hero { grid-template-columns: 1fr; } .sp-fan { height: 200px; } }
+
+/* ---------- 0.12.2: background idle and Health ---------- */
+body.app-idle *, body.app-idle *::before, body.app-idle *::after { animation-play-state: paused !important; }
+.health { display: grid; gap: 10px; padding: 12px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line); }
+.health-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.health-grid > div { display: flex; flex-direction: column; padding: 8px 10px; border-radius: 9px; background: var(--bg); }
+.health-grid b { font-size: 18px; }
+.health-grid span { font-size: 11.5px; color: var(--muted); }

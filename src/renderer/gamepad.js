@@ -119,6 +119,8 @@
   }
 
   function poll(now) {
+    // While another app (like a game) has focus, check far less often: input is ignored then anyway.
+    if (!document.hasFocus()) { setTimeout(() => requestAnimationFrame(poll), 400); return; }
     const pads = navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean) : [];
     if (pads.length && document.hasFocus()) {
       const pressed = (i) => pads.some((g) => g.buttons[i] && g.buttons[i].pressed);

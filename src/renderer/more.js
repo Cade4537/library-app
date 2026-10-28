@@ -448,10 +448,48 @@ function moreSettingsSections(s, state) {
     h('div', { class: 'field' }, toggleRow('News on Home', 'The latest Steam news from your 3 most played games', prefs.get('showNews', true), (v) => { prefs.set('showNews', v); newsKey = ''; })),
     h('div', { class: 'section-label' }, 'Phone remote'),
     h('div', { class: 'field' }, remoteToggle, qr),
+    ...healthSection(),
   ];
 }
 
+// Settings > Health: memory, helpers and the last crashes or hangs from diagnostics.log.
+function healthSection() {
+  const box = h('div', { class: 'health' }, h('div', { class: 'help' }, 'Loading…'));
+  const draw = async () => {
+    let d;
+    try { d = await api.diag(); } catch { d = null; }
+    if (!d) { fillEl(box, h('div', { class: 'help' }, 'Not available.')); return; }
+    const types = Object.entries(d.byTypeMB || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v} MB`).join(' · ');
+    const bad = (d.log || []).filter((l) => /crashed|unresponsive|process-gone|load-failed/.test(l));
+    fillEl(box,
+      h('div', { class: 'health-grid' },
+        h('div', {}, h('b', {}, `${d.totalMB} MB`), h('span', {}, 'Total memory')),
+        h('div', {}, h('b', {}, `${d.uptimeHours} h`), h('span', {}, 'Running for')),
+        h('div', {}, h('b', {}, String(d.processes)), h('span', {}, 'Processes')),
+        h('div', {}, h('b', {}, String(d.powershell ? d.powershell.active : 0)), h('span', {}, 'Helper jobs running'))),
+      h('div', { class: 'help' }, types),
+      h('div', { class: 'help' }, `Music helper ${d.helpers && d.helpers.music ? 'on' : 'off'} · Hours tracker ${d.helpers && d.helpers.playtime ? 'on' : 'off'} · Discord tab ${d.discordOpen ? 'loaded' : 'closed'} · Xbox stream ${d.streamOpen ? 'open' : 'closed'}`),
+      bad.length ? h('div', { class: 'note err', style: { margin: 0 } }, `${bad.length} recent problem${bad.length === 1 ? '' : 's'}: `, bad.slice(-3).map((l) => h('div', {}, l))) : h('div', { class: 'help' }, 'No crashes or hangs logged recently.'),
+      h('div', { class: 'row', style: { gap: '8px' } },
+        h('button', { class: 'btn', onclick: () => draw() }, icon('refresh'), 'Refresh'),
+        h('button', { class: 'btn', onclick: async () => { await api.copyText(JSON.stringify({ ...d, log: d.log }, null, 1)); showToast('Health report copied'); } }, 'Copy report'),
+        h('button', { class: 'btn', onclick: () => api.openDataFolder() }, 'Open log folder')));
+  };
+  draw();
+  return [h('div', { class: 'section-label' }, 'Health'), h('div', { class: 'field' }, box)];
+}
+
 function wireMore() {
+  // Animations pause while Crimson Vault is in the background, so it uses no GPU while you play.
+  const idle = () => {
+    const off = !document.hasFocus() || document.hidden;
+    document.body.classList.toggle('app-idle', off);
+    for (const v of document.querySelectorAll('video')) { if (off) v.pause(); else if (v.autoplay) v.play().catch(() => {}); }
+  };
+  window.addEventListener('blur', idle);
+  window.addEventListener('focus', idle);
+  document.addEventListener('visibilitychange', idle);
+  idle();
   if (api.onCommand) api.onCommand((c) => { if (c === 'surprise') window.surprise && surprise(); if (c === 'tv') window.setTV && setTV(true); });
   if ('Notification' in window && Notification.permission === 'default') { try { Notification.requestPermission(); } catch {} }
 }

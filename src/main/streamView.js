@@ -20,7 +20,7 @@ class StreamView {
     if (this.view) return;
     const ses = session.fromPartition(PARTITION);
     ses.setUserAgent(chromeUA(ses));
-    ses.setPermissionRequestHandler((_wc, perm, cb) => cb(['fullscreen', 'pointerLock', 'keyboardLock', 'media'].includes(perm)));
+    ses.setPermissionRequestHandler((_wc, perm, cb) => cb(['fullscreen', 'pointerLock', 'media'].includes(perm)));
     const view = new WebContentsView({ webPreferences: { partition: PARTITION, contextIsolation: true, sandbox: true } });
     view.setBackgroundColor('#000000');
     const wc = view.webContents;

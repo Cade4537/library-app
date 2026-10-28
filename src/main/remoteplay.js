@@ -46,7 +46,7 @@ function openRemotePlayWindow(parent, consoleName) {
   if (win && !win.isDestroyed()) { win.focus(); return; }
   const ses = session.fromPartition(PARTITION);
   ses.setUserAgent(chromeUA(ses));
-  ses.setPermissionRequestHandler((_wc, perm, cb) => cb(['fullscreen', 'pointerLock', 'keyboardLock', 'media'].includes(perm)));
+  ses.setPermissionRequestHandler((_wc, perm, cb) => cb(['fullscreen', 'pointerLock', 'media'].includes(perm)));
   win = new BrowserWindow({
     width: 1600, height: 900, backgroundColor: '#000000', autoHideMenuBar: true, show: false,
     title: 'Xbox Remote Play', icon: path.join(__dirname, '..', '..', 'assets', 'icon.ico'),
