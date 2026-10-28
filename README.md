@@ -84,8 +84,8 @@ Steam, Xbox and Epic friends, sorted into Playing, Online, Away and Offline. Epi
 
 Two mini games in the Arcade tab, for mouse, keyboard or controller:
 
-- **Vault Blocks:** a falling block puzzle. Clear lines to score; the level and speed go up every 10 lines. Hold, next pieces, ghost piece and a best score. Keys: arrows move, Space or Up hard drops, X rotates, Z rotates back, C holds, P or Esc pauses. Controller: D-pad or stick, A and B rotate, Up, Y or RB hard drop, LB holds, Menu pauses, View quits.
-- **Peg Drop:** drop balls through rows of pegs into slots worth x0.3 to x10. Pick a bet, aim, drop one at a time or turn on auto drop. Pretend points only (start at 1,000, refill any time); nothing is real money.
+- **Vault Blocks:** a falling block puzzle. Clear lines to score; the level and speed go up every 10 lines. Hold, next pieces, ghost piece and a best score. Keys: A / D move, S soft drops, Space hard drops, Q / E rotate, C holds, Esc or P pauses (arrow keys work too). Controller: stick or D-pad, A / B rotate, Y hard drops, LB holds, Menu pauses. Pause and Quit buttons are on screen, and the pause menu has Resume, Restart and Quit.
+- **Peg Drop:** drop balls through rows of pegs into slots. Set the bet per ball (type any amount like 500, 2.5M or 1Dc for a decillion, or use Min, ½, ×2, ×10, Max), drop 1 to 100 balls at once, and pick a risk level: Low, Medium, High or Extreme (bigger edge payouts, smaller middle). The balls are light, bouncy and a bit unpredictable, and move at half speed so they are easy to follow. Pause menu with Resume, Reset points and Quit; Reset points starts over at 1,000. Pretend points only; nothing is real money.
 
 ## Discord
 
@@ -159,6 +159,6 @@ One time setup (already done): the public repo `Cade4537/library-app` and a GitH
 
 Every release:
 
-1. Raise `version` in package.json (for example 0.9.5 to 0.9.6. Use three numbers only; a fourth number (like 0.9.4.5) breaks updates). Releasing the same version again only overwrites it, and installed copies will not update.
+1. Raise `version` in package.json (for example 0.10.0 to 0.10.1, or 0.10.0 to 0.11.0 for bigger updates. Use three numbers only; a fourth number (like 0.9.4.5) breaks updates). Releasing the same version again only overwrites it, and installed copies will not update.
 2. Commit and push in GitHub Desktop.
 3. Run `npm run release` in a terminal opened after `GH_TOKEN` was set.

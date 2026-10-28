@@ -141,7 +141,7 @@ class XboxLive {
     const a = await this.auth();
     const res = await fetch(url, {
       method: opts.method || 'GET',
-      headers: { Authorization: `XBL3.0 x=${a.uhs};${a.token}`, 'x-xbl-contract-version': String(contract), 'Accept-Language': 'en-US', Accept: 'application/json', ...(opts.body ? { 'Content-Type': 'application/json' } : {}) },
+      headers: { Authorization: `XBL3.0 x=${a.uhs};${a.token}`, 'x-xbl-contract-version': String(contract), 'Accept-Language': 'en-US', Accept: 'application/json', ...(opts.body ? { 'Content-Type': 'application/json' } : {}), ...(opts.headers || {}) },
       body: opts.body ? JSON.stringify(opts.body) : undefined,
       signal: AbortSignal.timeout(20000),
     });
@@ -149,6 +149,13 @@ class XboxLive {
     if (!res.ok) throw new Error(`Xbox error ${res.status}`);
     const text = await res.text();
     return text ? JSON.parse(text) : {};
+  }
+
+  // Your consoles, with their names (used to pick the right one for remote play).
+  async consoles() {
+    if (!this.signedIn) return [];
+    const j = await this.request('https://xccs.xboxlive.com/lists/devices?queryCurrentDevice=false&includeStorageDevices=false', 4, { headers: { skillplatform: 'RemoteManagement' } });
+    return (j.result || []).map((c) => ({ id: c.id, name: c.name, power: c.powerState }));
   }
 
   // Unfollows a friend on Xbox (needs the Microsoft sign in, OpenXBL keys cannot do it).

@@ -950,3 +950,14 @@ body.resume-on #content { padding-bottom: 110px; }
 .game-msg.on { display: flex; animation: viewIn .3s cubic-bezier(.2,.8,.2,1); }
 .gm-t { font: 800 40px/1 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif; }
 .gm-s { color: var(--muted); margin-bottom: 8px; }
+.game-side { width: 250px; }
+.gm-btns { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.gs-in { width: 100%; height: 34px; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.gs-in.small { width: 70px; text-align: center; }
+.gs-in.small::-webkit-inner-spin-button { opacity: .4; }
+.gs-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.gs-chips .chip, .gs-count .chip { height: 26px; padding: 0 9px; font-size: 12px; }
+.gs-count { display: flex; align-items: center; gap: 6px; }
+.gs-risk { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 3px; }
+.gs-risk button { height: 28px; font-size: 12px; }
+.gs-risk button:disabled { opacity: .35; }
