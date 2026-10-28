@@ -245,7 +245,8 @@ function catLabel(it) {
 function viewTitle(view = S.view) {
   switch (view.type) {
     case 'hub': return 'Home';
-    case 'library': return 'Library';
+    case 'library': case 'libcollections': case 'libcategories': case 'liblaunchers': case 'libmanage': return 'Library';
+    case 'surprise': return 'Surprise me';
     case 'home': return 'Everything';
     case 'games': return 'Games';
     case 'apps': return 'Apps';
@@ -416,7 +417,9 @@ function render() {
   const av = S.view.type === 'arcade';
   const dl = S.view.type === 'deals';
   const hb = S.view.type === 'hub';
-  const lb = S.view.type === 'library';
+  const lb = ['library', 'libcollections', 'libcategories', 'liblaunchers', 'libmanage'].includes(S.view.type);
+  const sp = S.view.type === 'surprise';
+  $('#surpriseView').hidden = !sp;
   $('#statsView').hidden = !tv2;
   $('#arcadeView').hidden = !av;
   $('#dealsView').hidden = !dl;
@@ -424,13 +427,14 @@ function render() {
   $('#libraryView').hidden = !lb;
   $('#news').hidden = true;
   document.body.classList.toggle('hub-on', hb);
-  if (tv2 || av || dl || hb || lb) {
+  if (tv2 || av || dl || hb || lb || sp) {
     for (const id of ['#friendsView', '#launchersView', '#storageView', '#grid', '#filters', '#jump', '#collections', '#news', '#empty', '#discordView', '#streamView']) $(id).hidden = true;
     document.body.classList.remove('discord-on');
     renderSidebar();
     renderHeader();
     if (hb) renderHub();
     else if (lb) renderLibraryHub();
+    else if (sp) renderSurprisePage();
     else if (dl) { if (render.shownView !== 'deals') renderDeals(); }
     else if (av) { if (render.shownView !== 'arcade') renderArcade(); }
     else if (render.shownView !== 'stats') renderStats();
@@ -637,8 +641,9 @@ function renderHeader() {
     }
   }
   const total = S.view.type === 'friends' ? (S.friends.people || []).length : viewItems().length;
-  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : S.view.type === 'storage' ? (S.drives ? `${fmtBytes(S.drives.reduce((a, d) => a + d.free, 0))} free` : '') : ['discord', 'remoteplay', 'stats', 'arcade', 'deals', 'hub', 'library'].includes(S.view.type) ? '' : `${total} ${total === 1 ? 'item' : 'items'}`)));
+  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : S.view.type === 'storage' ? (S.drives ? `${fmtBytes(S.drives.reduce((a, d) => a + d.free, 0))} free` : '') : ['discord', 'remoteplay', 'stats', 'arcade', 'deals', 'hub', 'library', 'libcollections', 'libcategories', 'liblaunchers', 'libmanage', 'surprise'].includes(S.view.type) ? '' : `${total} ${total === 1 ? 'item' : 'items'}`)));
   if (S.view.type === 'friends' || S.view.type === 'discord') kids.push(socialTabs());
+  if (isLibraryView(S.view.type)) kids.unshift(libTabs());
   if (S.view.type === 'discord') {
     kids.push(h('div', { class: 'discord-bar' },
       h('span', { class: 'help', style: { flex: 1 } }, 'Discord\'s own app, right here. Voice calls keep going while you switch pages.'),
@@ -956,6 +961,7 @@ function closeTopLayer() {
   if (closeMenu(true)) return true;
   const top = S.modals[S.modals.length - 1];
   if (top) { top(); return true; }
+  if (closeGuide()) return true;
   return false;
 }
 
@@ -1210,6 +1216,7 @@ function setFriends(st) {
   if (S.view.type === 'friends') { renderHeader(); renderFriends(); }
   else if (S.view.type === 'hub') renderHub();
   else if (before !== [...S.friendGames.keys()].join('|') && !['launchers', 'storage', 'discord'].includes(S.view.type)) renderGrid();
+  if (S.guideOpen) renderGuide();
   renderSidebar();
 }
 
@@ -1738,6 +1745,7 @@ function openConnectionsHelp(focus) {
 
 // ---------- surprise me ----------
 function surprisePool() {
+  if (S.view.type === 'surprise') return surpriseFromPage();
   const isGame = (it) => it.kind === 'game';
   const installedOnly = S.surprisePool === 'installed';
   const ok = (it) => isGame(it) && (!installedOnly || it.installed || it.manual);
@@ -1874,6 +1882,7 @@ function setMediaState(st) {
   NP.at = Date.now();
   renderNowPlaying();
   if (S.view.type === 'hub') renderHubMusic();
+  if (S.guideOpen) renderGuide();
 }
 
 // ---------- updates ----------
@@ -1905,16 +1914,21 @@ function focusedCardId() {
 // LB / RB only move between pages (never buttons that do something, like Xbox Remote Play),
 // stop at the first and last page instead of wrapping, and ignore presses closer than 250 ms apart.
 let lastCycle = 0;
+// LB / RB: switch tabs where a page has them (Library, Social), otherwise move between the main pages.
 function cycleView(delta) {
   const now = performance.now();
   if (now - lastCycle < 250) return;
   lastCycle = now;
-  const btns = [...document.querySelectorAll('#nav .nav-btn:not(.nav-action), #tree .cat-btn')];
-  const i = btns.findIndex((b) => b.classList.contains('active'));
-  const j = i < 0 ? 0 : i + delta;
-  if (j < 0 || j >= btns.length) return;
-  btns[j].click();
-  setTimeout(() => spatial.focusDefault(), 30);
+  const tabs = [...document.querySelectorAll('#viewHeader .page-tabs button, #viewHeader .social-bar .seg button')];
+  if (tabs.length > 1) {
+    const i = tabs.findIndex((b) => b.classList.contains('on'));
+    const j = i + delta;
+    if (j >= 0 && j < tabs.length) { tabs[j].click(); setTimeout(() => spatial.focusDefault(), 40); return; }
+  }
+  const pages = MAIN_PAGES.map(([t]) => t);
+  const at = pages.indexOf(pageOf(S.view.type));
+  const next = pages[Math.max(0, Math.min(pages.length - 1, (at < 0 ? 0 : at) + delta))];
+  if (next && next !== pageOf(S.view.type)) { setView({ type: next }); setTimeout(() => spatial.focusDefault(), 40); }
 }
 
 window.padActions = {
@@ -1933,7 +1947,7 @@ window.padActions = {
     const id = focusedCardId(); if (id) itemMenu(id, { el }); else if (!S.tv && !S.modals.length) setTV(true);
   },
   // View button: leaves controller mode, or jumps to search.
-  view: () => { if (S.modals.length) return; if (S.tv) setTV(false); else $('#search').focus(); },
+  view: () => { if (S.modals.length) return; toggleGuide(); },
   lt: () => $('#content').scrollBy({ top: -innerHeight * 0.7 }),
   rt: () => $('#content').scrollBy({ top: innerHeight * 0.7 }),
 };
@@ -1950,6 +1964,9 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     $('#search').focus();
     $('#search').select();
+  } else if ((e.key === 'g' || e.key === 'G') && !e.ctrlKey && !e.altKey && !e.metaKey && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName) && !S.modals.length) {
+    e.preventDefault();
+    toggleGuide();
   } else if (e.key === 'F11') {
     e.preventDefault();
     api.toggleFullscreen();

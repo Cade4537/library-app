@@ -6,6 +6,8 @@
     if (menu) return menu;
     const modals = document.querySelectorAll('#modalRoot .modal');
     if (modals.length) return modals[modals.length - 1];
+    const guide = document.getElementById('guide');
+    if (guide && document.body.classList.contains('guide-open')) return guide;
     const tv = document.getElementById('tv');
     if (tv && !tv.hidden) return tv;
     return document.getElementById('app');
@@ -28,7 +30,7 @@
 
   function focusDefault() {
     const layer = activeLayer();
-    const hub = layer.querySelector && layer.querySelector('#hubView:not([hidden]) [data-k="hero:play"], #hubView:not([hidden]) .hub-tile, #libraryView:not([hidden]) .lr-card, #libraryView:not([hidden]) .hub-tile');
+    const hub = layer.querySelector && layer.querySelector('#guide .gd-page.active, #hubView:not([hidden]) [data-k="hero:play"], #hubView:not([hidden]) .hub-tile, #libraryView:not([hidden]) .lr-card, #libraryView:not([hidden]) .hub-tile');
     const first = hub || layer.querySelector('.card') || layer.querySelector('.tile') || layer.querySelector('.hero .btn') || focusables(layer)[0];
     focusEl(first);
   }

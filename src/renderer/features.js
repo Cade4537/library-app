@@ -40,7 +40,7 @@ function setSideCollapsed(v) {
 const embedShown = { discord: false, stream: false };
 function syncEmbed(kind, hostSel, viewType, send) {
   if (!api || !send) return;
-  const clear = !S.modals.length && !document.querySelector('#menuRoot .menu') && !S.tv;
+  const clear = !S.modals.length && !document.querySelector('#menuRoot .menu') && !S.guideOpen;
   const host = $(hostSel);
   const on = S.view.type === viewType && clear && host && !host.closest('[hidden]') && (kind !== 'stream' || (S.stream && S.stream.open));
   if (!on) {
@@ -158,7 +158,8 @@ function tvJumpRow(delta) {
 function wireFeatures() {
   applyAccent(S.accent);
   document.body.classList.toggle('side-collapsed', !!S.sideCollapsed);
-  $('#sideToggle').addEventListener('click', () => setSideCollapsed(!S.sideCollapsed));
+  $('#sideToggle').addEventListener('click', () => toggleGuide());
+  $('#guideBack').addEventListener('mousedown', () => closeGuide());
   $('#tvBtn').addEventListener('click', () => setTV(true));
   $('#tvExit').addEventListener('click', () => setTV(false));
   $('#streamStartBtn').addEventListener('click', () => startRemotePlay('inapp'));

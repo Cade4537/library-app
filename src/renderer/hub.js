@@ -107,8 +107,8 @@ function renderHub() {
         tile('t:deals', 'tag', 'Deals & News', free.length || sale ? [free.length ? `${free.length} free` : null, sale ? `${sale} on sale` : null].filter(Boolean).join(' · ') : 'Wishlist, free games, news', () => setView({ type: 'deals' })),
         tile('t:social', 'users', 'Social', online.length ? `${online.length} online${playing.length ? ` · ${playing.length} playing` : ''}` : 'Friends and Discord', () => setView({ type: 'friends' })),
         tile('t:stats', 'chart', 'Statistics', `${fmtHours(games.reduce((a, it) => a + (it.minutes || 0), 0)) || '0 hrs'} played`, () => setView({ type: 'stats' })),
-        tile('t:surprise', 'dice', 'Surprise me', 'Let fate pick a game', () => surprise(), 'accent'),
-        tile('t:xbox', 'gamepad', 'Xbox Remote Play', S.stream.open ? 'Streaming now' : 'Play your console here', () => startRemotePlay('inapp'))),
+        tile('t:surprise', 'dice', 'Surprise me', 'Let fate pick a game', () => setView({ type: 'surprise' }), 'accent'),
+        tile('t:xbox', 'gamepad', 'Xbox Remote Play', S.stream.open ? 'Streaming now' : 'Play your console here', () => setView({ type: 'remoteplay' }))),
       free.length ? h('section', { class: 'hub-sec' },
         h('div', { class: 'sec-head' }, h('h3', { class: 'section-title' }, 'Free to keep'), h('button', { class: 'link-btn', onclick: () => setView({ type: 'deals' }) }, 'All deals')),
         h('div', { class: 'hub-free' }, free.slice(0, 4).map((f) => h('button', { class: `hub-freecard st-${f.store || 'epic'}`, 'data-k': `free:${f.store}:${f.title}`, onclick: () => openStore(f.url, f.store) },
@@ -203,8 +203,7 @@ function renderHubMusic() {
 }
 
 // ---------- Library hub ----------
-function renderLibraryHub() {
-  const box = $('#libraryView');
+function renderLibraryOverview(box) {
   if (!box) return;
   const vis = S.lib.items.filter(visible);
   const games = vis.filter(isGameItem);
@@ -222,7 +221,7 @@ function renderLibraryHub() {
   const sig = JSON.stringify([recent.map((it) => [it.id, it.running, it.coverUrl, it.minutes]), games.length, apps.length, fav, backlog, hidden, uncat, folders.map((f) => [f.c.id, f.list.length, f.list.slice(0, 4).map((x) => x.coverUrl)]), [...bySource], smart.map((c) => c.id + c.name), S.libMode]);
   if (box.dataset.sig === sig) return;
   box.dataset.sig = sig;
-  const mosaic = (list) => { const covers = list.filter((it) => it.coverUrl).sort((a, b) => (b.lastPlayed || 0) - (a.lastPlayed || 0) || (b.minutes || 0) - (a.minutes || 0)).slice(0, 4); return h('div', { class: 'coll-mosaic n' + Math.max(1, covers.length) }, covers.length ? covers.map((it) => h('img', { src: it.coverUrl, alt: '', loading: 'lazy', draggable: 'false' })) : h('div', { class: 'coll-empty' }, icon('sparkle'))); };
+  const mosaicUnused = (list) => { const covers = list.filter((it) => it.coverUrl).sort((a, b) => (b.lastPlayed || 0) - (a.lastPlayed || 0) || (b.minutes || 0) - (a.minutes || 0)).slice(0, 4); return h('div', { class: 'coll-mosaic n' + Math.max(1, covers.length) }, covers.length ? covers.map((it) => h('img', { src: it.coverUrl, alt: '', loading: 'lazy', draggable: 'false' })) : h('div', { class: 'coll-empty' }, icon('sparkle'))); };
   keepFocus(box, () => fillEl(box,
     recent.length ? h('section', { class: 'hub-sec' }, h('h3', { class: 'section-title' }, 'Recently played'),
       h('div', { class: 'lib-recent' }, recent.map((it) => {
@@ -245,23 +244,8 @@ function renderLibraryHub() {
         tile('l:backlog', 'list', 'Backlog', backlog ? `${backlog} waiting` : 'Plan what to play', () => setView({ type: 'backlog' })),
         tile('l:fav', 'star', 'Favorites', `${fav}`, () => setView({ type: 'favorites' })),
         tile('l:added', 'clock', 'Recently added', 'Newest first', () => setView({ type: 'added' })),
-        tile('l:surprise', 'dice', 'Surprise me', 'Pick for me', () => surprise(), 'accent'),
-        tile('l:all', 'rows', 'Everything', `${vis.length} games and apps`, () => setView({ type: 'home' })))),
-    folders.length || smart.length ? h('section', { class: 'hub-sec' },
-      h('div', { class: 'sec-head' }, h('h3', { class: 'section-title' }, 'Collections'), h('button', { class: 'link-btn', onclick: () => smartEditor(null) }, '+ Smart collection')),
-      h('div', { class: 'coll-row' },
-        folders.map((f) => h('button', { class: 'coll', 'data-k': `c:${f.c.id}`, onclick: () => setView({ type: 'category', id: f.c.id }) }, mosaic(f.list),
-          h('div', { class: 'coll-info' }, h('div', { class: 'coll-name' }, f.c.name), h('div', { class: 'coll-sub' }, `${f.list.length} ${f.list.length === 1 ? 'game' : 'games'}`)))),
-        smart.map((c) => { const list = vis.filter((it) => matchSmart(c, it)); return h('button', { class: 'coll smart', 'data-k': `s:${c.id}`, onclick: () => setView({ type: 'smart', id: c.id }) }, mosaic(list),
-          h('div', { class: 'coll-info' }, h('div', { class: 'coll-name' }, icon('sparkle'), c.name), h('div', { class: 'coll-sub' }, `${list.length} · smart`))); }))) : null,
-    bySource.size ? h('section', { class: 'hub-sec' }, h('h3', { class: 'section-title' }, 'By launcher'),
-      h('div', { class: 'chip-row' }, [...bySource].sort((a, b) => b[1] - a[1]).map(([src, n]) => h('button', { class: `chip src-${src}`, 'data-k': `src:${src}`, onclick: () => setView({ type: 'launcher', source: src }) }, h('span', { class: 'src-dot' }), SOURCES[src] || src, h('span', { class: 'count' }, n))))) : null,
-    h('section', { class: 'hub-sec' }, h('h3', { class: 'section-title' }, 'Manage'),
-      h('div', { class: 'chip-row' },
-        h('button', { class: 'chip', 'data-k': 'm:uncat', onclick: () => setView({ type: 'uncategorized' }) }, icon('inbox'), 'Uncategorized', h('span', { class: 'count' }, uncat)),
-        h('button', { class: 'chip', 'data-k': 'm:hidden', onclick: () => setView({ type: 'hidden' }) }, icon('eyeOff'), 'Hidden', h('span', { class: 'count' }, hidden)),
-        h('button', { class: 'chip', 'data-k': 'm:storage', onclick: () => setView({ type: 'storage' }) }, icon('drive'), 'Storage'),
-        h('button', { class: 'chip', 'data-k': 'm:launchers', onclick: () => setView({ type: 'launchers' }) }, icon('rocket'), 'Launchers')))));
+        tile('l:surprise', 'dice', 'Surprise me', 'Pick for me', () => setView({ type: 'surprise' }), 'accent'),
+        tile('l:all', 'rows', 'Everything', `${vis.length} games and apps`, () => setView({ type: 'home' }))))));
 }
 
 // ---------- Deals & News: the news half ----------

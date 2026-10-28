@@ -47,7 +47,9 @@ Owned games that are not installed show when the Installed / All owned switch ab
 
 ## Home
 
-Home is a menu of big tiles that works with a mouse, keyboard or controller. The sidebar shows up once you open a section.
+Home is a menu of big tiles that works with a mouse, keyboard or controller. Each tile opens its own page.
+
+- **Guide:** the menu button at the top left, G on the keyboard, or View on a controller slides out the guide over any page: the game you are playing with Back to game, Apple Music, every main page, friends online, and Search, Settings, Controller mode and Power. B or Esc closes it.
 
 - **Jump back in:** your last game (or the one running) with Play or Back to game, hours and achievement progress.
 - **Friends and music:** who is online and what they are playing, plus Apple Music with play, pause and skip.
@@ -55,7 +57,8 @@ Home is a menu of big tiles that works with a mouse, keyboard or controller. The
 - **Free to keep:** this week's free games from Epic, Steam, GOG and Ubisoft.
 - **News:** the latest posts from your 3 most played games.
 - **Bottom row:** Search, Storage, Launchers, Settings, Controller mode and Power (sleep, lock, restart, shut down, quit).
-- **Library:** your 5 most recent games, then Games, Apps, Arcade, Backlog, Favorites, Recently added, Surprise me and Everything, with an Installed / All owned switch, your collections and smart collections, games by launcher, and Uncategorized, Hidden, Storage and Launchers.
+- **Library:** tabs for Overview (your 5 most recent games plus Games, Apps, Arcade, Backlog, Favorites, Recently added, Surprise me and Everything), Games, Apps, Collections (smart collections and genres), Categories (every folder; right click to edit, drag games onto them), Launchers and Manage (Storage, Launchers, Uncategorized, Hidden, add a game, rescan, find covers). LB / RB switch tabs.
+- **Surprise me:** its own page. Pick from installed or all owned games, only never played, backlog, favorites or small games, a genre or a launcher, then Spin. Past picks are listed below.
 - **Deals & News:** wishlist and free games on top, news from your most played games and more news below.
 - **Social:** Friends and Discord as tabs, with switches for friend alerts and your Discord status.
 - **Back:** Esc, the B button or the mouse back button goes to the page before. Typing in search from Home jumps to results.
@@ -135,7 +138,7 @@ Every game has Pause and Quit buttons on screen and a pause menu, plus controlle
 
 ## Controller mode
 
-The TV button in the top bar, the Controller mode button on Home, or Menu on a controller opens Home full screen with bigger tiles. The D-pad or left stick moves between tiles, A opens, B goes back, LB / RB switch pages, X is Surprise me, Y favorites a game, and View (or Esc on Home) leaves. Settings can open it on start.
+The TV button in the top bar, the Controller mode button on Home, or Menu on a controller opens Home full screen with bigger tiles. The D-pad or left stick moves between tiles, A opens, B goes back, LB / RB switch tabs and pages, View opens the guide, X is Surprise me, Y favorites a game, and Esc on Home leaves. Settings can open it on start.
 
 ## Look
 

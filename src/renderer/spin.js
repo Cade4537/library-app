@@ -222,6 +222,7 @@ function spinOverlay(pool, from) {
     if (el) el.classList.add('win');
     setBg(winner);
     showResult(winner);
+    if (typeof onSurpriseLanded === 'function') onSurpriseLanded(winner);
     Sfx.land();
     const r = reel.getBoundingClientRect();
     ring.classList.remove('pulse'); void ring.offsetWidth; ring.classList.add('pulse');

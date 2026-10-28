@@ -371,7 +371,7 @@ async function renderDeals(force) {
 // Wishlist art: tries each picture Steam lists, then falls back to a tile with the name.
 function wishImg(w) {
   const list = [...new Set([...(w.imgs || []), w.img].filter(Boolean))];
-  const ph = h('div', { class: 'wish-ph', style: { '--h': String(hashHue ? hashHue(w.name) : 0) } }, h('span', {}, w.name));
+  const ph = h('div', { class: 'wish-ph', style: `--h:${hashHue(w.name) % 360}` }, h('span', {}, w.name));
   if (!list.length) return ph;
   let n = 0;
   const img = h('img', { src: list[0], alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' });

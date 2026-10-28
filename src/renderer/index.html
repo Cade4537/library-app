@@ -9,7 +9,7 @@
 <body>
   <div id="app">
     <header id="topbar">
-      <button id="sideToggle" class="icon-btn" title="Shrink the sidebar to icons"><span data-icon="sidebar"></span></button>
+      <button id="sideToggle" class="icon-btn" title="Guide (G, or View on a controller)"><span data-icon="menu"></span></button>
       <div class="brand"><span class="brand-mark"></span><span class="brand-name">Crimson Vault</span></div>
       <div class="search-wrap">
         <span class="search-icon" data-icon="search"></span>
@@ -56,6 +56,7 @@
       <section id="launchersView" hidden></section>
       <section id="storageView" hidden></section>
       <section id="statsView" hidden></section>
+      <section id="surpriseView" hidden></section>
       <section id="dealsView" hidden></section>
       <section id="arcadeView" hidden></section>
       <section id="streamView" hidden><div id="streamHost"><div id="streamIdle" class="stream-idle"><div class="stream-idle-ic"><span data-icon="gamepad"></span></div><h3>Your Xbox, on this PC</h3><p>Streams from your console with the sidebar right here. Your console turns on and connects by itself.</p><button id="streamStartBtn" class="btn primary big"><span data-icon="play"></span><span>Start Remote Play</span></button></div><div class="stream-loading"><span class="spinner"></span>Connecting to your Xbox</div></div></section>
@@ -95,6 +96,9 @@
     </footer>
   </div>
 
+  <div id="guideBack"></div>
+  <aside id="guide" aria-label="Guide"></aside>
+
   <div id="modalRoot"></div>
   <div id="menuRoot"></div>
   <div id="toasts"></div>
@@ -110,6 +114,7 @@
   <script src="extras.js"></script>
   <script src="more.js"></script>
   <script src="hub.js"></script>
+  <script src="guide.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
