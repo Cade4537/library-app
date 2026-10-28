@@ -45,7 +45,22 @@ Settings > Connections. Settings > Help has step by step guides, including the D
 
 Owned games that are not installed show when the Installed / All owned switch above the cards is set to All owned. They are greyed out with a Not installed tag, and clicking Install opens the right launcher.
 
-## Home and details
+## Home
+
+Home is a menu of big tiles that works with a mouse, keyboard or controller. The sidebar shows up once you open a section.
+
+- **Jump back in:** your last game (or the one running) with Play or Back to game, hours and achievement progress.
+- **Friends and music:** who is online and what they are playing, plus Apple Music with play, pause and skip.
+- **Tiles:** Library, Deals & News, Social, Statistics, Surprise me and Xbox Remote Play.
+- **Free to keep:** this week's free games from Epic, Steam, GOG and Ubisoft.
+- **News:** the latest posts from your 3 most played games.
+- **Bottom row:** Search, Storage, Launchers, Settings, Controller mode and Power (sleep, lock, restart, shut down, quit).
+- **Library:** your 5 most recent games, then Games, Apps, Arcade, Backlog, Favorites, Recently added, Surprise me and Everything, with an Installed / All owned switch, your collections and smart collections, games by launcher, and Uncategorized, Hidden, Storage and Launchers.
+- **Deals & News:** wishlist and free games on top, news from your most played games and more news below.
+- **Social:** Friends and Discord as tabs, with switches for friend alerts and your Discord status.
+- **Back:** Esc, the B button or the mouse back button goes to the page before. Typing in search from Home jumps to results.
+
+## Details and cards
 
 - **Continue playing:** the top of Home shows your last game as a big banner with its art, hours and achievement progress, plus the next four as tiles.
 - **Details:** clicking a card opens its page with the game's wide art, description, release date, developer, genres and screenshots from the Steam store (click a screenshot to see it full size), plus hours, size and achievements.
@@ -120,7 +135,7 @@ Every game has Pause and Quit buttons on screen and a pause menu, plus controlle
 
 ## Controller mode
 
-The TV button in the top bar (or Menu on a controller with no card selected) opens a full screen layout made for the couch: big covers in rows (Continue playing, Favorites, each genre, Apps), with the focused game's art behind. A opens details, LB / RB jump between rows, X is Surprise me, Y favorites, and View (or Esc) leaves. Settings can open it on start.
+The TV button in the top bar, the Controller mode button on Home, or Menu on a controller opens Home full screen with bigger tiles. The D-pad or left stick moves between tiles, A opens, B goes back, LB / RB switch pages, X is Surprise me, Y favorites a game, and View (or Esc on Home) leaves. Settings can open it on start.
 
 ## Look
 

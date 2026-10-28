@@ -51,7 +51,7 @@ function renderResume() {
   const bar = $('#resumeBar');
   if (!bar) return;
   const it = S.lib.items.find((x) => x.running && x.kind === 'game');
-  const show = !!it && !S.tv && prefs.get('resumeBar', true) && !bar.dataset.dismissed?.includes(it ? it.id : '-');
+  const show = !!it && !S.tv && S.view.type !== 'hub' && prefs.get('resumeBar', true) && !bar.dataset.dismissed?.includes(it ? it.id : '-');
   bar.hidden = !show;
   document.body.classList.toggle('resume-on', show);
   if (!show) return;

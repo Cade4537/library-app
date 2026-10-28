@@ -365,6 +365,7 @@ async function renderDeals(force) {
       h('div', { class: 'wish-info' }, h('div', { class: 'wish-name' }, w.name),
         h('div', { class: 'wish-price' }, w.comingSoon ? h('span', { class: 'help' }, 'Coming soon') : [w.discount ? h('s', {}, money(w.original)) : null, h('b', {}, money(w.price))],
           w.low != null && w.price != null && w.price <= w.low && w.discount ? h('span', { class: 'wish-low' }, 'Lowest seen') : null))))) : d.wish && !d.wish.error ? h('div', { class: 'loading' }, 'Your wishlist is empty.') : null);
+  appendDealNews(box);
 }
 
 // Wishlist art: tries each picture Steam lists, then falls back to a tile with the name.
@@ -444,7 +445,7 @@ function moreSettingsSections(s, state) {
     h('div', { class: 'section-label' }, 'Alerts'),
     h('div', { class: 'field' }, toggleRow('Friend alerts', 'A pop up when a friend starts playing a game you own', prefs.get('friendAlerts', true), (v) => prefs.set('friendAlerts', v))),
     h('div', { class: 'field' }, toggleRow('Deal alerts', 'A pop up when a wishlist game drops in price or Epic has new free games', state.dealAlerts, (v) => { state.dealAlerts = v; })),
-    h('div', { class: 'field' }, toggleRow('News on Home', 'Steam news for the games you played last', prefs.get('showNews', true), (v) => { prefs.set('showNews', v); newsKey = ''; })),
+    h('div', { class: 'field' }, toggleRow('News on Home', 'The latest Steam news from your 3 most played games', prefs.get('showNews', true), (v) => { prefs.set('showNews', v); newsKey = ''; })),
     h('div', { class: 'section-label' }, 'Phone remote'),
     h('div', { class: 'field' }, remoteToggle, qr),
   ];

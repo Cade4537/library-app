@@ -447,6 +447,18 @@ function registerIpc() {
   ipcMain.handle('remote:set', async (_e, on) => { store.data.settings.remoteEnabled = !!on; store.changed(); if (on) remote.start(); else remote.stop(); return remoteInfo(); });
   ipcMain.handle('remote:newToken', async () => { remote.newToken(); return remoteInfo(); });
   ipcMain.handle('app:applyStartup', () => applyStartup());
+  // Power menu on Home. The renderer asks first; restart and shut down wait a few seconds.
+  ipcMain.handle('app:power', async (_e, action) => {
+    if (action === 'quit') { quitting = true; app.quit(); return { ok: true }; }
+    if (process.platform !== 'win32') return { error: 'Only on Windows' };
+    const { execFile } = require('child_process');
+    const run = (cmd, args) => new Promise((res) => execFile(cmd, args, { windowsHide: true }, (err) => res(err ? { error: 'Windows did not allow that.' } : { ok: true })));
+    if (action === 'lock') return run('rundll32.exe', ['user32.dll,LockWorkStation']);
+    if (action === 'restart') return run('shutdown', ['/r', '/t', '5']);
+    if (action === 'shutdown') return run('shutdown', ['/s', '/t', '5']);
+    if (action === 'sleep') { const r = await runPowerShell("Add-Type -AssemblyName System.Windows.Forms; [void][System.Windows.Forms.Application]::SetSuspendState('Suspend', $false, $false)").catch(() => null); return r === null ? { error: 'Windows did not allow sleep.' } : { ok: true }; }
+    return { error: 'Unknown action' };
+  });
   ipcMain.handle('app:pickExe', async () => {
     const r = await dialog.showOpenDialog(win, { properties: ['openFile'], filters: [{ name: 'Programs', extensions: ['exe', 'bat', 'cmd', 'lnk'] }] });
     return r.canceled ? null : r.filePaths[0];

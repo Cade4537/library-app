@@ -62,7 +62,7 @@ const S = {
   byId: new Map(),
   cats: new Map(),
   kids: new Map(),
-  view: prefs.get('view', { type: 'home' }),
+  view: { type: 'hub' },
   search: '',
   source: 'all',
   sort: prefs.get('sort', 'name'),
@@ -195,6 +195,9 @@ function baseItems(view = S.view) {
   let list = S.lib.items.filter((it) => (view.type === 'hidden' ? it.hidden : S.search ? shown(it) : visible(it)));
   switch (view.type) {
     case 'favorites': list = list.filter((it) => it.favorite); break;
+    case 'games': list = list.filter((it) => it.kind === 'game'); break;
+    case 'apps': list = list.filter((it) => it.kind !== 'game'); break;
+    case 'added': list = list.filter((it) => it.addedAt > 0); break;
     case 'recent': list = list.filter((it) => it.lastPlayed > 0); break;
     case 'uncategorized': list = list.filter((it) => !it.categoryId || !S.cats.has(it.categoryId)); break;
     case 'category': {
@@ -217,7 +220,7 @@ function viewItems() {
     list = list.filter((it) => { const n = norm(displayName(it)); return words.every((w) => n.includes(w)); });
   }
   const byName = (a, b) => displayName(a).localeCompare(displayName(b), undefined, { sensitivity: 'base', numeric: true });
-  const sort = S.view.type === 'recent' ? 'played' : S.sort;
+  const sort = S.view.type === 'recent' ? 'played' : S.view.type === 'added' ? 'added' : S.sort;
   const flip = S.sortDir === 'reverse' ? -1 : 1;
   if (sort === 'played') list.sort((a, b) => flip * ((b.lastPlayed || 0) - (a.lastPlayed || 0)) || byName(a, b));
   else if (sort === 'added') list.sort((a, b) => flip * ((b.addedAt || 0) - (a.addedAt || 0)) || byName(a, b));
@@ -241,20 +244,25 @@ function catLabel(it) {
 
 function viewTitle(view = S.view) {
   switch (view.type) {
-    case 'home': return 'Home';
+    case 'hub': return 'Home';
+    case 'library': return 'Library';
+    case 'home': return 'Everything';
+    case 'games': return 'Games';
+    case 'apps': return 'Apps';
+    case 'added': return 'Recently added';
     case 'favorites': return 'Favorites';
     case 'recent': return 'Recently played';
     case 'uncategorized': return 'Uncategorized';
     case 'hidden': return 'Hidden';
-    case 'friends': return 'Friends';
+    case 'friends': return 'Social';
     case 'launchers': return 'Launchers';
     case 'storage': return 'Storage';
-    case 'discord': return 'Discord';
+    case 'discord': return 'Social';
     case 'remoteplay': return 'Xbox Remote Play';
     case 'stats': return 'Stats';
     case 'arcade': return 'Arcade';
     case 'backlog': return 'Backlog';
-    case 'deals': return 'Deals';
+    case 'deals': return 'Deals & News';
     case 'smart': return (smartById(view.id) || {}).name || 'Smart collection';
     case 'launcher': return `${SOURCES[view.source] || view.source} games`;
     case 'category': return (S.cats.get(view.id) || {}).name || 'Category';
@@ -262,7 +270,8 @@ function viewTitle(view = S.view) {
   }
 }
 
-function setView(v) {
+function setView(v, back) {
+  if (!back) pushHistory(S.view, v);
   S.view = v;
   S.source = 'all';
   prefs.set('view', v);
@@ -406,15 +415,23 @@ function render() {
   const tv2 = S.view.type === 'stats';
   const av = S.view.type === 'arcade';
   const dl = S.view.type === 'deals';
+  const hb = S.view.type === 'hub';
+  const lb = S.view.type === 'library';
   $('#statsView').hidden = !tv2;
   $('#arcadeView').hidden = !av;
   $('#dealsView').hidden = !dl;
-  if (tv2 || av || dl) {
+  $('#hubView').hidden = !hb;
+  $('#libraryView').hidden = !lb;
+  $('#news').hidden = true;
+  document.body.classList.toggle('hub-on', hb);
+  if (tv2 || av || dl || hb || lb) {
     for (const id of ['#friendsView', '#launchersView', '#storageView', '#grid', '#filters', '#jump', '#collections', '#news', '#empty', '#discordView', '#streamView']) $(id).hidden = true;
     document.body.classList.remove('discord-on');
     renderSidebar();
     renderHeader();
-    if (dl) { if (render.shownView !== 'deals') renderDeals(); }
+    if (hb) renderHub();
+    else if (lb) renderLibraryHub();
+    else if (dl) { if (render.shownView !== 'deals') renderDeals(); }
     else if (av) { if (render.shownView !== 'arcade') renderArcade(); }
     else if (render.shownView !== 'stats') renderStats();
     render.shownView = S.view.type;
@@ -463,7 +480,6 @@ function render() {
   $('#scanStatus').hidden = !scanning;
   $('#rescanBtn').classList.toggle('spinning', scanning);
   renderCollections();
-  renderNews();
   renderResume();
   syncDiscord();
 }
@@ -496,21 +512,28 @@ function hideEmpty(c, counts) {
 function renderSidebar() {
   const vis = S.lib.items.filter(visible);
   const nav = $('#nav');
+  const social = navButton('friends', 'Social', 'users', (S.friends.people || []).filter((p) => p.status !== 'offline').length || null);
+  if (S.view.type === 'discord') social.classList.add('active');
+  const navHead = (t) => h('div', { class: 'nav-head' }, t);
   nav.replaceChildren(
-    navButton('home', 'Home', 'home', vis.length),
-    navButton('favorites', 'Favorites', 'star', vis.filter((i) => i.favorite).length),
+    navButton('hub', 'Home', 'home', null),
+    navButton('library', 'Library', 'grid', vis.length),
+    navButton('deals', 'Deals & News', 'tag', null),
+    social,
+    navButton('stats', 'Statistics', 'chart', null),
+    showRemotePlay() ? remotePlayButton() : null,
+    navHead('Library'),
+    navButton('games', 'Games', 'gamepad', vis.filter((i) => i.kind === 'game').length),
+    navButton('apps', 'Apps', 'rows', vis.filter((i) => i.kind !== 'game').length || null),
+    navButton('favorites', 'Favorites', 'star', vis.filter((i) => i.favorite).length || null),
     navButton('recent', 'Recently played', 'clock', null),
     navButton('backlog', 'Backlog', 'list', S.lib.items.filter((i) => i.status === 'backlog' && visible(i)).length || null),
-    navButton('deals', 'Deals', 'tag', null),
-    navButton('stats', 'Stats', 'chart', null),
     navButton('arcade', 'Arcade', 'joystick', null),
-    navButton('uncategorized', 'Uncategorized', 'inbox', vis.filter((i) => !i.categoryId || !S.cats.has(i.categoryId)).length || null),
-    navButton('hidden', 'Hidden', 'eyeOff', S.lib.items.filter((i) => i.hidden).length || null),
-    navButton('launchers', 'Launchers', 'rocket', null),
+    navHead('Manage'),
     navButton('storage', 'Storage', 'drive', S.drives ? fmtBytes(S.drives.reduce((a, d) => a + d.free, 0)) + ' free' : null),
-    navButton('friends', 'Friends', 'users', (S.friends.people || []).filter((p) => p.status !== 'offline').length || null),
-    S.lib.settings.discordTab !== false ? navButton('discord', 'Discord', 'chat', null) : null,
-    showRemotePlay() ? remotePlayButton() : null
+    navButton('launchers', 'Launchers', 'rocket', null),
+    navButton('uncategorized', 'Uncategorized', 'inbox', vis.filter((i) => !i.categoryId || !S.cats.has(i.categoryId)).length || null),
+    navButton('hidden', 'Hidden', 'eyeOff', S.lib.items.filter((i) => i.hidden).length || null)
   );
 
   const counts = new Map();
@@ -614,7 +637,8 @@ function renderHeader() {
     }
   }
   const total = S.view.type === 'friends' ? (S.friends.people || []).length : viewItems().length;
-  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : S.view.type === 'storage' ? (S.drives ? `${fmtBytes(S.drives.reduce((a, d) => a + d.free, 0))} free` : '') : ['discord', 'remoteplay', 'stats', 'arcade', 'deals'].includes(S.view.type) ? '' : `${total} ${total === 1 ? 'item' : 'items'}`)));
+  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : S.view.type === 'storage' ? (S.drives ? `${fmtBytes(S.drives.reduce((a, d) => a + d.free, 0))} free` : '') : ['discord', 'remoteplay', 'stats', 'arcade', 'deals', 'hub', 'library'].includes(S.view.type) ? '' : `${total} ${total === 1 ? 'item' : 'items'}`)));
+  if (S.view.type === 'friends' || S.view.type === 'discord') kids.push(socialTabs());
   if (S.view.type === 'discord') {
     kids.push(h('div', { class: 'discord-bar' },
       h('span', { class: 'help', style: { flex: 1 } }, 'Discord\'s own app, right here. Voice calls keep going while you switch pages.'),
@@ -1184,6 +1208,7 @@ function setFriends(st) {
   const before = [...S.friendGames.keys()].join('|');
   indexFriendGames();
   if (S.view.type === 'friends') { renderHeader(); renderFriends(); }
+  else if (S.view.type === 'hub') renderHub();
   else if (before !== [...S.friendGames.keys()].join('|') && !['launchers', 'storage', 'discord'].includes(S.view.type)) renderGrid();
   renderSidebar();
 }
@@ -1202,6 +1227,7 @@ async function loadDrives() {
   S.drives = await api.getDrives();
   renderSidebar();
   if (S.view.type === 'storage') { renderHeader(); renderStorage(); }
+  else if (S.view.type === 'hub') renderHub();
 }
 
 async function uninstallGame(id) {
@@ -1847,6 +1873,7 @@ function setMediaState(st) {
   NP.base = st && st.pos ? st.pos : 0;
   NP.at = Date.now();
   renderNowPlaying();
+  if (S.view.type === 'hub') renderHubMusic();
 }
 
 // ---------- updates ----------
@@ -1894,14 +1921,12 @@ window.padActions = {
   a: () => { const el = document.activeElement; if (el && el !== document.body && el.click) el.click(); else spatial.focusDefault(); },
   b: () => {
     if (closeTopLayer()) return;
-    if (S.tv) return;
-    const el = document.activeElement;
-    if (el && !el.closest('#grid')) spatial.focusDefault();
+    if (goBack()) setTimeout(() => spatial.focusDefault(), 40);
   },
   x: () => { if (!S.modals.length || (S.spin && document.querySelector('.spin'))) surprise(); },
   y: () => { const id = focusedCardId(); if (id) { const it = S.byId.get(id); api.updateItem(id, { favorite: !it.favorite }); showToast(it.favorite ? 'Removed from favorites' : 'Added to favorites'); } },
-  lb: () => { if (S.modals.length) return; if (S.tv) tvJumpRow(-1); else cycleView(-1); },
-  rb: () => { if (S.modals.length) return; if (S.tv) tvJumpRow(1); else cycleView(1); },
+  lb: () => { if (S.modals.length) return; cycleView(-1); },
+  rb: () => { if (S.modals.length) return; cycleView(1); },
   menu: () => {
     const el = document.activeElement;
     if (el && el.classList && el.classList.contains('nav-action')) return remotePlayMenu({ el });
@@ -1916,7 +1941,11 @@ window.padActions = {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (closeTopLayer()) { e.preventDefault(); return; }
-    if (document.activeElement === $('#search') && S.search) { $('#search').value = ''; S.search = ''; render(); }
+    if (document.activeElement === $('#search') && S.search) { $('#search').value = ''; S.search = ''; render(); return; }
+    const t = document.activeElement;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) { t.blur(); return; }
+    if (S.tv && S.view.type === 'hub') return;
+    if (goBack()) e.preventDefault();
   } else if ((e.ctrlKey && e.key.toLowerCase() === 'f') || (e.key === '/' && document.activeElement.tagName !== 'INPUT')) {
     e.preventDefault();
     $('#search').focus();
@@ -1937,7 +1966,13 @@ document.addEventListener('keydown', (e) => {
 function wire() {
   hydrateIcons();
   const search = $('#search');
-  search.addEventListener('input', () => { S.search = search.value.trim(); if (S.view.type === 'friends') { renderFriends(); return; } renderHeader(); renderJump(); renderGrid(); });
+  search.addEventListener('input', () => {
+    S.search = search.value.trim();
+    if (S.view.type === 'friends') { renderFriends(); return; }
+    // Pages without a grid (Home, Library, Deals, Stats...) switch to Everything to show results.
+    if (S.search && ['hub', 'library', 'deals', 'stats', 'arcade', 'discord', 'remoteplay', 'launchers', 'storage'].includes(S.view.type)) { setView({ type: 'home' }); return; }
+    renderHeader(); renderJump(); renderGrid();
+  });
   search.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); spatial.focusDefault(); } });
   $('#surpriseBtn').addEventListener('click', surprise);
   $('#surpriseMode').addEventListener('click', surpriseModeMenu);

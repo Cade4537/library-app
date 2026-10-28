@@ -28,7 +28,8 @@
 
   function focusDefault() {
     const layer = activeLayer();
-    const first = layer.querySelector('.card') || layer.querySelector('.tile') || layer.querySelector('.hero .btn') || focusables(layer)[0];
+    const hub = layer.querySelector && layer.querySelector('#hubView:not([hidden]) [data-k="hero:play"], #hubView:not([hidden]) .hub-tile, #libraryView:not([hidden]) .lr-card, #libraryView:not([hidden]) .hub-tile');
+    const first = hub || layer.querySelector('.card') || layer.querySelector('.tile') || layer.querySelector('.hero .btn') || focusables(layer)[0];
     focusEl(first);
   }
 
@@ -163,7 +164,7 @@
       for (const g of pads) { const v = g.axes[3] || 0; if (Math.abs(v) > 0.25) ry = v; }
       if (ry) {
         const tv = document.getElementById('tv');
-        const scroller = document.querySelector('#modalRoot .modal-body') || (tv && !tv.hidden ? tv.querySelector('.tv-rows') : null) || document.getElementById('content');
+        const scroller = document.querySelector('#modalRoot .modal-body') || document.getElementById('content');
         scroller.scrollBy({ top: ry * 22, behavior: 'auto' });
       }
     }

@@ -119,33 +119,8 @@ function tvFeature(it) {
     h('div', { class: 'tv-sub' }, [it.minutes ? `${fmtHours(it.minutes)} played` : null, it.lastPlayed && !it.running ? `Last played ${timeAgo(it.lastPlayed).toLowerCase()}` : null, ach ? `${ach.have} of ${ach.total} achievements` : null].filter(Boolean).join(' · ')));
 }
 
-function renderTV() {
-  const tv = $('#tv');
-  if (!S.tv) { tv.hidden = true; return; }
-  const keep = document.activeElement && document.activeElement.closest && document.activeElement.closest('#tv .tv-card');
-  const keepId = keep ? keep.dataset.id : tv.dataset.focus;
-  const rows = tvRows();
-  const sig = rows.map(([t, l]) => t + ':' + l.map((it) => `${it.id}${it.coverUrl ? 'c' : ''}${it.favorite ? 'f' : ''}${it.running ? 'r' : ''}`).join(',')).join('|');
-  tv.hidden = false;
-  if (tv.dataset.sig === sig) return;
-  tv.dataset.sig = sig;
-  const scroller = tv.querySelector('.tv-rows');
-  const top = scroller.scrollTop;
-  scroller.replaceChildren(...rows.map(([title, list], r) => h('section', { class: 'tv-section', 'data-row': r },
-    h('h3', {}, title, h('span', { class: 'count' }, list.length)),
-    h('div', { class: 'tv-row' }, list.map((it) => {
-      const b = h('button', { class: 'card tv-card' + (notInstalled(it) ? ' not-installed' : ''), 'data-id': it.id, title: displayName(it) }, artFor(it),
-        it.running ? h('span', { class: 'run-badge' }, h('span', { class: 'dot' }), 'Playing') : null);
-      b.addEventListener('focus', () => tvFeature(it));
-      b.addEventListener('mouseenter', () => tvFeature(it));
-      b.addEventListener('click', () => openDetails(it.id));
-      return b;
-    })))));
-  scroller.scrollTop = top;
-  const again = keepId && tv.querySelector(`.tv-card[data-id="${CSS.escape(keepId)}"]`);
-  const first = again || tv.querySelector('.tv-card');
-  if (first) { spatial.focusEl(first); tvFeature(S.lib.items.find((x) => x.id === first.dataset.id)); }
-}
+// Controller mode now uses the Home hub, full screen. The old row screen stays hidden.
+function renderTV() { const tv = $('#tv'); if (tv) tv.hidden = true; }
 
 function tvClock() {
   const el = $('#tv .tv-clock');
@@ -154,12 +129,13 @@ function tvClock() {
 
 function setTV(on) {
   S.tv = on;
-  document.body.classList.toggle('tv-on', on);
-  $('#tv').hidden = !on;
-  if (on) { $('#tv').dataset.sig = ''; renderTV(); tvClock(); }
+  document.body.classList.toggle('ctl-mode', on);
+  $('#tv').hidden = true;
   if (api.setFullscreen) api.setFullscreen(on);
+  if (on) setView({ type: 'hub' });
+  else render();
   syncDiscord();
-  if (!on) setTimeout(() => spatial.focusDefault(), 50);
+  setTimeout(() => spatial.focusDefault(), 80);
 }
 
 // LB / RB in controller mode: jump to the row above or below, keeping roughly the same spot.
@@ -197,9 +173,7 @@ function wireFeatures() {
   setInterval(tvClock, 15000);
   document.addEventListener('keydown', (e) => {
     if (!S.tv) return;
-    if (e.key === 'Escape' && !S.modals.length && !document.querySelector('#menuRoot .menu')) { e.preventDefault(); setTV(false); }
-    if (e.key === 'PageDown') { e.preventDefault(); tvJumpRow(1); }
-    if (e.key === 'PageUp') { e.preventDefault(); tvJumpRow(-1); }
+    if (e.key === 'Escape' && S.view.type === 'hub' && !S.modals.length && !document.querySelector('#menuRoot .menu')) { e.preventDefault(); setTV(false); }
   });
   hydrateIcons();
   // Open in controller mode when that is turned on in Settings.
