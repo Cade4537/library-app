@@ -7,6 +7,10 @@
 const ARCADE = [
   { id: 'blocks', name: 'Vault Blocks', sub: 'Stack falling blocks and clear lines', best: () => prefs.get('blocksBest', 0), bestLabel: 'Best score' },
   { id: 'pegs', name: 'Peg Drop', sub: 'Drop balls through the pegs into point slots', best: () => prefs.get('pegsBank', 1000), bestLabel: 'Points' },
+  { id: 'bj', name: 'Blackjack', sub: 'Beat the dealer to 21 without going over', best: () => prefs.get('pegsBank', 1000), bestLabel: 'Points' },
+  { id: 'breaker', name: 'Block Breaker', sub: 'Bounce the ball and smash every brick', best: () => prefs.get('breakerBest', 0), bestLabel: 'Best score' },
+  { id: 'snake', name: 'Snake', sub: 'Eat, grow and don\'t hit yourself', best: () => prefs.get('snakeBest', 0), bestLabel: 'Best score' },
+  { id: 'duel', name: 'Paddle Duel', sub: 'Classic paddle tennis, against the computer or a friend', best: () => prefs.get('duelWins', 0), bestLabel: 'Wins' },
 ];
 
 function renderArcade() {
@@ -17,7 +21,7 @@ function renderArcade() {
       h('div', { class: 'arc-info' }, h('div', { class: 'arc-name' }, g.name), h('div', { class: 'arc-sub' }, g.sub),
         h('div', { class: 'arc-best' }, `${g.bestLabel}: ${fmtBig(Number(g.best()) || 0)}`)),
       h('span', { class: 'arc-play' }, icon('play'), 'Play')))),
-    h('div', { class: 'help', style: { marginTop: '14px' } }, 'Works with mouse, keyboard or controller. Peg Drop uses pretend points that only live in this app.'));
+    h('div', { class: 'help', style: { marginTop: '14px' } }, 'Works with mouse, keyboard or controller. Peg Drop and Blackjack share pretend points that only live in this app.'));
   box.querySelectorAll('.arc-preview').forEach(drawPreview);
 }
 
@@ -31,6 +35,8 @@ function drawPreview(c) {
     const rows = ['..........', '.......Z..', '....TTTZZ.', 'I...OT.LZ.', 'I.SSOOLLL.', 'IJSS.OO.JJ', 'IJJJLLL..J'];
     rows.forEach((r, yy) => [...r].forEach((ch, xx) => { if (ch !== '.') drawCell(x, 80 + xx * s, 70 + yy * s, s, cols['IJLOSTZ'.indexOf(ch) + 1]); }));
     x.strokeStyle = '#2a2a30'; x.strokeRect(79.5, 9.5, 201, 201);
+  } else if (c.dataset.game !== 'pegs') {
+    drawPreview2(c);
   } else {
     for (let r = 0; r < 7; r++) for (let i = 0; i <= r + 2; i++) { x.fillStyle = '#cfcfd5'; x.beginPath(); x.arc(180 + (i - (r + 2) / 2) * 26, 30 + r * 22, 3, 0, 7); x.fill(); }
     [['x5', '#ff3040'], ['x2', '#f0452a'], ['x1', '#8a8a93'], ['x.5', '#4a4a52'], ['x1', '#8a8a93'], ['x2', '#f0452a'], ['x5', '#ff3040']].forEach(([t, col], i) => { x.fillStyle = col; x.fillRect(77 + i * 30, 190, 27, 18); x.fillStyle = '#fff'; x.font = 'bold 10px Segoe UI'; x.textAlign = 'center'; x.fillText(t, 90.5 + i * 30, 203); });
@@ -66,7 +72,11 @@ function gameShell(title, onClose) {
 function openGame(id) {
   if (document.querySelector('.game')) return;
   if (id === 'blocks') vaultBlocks();
-  else pegDrop();
+  else if (id === 'pegs') pegDrop();
+  else if (id === 'bj') blackjack();
+  else if (id === 'breaker') blockBreaker();
+  else if (id === 'snake') snakeGame();
+  else if (id === 'duel') paddleDuel();
 }
 
 // ---------- Vault Blocks ----------

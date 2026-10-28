@@ -87,6 +87,13 @@ Two mini games in the Arcade tab, for mouse, keyboard or controller:
 - **Vault Blocks:** a falling block puzzle. Clear lines to score; the level and speed go up every 10 lines. Hold, next pieces, ghost piece and a best score. Keys: A / D move, S soft drops, Space hard drops, Q / E rotate, C holds, Esc or P pauses (arrow keys work too). Controller: stick or D-pad, A / B rotate, Y hard drops, LB holds, Menu pauses. Pause and Quit buttons are on screen, and the pause menu has Resume, Restart and Quit.
 - **Peg Drop:** drop balls through rows of pegs into slots. Set the bet per ball (type any amount like 500, 2.5M or 1Dc for a decillion, or use Min, ½, ×2, ×10, Max), drop 1 to 100 balls at once, and pick a risk level: Low, Medium, High or Extreme (bigger edge payouts, smaller middle). The balls are light, bouncy and a bit unpredictable, and move at half speed so they are easy to follow. Pause menu with Resume, Reset points and Quit; Reset points starts over at 1,000. Pretend points only; nothing is real money.
 
+- **Blackjack:** six decks, dealer stands on 17, blackjack pays 3 to 2, double down and one split. Same pretend points as Peg Drop. Keys: Space deal, H hit, S stand, D double, P split. Controller: A hit or deal, B stand, X double, Y split.
+- **Block Breaker:** bounce the ball off your paddle to smash the bricks; top rows take two hits, later levels are faster. Catch falling W for a wide paddle and + for an extra ball. A / D or the mouse move, Space launches.
+- **Snake:** eat to grow, speed goes up as you go, gold food is worth 5 and fades. W A S D or arrows to turn.
+- **Paddle Duel:** paddle tennis to 7 against the computer (Easy, Normal, Hard) or a friend on the same keyboard (W / S and ↑ / ↓).
+
+Every game has Pause and Quit buttons on screen and a pause menu, plus controller support.
+
 ## Discord
 
 - **Discord tab:** Discord's own web app in the sidebar, signed in once and kept. Voice calls keep going while you switch pages, and screen share asks which screen or window to share. Turn the tab off in Settings > Discord.
