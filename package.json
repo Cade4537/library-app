@@ -1,7 +1,7 @@
 {
   "name": "library-app",
   "productName": "Crimson Vault",
-  "version": "0.10.2",
+  "version": "0.11.0",
   "description": "One library for all your games and apps",
   "author": "Caden",
   "main": "main.js",
@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "electron-updater": "^6.3.9",
+    "qrcode": "^1.5.4",
     "sql.js": "^1.15.2",
     "yaml": "^2.9.1"
   },

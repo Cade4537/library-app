@@ -71,6 +71,25 @@ Owned games that are not installed show when the Installed / All owned switch ab
 - **Add by hand:** the + button adds any program, shortcut or link.
 - **Surprise me:** a reel of covers spins, slows down and lands on a random game from the current view, with sound, sparks and the game's art filling the screen. Play, Spin again (X) or Details from there; the sound can be turned off in the corner. The arrow next to the button switches between installed games and all owned games.
 - **Launching:** starting a game shows a short splash with its art.
+- **One card per game:** a game you have on two launchers (say Steam and Xbox) shows as one card with small launcher dots. Hours are added together, and its details have a Play via button for the other copy. Split copies brings back separate cards.
+- **Launch options:** in a game's details. Add launch arguments, plus things to do before playing (start an OBS recording, switch to the High performance power plan, close programs like Discord or Chrome, run a program) and after the game closes. A power plan switched before playing goes back by itself.
+- **Move:** in a game's details. Opens the right place in Steam, Windows or the launcher to move the game to another drive.
+
+## Backlog, smart collections and deals
+
+- **Backlog:** set a status on any game (Backlog, Playing, Beaten, 100%, Dropped), give it stars and keep notes, all in its details. The Backlog page lists them with a filter per status, and cards show their status. "How long to beat?" opens HowLongToBeat for the game.
+- **Smart collections:** folders that fill themselves from rules: status, hours played, played or never played, played in the last X days, installed, size, launcher, folder and your rating. Add them under the categories in the sidebar; right click to edit or delete.
+- **Deals:** your Steam wishlist with current prices, sales and the lowest price seen, plus Epic's free games. Checked every 6 hours, with a pop up when a wishlist game drops in price or new free games appear. The wishlist needs your SteamID and a public wishlist.
+- **News:** Steam news for the games you played last shows on Home and in each Steam game's details.
+- **Friend alerts:** a pop up when a friend starts playing a game you own.
+
+## Tray, startup and shortcut
+
+Closing the window keeps Crimson Vault in the tray so tracking, alerts and the phone remote keep working (Quit from the tray icon closes it fully). Settings > App can start it with Windows, quietly in the tray, and sets a shortcut that shows or hides it from anywhere (Ctrl+Alt+Space by default).
+
+## Phone remote
+
+Settings > Phone remote turns it on and shows a QR code. Scan it with your phone on the same Wi-Fi and add the page to your home screen. From the phone you can browse your library, start games on the PC, install games you own, and see your drives with installed games by size and uninstall them (it asks first). When Windows asks to allow Crimson Vault on networks, allow private networks. Only devices on your home network with the pairing code can use it; Unpair all phones makes a new code.
 
 ## Hours played and achievements
 

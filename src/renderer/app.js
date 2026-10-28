@@ -106,6 +106,7 @@ function indexLibrary(snap) {
   }
   for (const list of S.related.values()) list.sort((a, b) => displayName(a).localeCompare(displayName(b)));
   if (S.view.type === 'category' && !S.cats.has(S.view.id)) S.view = { type: 'home' };
+  computeMerge();
   // Forget cards and store info for items that left the library, so they do not pile up.
   for (const id of cardCache.keys()) if (!S.byId.has(id)) cardCache.delete(id);
   for (const id of S.storeInfo.keys()) if (!S.byId.has(id)) S.storeInfo.delete(id);
@@ -134,7 +135,7 @@ function isGrouped(it) {
 // Owned on Steam or GOG but not installed on this PC.
 const notInstalled = (it) => !it.installed && !it.manual && !!it.owned;
 const shown = (it) => !it.hidden && (it.installed || it.manual || (S.libMode === 'all' && !!it.owned));
-const visible = (it) => shown(it) && !isGrouped(it);
+const visible = (it) => shown(it) && !isGrouped(it) && !isDupe(it);
 const relatedOf = (id) => (S.related && S.related.get(id)) || [];
 
 function fmtHours(min) {
@@ -202,6 +203,8 @@ function baseItems(view = S.view) {
       break;
     }
     case 'launcher': list = list.filter((it) => it.kind === 'game' && it.source === view.source); break;
+    case 'backlog': list = list.filter((it) => it.kind === 'game' && it.status && (S.statusFilter === 'all' ? it.status !== 'dropped' : it.status === (S.statusFilter || 'backlog'))); break;
+    case 'smart': list = list.filter((it) => matchSmart(smartById(view.id), it)); break;
   }
   return list;
 }
@@ -250,6 +253,9 @@ function viewTitle(view = S.view) {
     case 'remoteplay': return 'Xbox Remote Play';
     case 'stats': return 'Stats';
     case 'arcade': return 'Arcade';
+    case 'backlog': return 'Backlog';
+    case 'deals': return 'Deals';
+    case 'smart': return (smartById(view.id) || {}).name || 'Smart collection';
     case 'launcher': return `${SOURCES[view.source] || view.source} games`;
     case 'category': return (S.cats.get(view.id) || {}).name || 'Category';
     default: return 'Library';
@@ -325,7 +331,7 @@ const cardCache = new Map();
 
 function cardSig(it) {
   const ach = it.meta && it.meta.achievements;
-  return [displayName(it), it.coverUrl, it.iconUrl, it.coverFit, it.favorite, it.source, it.missing, it.hidden, relatedOf(it.id).length, isGrouped(it), notInstalled(it), Math.round((it.minutes || 0) / 6), it.running, ach ? `${ach.have}/${ach.total}` : '', friendsPlaying(it).join(',')].join('|');
+  return [displayName(it), it.coverUrl, it.iconUrl, it.coverFit, it.favorite, it.source, it.missing, it.hidden, relatedOf(it.id).length, isGrouped(it), notInstalled(it), Math.round(groupMinutes(it) / 6), it.running, ach ? `${ach.have}/${ach.total}` : '', friendsPlaying(it).join(','), it.status || '', dupesOf(it).map((o) => o.source).join(',')].join('|');
 }
 
 function buildCard(id) {
@@ -372,7 +378,10 @@ function fillCard(card, it) {
   const rel = relatedOf(it.id).length;
   const sub = rel ? h('span', { class: 'sub related-link', role: 'button', onclick: (e) => { e.stopPropagation(); relatedModal(it.id); } }, `+${rel} related ${rel === 1 ? 'app' : 'apps'}`)
     : isGrouped(it) ? h('div', { class: 'sub' }, `Part of ${(S.byId.get(it.parentId) || {}).name || 'a suite'}`)
-    : it.minutes ? h('div', { class: 'sub' }, fmtHours(it.minutes)) : null;
+    : groupMinutes(it) ? h('div', { class: 'sub' }, fmtHours(groupMinutes(it))) : null;
+  const others = dupesOf(it);
+  if (others.length) art.append(h('span', { class: 'multi-src', title: `Also on ${others.map((o) => SOURCES[o.source] || o.source).join(', ')}` }, others.slice(0, 3).map((o) => h('i', { class: `src-${o.source}` }))));
+  if (it.status) art.append(h('span', { class: `status-tag st-${it.status}` }, STATUS_NAMES[it.status] || it.status));
   const titleEl = h('div', { class: 'title' }, displayName(it));
   const wideSub = h('div', { class: 'wide-sub' }, [SOURCES[it.source] || it.source, it.running ? 'Playing now' : it.lastPlayed ? timeAgo(it.lastPlayed) : null].filter(Boolean).join(' · '));
   titleEl.addEventListener('click', (e) => { e.stopPropagation(); openDetails(it.id); });
@@ -396,14 +405,17 @@ function render() {
   const sv = S.view.type === 'storage';
   const tv2 = S.view.type === 'stats';
   const av = S.view.type === 'arcade';
+  const dl = S.view.type === 'deals';
   $('#statsView').hidden = !tv2;
   $('#arcadeView').hidden = !av;
-  if (tv2 || av) {
-    for (const id of ['#friendsView', '#launchersView', '#storageView', '#grid', '#filters', '#jump', '#collections', '#empty', '#discordView', '#streamView']) $(id).hidden = true;
+  $('#dealsView').hidden = !dl;
+  if (tv2 || av || dl) {
+    for (const id of ['#friendsView', '#launchersView', '#storageView', '#grid', '#filters', '#jump', '#collections', '#news', '#empty', '#discordView', '#streamView']) $(id).hidden = true;
     document.body.classList.remove('discord-on');
     renderSidebar();
     renderHeader();
-    if (av) { if (render.shownView !== 'arcade') renderArcade(); }
+    if (dl) { if (render.shownView !== 'deals') renderDeals(); }
+    else if (av) { if (render.shownView !== 'arcade') renderArcade(); }
     else if (render.shownView !== 'stats') renderStats();
     render.shownView = S.view.type;
     renderResume();
@@ -451,6 +463,7 @@ function render() {
   $('#scanStatus').hidden = !scanning;
   $('#rescanBtn').classList.toggle('spinning', scanning);
   renderCollections();
+  renderNews();
   renderResume();
   syncDiscord();
 }
@@ -487,6 +500,8 @@ function renderSidebar() {
     navButton('home', 'Home', 'home', vis.length),
     navButton('favorites', 'Favorites', 'star', vis.filter((i) => i.favorite).length),
     navButton('recent', 'Recently played', 'clock', null),
+    navButton('backlog', 'Backlog', 'list', S.lib.items.filter((i) => i.status === 'backlog' && visible(i)).length || null),
+    navButton('deals', 'Deals', 'tag', null),
     navButton('stats', 'Stats', 'chart', null),
     navButton('arcade', 'Arcade', 'joystick', null),
     navButton('uncategorized', 'Uncategorized', 'inbox', vis.filter((i) => !i.categoryId || !S.cats.has(i.categoryId)).length || null),
@@ -540,6 +555,7 @@ function renderSidebar() {
       return wrap;
     });
   tree.replaceChildren(...build(null));
+  renderSmartSidebar();
 }
 
 // Filter folders under Games: every game from one launcher, wherever it is categorized.
@@ -598,7 +614,7 @@ function renderHeader() {
     }
   }
   const total = S.view.type === 'friends' ? (S.friends.people || []).length : viewItems().length;
-  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : S.view.type === 'storage' ? (S.drives ? `${fmtBytes(S.drives.reduce((a, d) => a + d.free, 0))} free` : '') : S.view.type === 'discord' || S.view.type === 'remoteplay' || S.view.type === 'stats' || S.view.type === 'arcade' ? '' : `${total} ${total === 1 ? 'item' : 'items'}`)));
+  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : S.view.type === 'storage' ? (S.drives ? `${fmtBytes(S.drives.reduce((a, d) => a + d.free, 0))} free` : '') : ['discord', 'remoteplay', 'stats', 'arcade', 'deals'].includes(S.view.type) ? '' : `${total} ${total === 1 ? 'item' : 'items'}`)));
   if (S.view.type === 'discord') {
     kids.push(h('div', { class: 'discord-bar' },
       h('span', { class: 'help', style: { flex: 1 } }, 'Discord\'s own app, right here. Voice calls keep going while you switch pages.'),
@@ -606,6 +622,8 @@ function renderHeader() {
       h('button', { class: 'btn', onclick: () => api.discordOpenApp() }, icon('exit'), 'Open Discord app'),
       h('button', { class: 'btn', title: 'Closes the tab to free memory. It loads again when you come back.', onclick: async () => { await api.discordUnload(); setView({ type: 'home' }); showToast('Discord tab closed to free memory'); } }, icon('close'), 'Close tab')));
   }
+  if (S.view.type === 'backlog' && !S.search) kids.push(h('div', { class: 'discord-bar' }, statusFilterBar(), h('span', { class: 'help', style: { flex: 1 } }, 'Set a status from any game\'s details page.')));
+  if (S.view.type === 'smart' && !S.search && smartById(S.view.id)) kids.push(h('div', { class: 'discord-bar' }, h('span', { class: 'help', style: { flex: 1 } }, 'Fills itself from rules. New games that match show up here on their own.'), h('button', { class: 'btn', onclick: () => smartEditor(smartById(S.view.id)) }, icon('gear'), 'Edit rules')));
   if (S.view.type === 'remoteplay') {
     kids.push(h('div', { class: 'discord-bar' },
       h('span', { class: 'help', style: { flex: 1 } }, S.stream.open ? 'Streaming from your Xbox. Use your controller in the stream; it keeps going while you look at other pages.' : 'Play your Xbox console on this PC, right here next to the sidebar.'),
@@ -981,11 +999,14 @@ function openDetails(id) {
   const achStat = h('div', { class: 'stat-v' }, '…');
   const cat = it.categoryId ? catPath(it.categoryId).map((c) => c.name).join(' › ') : 'No category';
   let m;
+  const ex = detailsExtras(it, () => m);
   const actions = h('div', { class: 'det-actions' },
     h('button', { class: 'btn primary', onclick: () => { m.close(); launch(id); } }, icon(ni ? 'download' : 'play'), ni ? 'Install' : it.kind === 'game' ? 'Play' : 'Open'),
+    ...ex.via,
     it.source === 'xbox' ? h('button', { class: 'btn', onclick: () => { m.close(); startRemotePlay('inapp'); }, oncontextmenu: (e) => { e.preventDefault(); remotePlayMenu({ x: e.clientX, y: e.clientY }); } }, icon('gamepad'), 'Stream from console') : null,
     h('button', { class: 'btn', onclick: () => { m.close(); coverPicker(id); } }, icon('image'), 'Change cover'),
     it.installDir ? h('button', { class: 'btn', onclick: () => api.openFolder(id) }, icon('folder'), 'Open folder') : null,
+    ...ex.more,
     it.installed && !it.manual && it.kind === 'game' ? h('button', { class: 'btn danger', onclick: () => { m.close(); uninstallGame(id); } }, icon('trash'), 'Uninstall') : null);
   const heroBg = h('div', { class: 'det-hero' + (it.coverUrl ? '' : ' plain'), style: it.coverUrl ? { backgroundImage: `url("${it.coverUrl}")` } : { background: `hsl(${hashHue(it.name) % 360} 45% 16%)` } });
   const about = h('div', { class: 'det-about' });
@@ -1020,12 +1041,13 @@ function openDetails(id) {
         h('div', { class: 'det-kicker' }, [SOURCES[it.source], cat, it.meta && it.meta.family ? 'Steam Family' : null, ni ? 'Not installed' : null].filter(Boolean).join(' · ')),
         h('h2', { class: 'det-name' }, displayName(it)),
         h('div', { class: 'det-stats' },
-          stat('Played', it.minutes ? fmtHours(it.minutes) : 'Not yet'),
+          stat('Played', groupMinutes(it) ? fmtHours(groupMinutes(it)) : 'Not yet'),
           stat('Last played', it.running ? 'Playing now' : timeAgo(it.lastPlayed)),
           it.installed && it.meta && it.meta.sizeBytes ? stat('Size', fmtBytes(it.meta.sizeBytes)) : null,
           h('div', { class: 'stat' }, achStat, h('div', { class: 'stat-l' }, 'Achievements'))),
-        actions)),
+        actions, ex.backlog)),
     about,
+    ex.news,
     h('h3', { class: 'section-title', style: { marginTop: '24px' } }, 'Achievements'),
     achBox);
   m = openModal({ title: null, body, cls: 'wide details-modal', onClose: () => { if (video) { video.pause(); video.removeAttribute('src'); video.load(); video.remove(); video = null; } } });
@@ -1158,6 +1180,7 @@ function pickFriendToLink(p) {
 
 function setFriends(st) {
   S.friends = st || S.friends;
+  try { friendAlerts(S.friends); } catch {}
   const before = [...S.friendGames.keys()].join('|');
   indexFriendGames();
   if (S.view.type === 'friends') { renderHeader(); renderFriends(); }
@@ -1408,6 +1431,8 @@ function openSettings() {
   let discordPresence = s.discordPresence !== false;
   let discordBrowsing = !!s.discordBrowsing;
   let tvOnStart = !!s.tvOnStart;
+  const app = {};
+  const appSections = moreSettingsSections(s, app);
   const dcId = h('input', { class: 'text-input', value: s.discordClientId || '', placeholder: 'Application ID, like 1234567890123456789', spellcheck: 'false' });
   const dcTest = h('button', { class: 'btn', onclick: async () => {
     await api.updateSettings({ discordClientId: dcId.value.trim() });
@@ -1582,6 +1607,7 @@ function openSettings() {
       h('div', { class: 'field' }, toggleRow('Back to game bar', 'A small bar at the bottom while a game is running', prefs.get('resumeBar', true), (v) => { prefs.set('resumeBar', v); renderResume(); })),
       h('div', { class: 'field' }, toggleRow('Collections on Home', 'Big tiles for each genre folder', prefs.get('showCollections', true), (v) => { prefs.set('showCollections', v); renderCollections(); })),
       h('div', { class: 'field' }, toggleRow('Start in controller mode', 'Opens the full screen controller layout when Crimson Vault starts', tvOnStart, (v) => { tvOnStart = v; })),
+      ...appSections,
       h('div', { class: 'section-label' }, 'Music'),
       h('div', { class: 'field' }, toggleRow('Apple Music player', 'Shows what is playing in the sidebar with play, pause and skip', musicEnabled, (v) => { musicEnabled = v; })),
       h('div', { class: 'field' }, toggleRow('Other music apps too', 'Falls back to Spotify, a browser, or whatever is playing when Apple Music is closed', musicAnyApp, (v) => { musicAnyApp = v; }))),
@@ -1595,7 +1621,9 @@ function openSettings() {
           steamGridDbKey: sgdb.input.value.trim(), curseforgeInstancesPath: cf.value.trim(), includeApps, musicEnabled, musicAnyApp,
           steamApiKey: steamKey.input.value.trim(), steamId: steamId.value.trim(), gogOwned, openXblKey: xblKey.input.value.trim(), genreSort, ubisoftOwned,
           discordTab, discordPresence, discordBrowsing, discordClientId: dcId.value.trim(), tvOnStart,
+          closeToTray: app.closeToTray, startWithWindows: app.startWithWindows, hotkey: app.hotkey, dealAlerts: app.dealAlerts,
         });
+        api.applyStartup();
         S.keyErrorShown = false;
         showToast('Settings saved');
       } },

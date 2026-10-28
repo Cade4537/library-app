@@ -1,8 +1,11 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, clipboard, Tray, Menu, globalShortcut, Notification, nativeImage } = require('electron');
 const { DiscordView } = require('./src/main/discordView');
 const { DiscordRpc } = require('./src/main/discordRpc');
 const { StreamView } = require('./src/main/streamView');
 const { UbisoftActivity } = require('./src/main/ubisoftActivity');
+const services = require('./src/main/services');
+const { runActions, withArgs } = require('./src/main/actions');
+const { RemoteServer } = require('./src/main/remote');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { Store } = require('./src/main/store');
@@ -48,12 +51,30 @@ let steamIdCache = null;
 let discordView = null;
 let streamView = null;
 let ubisoft = null;
+let tray = null;
+let remote = null;
+let quitting = false;
+const startHidden = process.argv.includes('--hidden');
+const afterRun = new Map(); // game id -> { actions, ctx } to run when it closes
+const newsCache = new Map();
+let dealsCache = null;
 const rpc = new DiscordRpc();
 const runningSince = new Map();
 const pendingSource = new Map();
 const APP_ICON_URL = 'https://raw.githubusercontent.com/Cade4537/library-app/main/assets/icon.png';
 
 // Shows the game you are playing on Discord (when Rich Presence is set up in Settings).
+// Runs a game's "after playing" actions once it has been seen running and then closes.
+const seenRunning = new Set();
+function checkAfterActions() {
+  const now = playtime ? playtime.running : new Set();
+  for (const id of now) seenRunning.add(id);
+  for (const [id, job] of [...afterRun]) {
+    if (seenRunning.has(id) && !now.has(id)) { afterRun.delete(id); seenRunning.delete(id); runActions(job.actions, job.ctx); }
+    else if (!seenRunning.has(id) && Date.now() - job.at > 15 * 60 * 1000) afterRun.delete(id); // never seen running
+  }
+}
+
 function updatePresence() {
   const s = store.data.settings;
   rpc.configure(s.discordClientId, s.discordPresence !== false);
@@ -280,12 +301,149 @@ function createWindow() {
     if (/^https:\/\//.test(url)) shell.openExternal(url);
     return { action: 'deny' };
   });
+  if (startHidden && store.data.settings.closeToTray !== false) win.once('ready-to-show', () => win.hide());
+  // Closing the window keeps Crimson Vault running in the tray (unless turned off in Settings).
+  win.on('close', (e) => {
+    if (!quitting && store.data.settings.closeToTray !== false && tray) { e.preventDefault(); win.hide(); }
+  });
   win.on('enter-full-screen', () => win.webContents.send('fullscreen', true));
   win.on('leave-full-screen', () => win.webContents.send('fullscreen', false));
 }
 
+function showWindow() {
+  if (!win || win.isDestroyed()) return;
+  if (win.isMinimized()) win.restore();
+  win.show(); win.focus();
+}
+
+function setupTray() {
+  if (tray) return;
+  const img = nativeImage.createFromPath(path.join(__dirname, 'assets', 'icon.png')).resize({ width: 16, height: 16 });
+  tray = new Tray(img);
+  tray.setToolTip('Crimson Vault');
+  const menu = () => Menu.buildFromTemplate([
+    { label: 'Open Crimson Vault', click: showWindow },
+    { label: 'Surprise me', click: () => { showWindow(); sendTo('app:command', 'surprise'); } },
+    { label: 'Controller mode', click: () => { showWindow(); sendTo('app:command', 'tv'); } },
+    { type: 'separator' },
+    { label: 'Quit', click: () => { quitting = true; app.quit(); } },
+  ]);
+  tray.setContextMenu(menu());
+  tray.on('click', () => { if (win && win.isVisible() && win.isFocused()) win.hide(); else showWindow(); });
+}
+
+// Start with Windows (quietly in the tray) and the show/hide hotkey.
+function applyStartup() {
+  const s = store.data.settings;
+  if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: !!s.startWithWindows, args: ['--hidden'] });
+  globalShortcut.unregisterAll();
+  const key = s.hotkey === undefined ? 'Control+Alt+Space' : s.hotkey;
+  if (key) {
+    try {
+      globalShortcut.register(key, () => { if (win && win.isVisible() && win.isFocused()) win.hide(); else showWindow(); });
+    } catch {}
+  }
+}
+
+// Data the phone remote can see and the things it can do.
+function remoteApi() {
+  const SRC = { steam: 'Steam', epic: 'Epic', gog: 'GOG', ubisoft: 'Ubisoft', xbox: 'Xbox', rockstar: 'Rockstar', riot: 'Riot', curseforge: 'CurseForge', app: 'App', msstore: 'Store', manual: 'Added' };
+  const norm = (x) => String(x || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  return {
+    async library() {
+      const running = playtime ? playtime.running : new Set();
+      const list = Object.values(store.data.items).filter((it) => !it.hidden && !it.missing && (it.installed || it.owned || it.manual) && !(it.parentId && !it.ungrouped));
+      // One entry per game: an installed copy wins over owned copies with the same name.
+      const best = new Map();
+      for (const it of list) {
+        const k = it.kind === 'game' ? norm(it.customName || it.name) : it.id;
+        const cur = best.get(k);
+        const score = (x) => (x.installed ? 2 : 0) + (running.has(x.id) ? 4 : 0) + (x.minutes || 0) / 1e9;
+        if (!cur || score(it) > score(cur)) best.set(k, it);
+      }
+      return [...best.values()].map((it) => ({
+        id: it.id, name: it.customName || it.name, kind: it.kind, source: it.source, sourceName: SRC[it.source] || it.source,
+        installed: !!(it.installed || it.manual), owned: !!it.owned, favorite: !!it.favorite, hidden: !!it.hidden,
+        cover: !!it.cover, minutes: minutesPlayed(it), lastPlayed: it.lastPlayed || 0, running: running.has(it.id),
+        size: (it.meta && it.meta.sizeBytes) || 0, drive: it.installDir ? String(it.installDir).slice(0, 2).toUpperCase() : '',
+      }));
+    },
+    async launch(id) {
+      const it = store.data.items[id];
+      try { await launchItem({ ...it, launch: withArgs(it.launch, (it.launchOpts || {}).args, it) }); it.lastPlayed = Date.now(); store.changed(); sendTo('toast', { text: `Started ${it.customName || it.name} from your phone` }); return { ok: true }; }
+      catch (e) { return { ok: false, error: e.message }; }
+    },
+    async install(id) {
+      const it = store.data.items[id];
+      if (it.installed) return { ok: false, error: 'Already installed' };
+      try { await launchItem(it); sendTo('toast', { text: `Install of ${it.customName || it.name} started from your phone` }); return { ok: true, message: 'The launcher on your PC opened the install.' }; }
+      catch (e) { return { ok: false, error: e.message }; }
+    },
+    async uninstall(id) {
+      const it = store.data.items[id];
+      if (!it.installed || it.manual || it.kind !== 'game') return { ok: false, error: 'Only installed games can be uninstalled here' };
+      try { const msg = await uninstall(it); setTimeout(() => rescan(true), 90 * 1000); sendTo('toast', { text: `Uninstall of ${it.customName || it.name} started from your phone` }); return { ok: true, message: msg }; }
+      catch (e) { return { ok: false, error: e.message }; }
+    },
+    drives: () => getDrives().catch(() => []),
+    async status() { return { running: [...(playtime ? playtime.running : [])] }; },
+  };
+}
+
+async function remoteInfo() {
+  const i = remote.info();
+  let qr = null;
+  if (i.url) { try { qr = await require('qrcode').toDataURL(i.url, { margin: 1, width: 240, color: { dark: '#0a0a0b', light: '#ffffff' } }); } catch {} }
+  return { ...i, qr, enabled: !!store.data.settings.remoteEnabled };
+}
+
+// Deals page data, cached for 6 hours. Price drops pop a Windows notification.
+async function deals(force) {
+  if (!force && dealsCache && Date.now() - dealsCache.at < services.SIX_HOURS) return dealsCache;
+  const [wish, free] = await Promise.all([
+    services.wishlist(store, await getSteamId()).catch((e) => ({ error: e.message })),
+    services.epicFree().catch(() => []),
+  ]);
+  dealsCache = { wish, free, at: Date.now() };
+  store.changed();
+  const s = store.data.settings;
+  if (s.dealAlerts !== false && Notification.isSupported()) {
+    for (const d of (wish.drops || []).slice(0, 3)) new Notification({ title: `Price drop: ${d.name}`, body: `$${d.from.toFixed(2)} → $${d.to.toFixed(2)}${d.discount ? ` (${d.discount}% off)` : ''}` }).show();
+    const seen = new Set(store.data.seenFree || []);
+    const fresh = free.filter((f) => f.now && !seen.has(f.title));
+    if (fresh.length && store.data.seenFree) new Notification({ title: 'Free on Epic this week', body: fresh.map((f) => f.title).join(', ') }).show();
+    store.data.seenFree = free.filter((f) => f.now).map((f) => f.title);
+  }
+  return dealsCache;
+}
+
+async function newsFor(appids) {
+  const out = [];
+  for (const appid of appids.slice(0, 8)) {
+    const c = newsCache.get(appid);
+    if (c && Date.now() - c.at < 3 * 3600 * 1000) { out.push(...c.items); continue; }
+    try { const items = await services.steamNews(appid, 4); newsCache.set(appid, { at: Date.now(), items }); out.push(...items); } catch {}
+  }
+  return out.sort((a, b) => b.date - a.date);
+}
+
 function registerIpc() {
   const item = (id) => store.data.items[id];
+
+  ipcMain.handle('deals:get', (_e, force) => deals(!!force));
+  ipcMain.handle('news:get', (_e, ids) => {
+    const appids = [...new Set((ids || []).map((id) => { const it = item(id); return it && (it.steamAppId || (steamInfo && steamInfo.appIdFor(it))); }).filter(Boolean))];
+    return newsFor(appids);
+  });
+  ipcMain.handle('remote:info', () => remoteInfo());
+  ipcMain.handle('remote:set', async (_e, on) => { store.data.settings.remoteEnabled = !!on; store.changed(); if (on) remote.start(); else remote.stop(); return remoteInfo(); });
+  ipcMain.handle('remote:newToken', async () => { remote.newToken(); return remoteInfo(); });
+  ipcMain.handle('app:applyStartup', () => applyStartup());
+  ipcMain.handle('app:pickExe', async () => {
+    const r = await dialog.showOpenDialog(win, { properties: ['openFile'], filters: [{ name: 'Programs', extensions: ['exe', 'bat', 'cmd', 'lnk'] }] });
+    return r.canceled ? null : r.filePaths[0];
+  });
+  ipcMain.handle('app:openUrl', (_e, url) => { if (/^(https:\/\/|steam:\/\/|ms-settings:|com\.epicgames\.launcher:\/\/|goggalaxy:\/\/)/.test(String(url))) shell.openExternal(url); });
 
   ipcMain.handle('library:get', () => snapshot());
   ipcMain.handle('library:rescan', () => rescan(false));
@@ -294,7 +452,12 @@ function registerIpc() {
     const it = item(id);
     if (!it) return { ok: false, error: 'Not found' };
     try {
-      await launchItem(it);
+      const o = it.launchOpts || {};
+      const ctx = {};
+      const notes = o.before && o.before.length ? await runActions(o.before, ctx) : [];
+      if (o.after && o.after.length || ctx.savedPlan) afterRun.set(it.id, { actions: [...(o.after || []), ...(ctx.savedPlan ? [{ type: 'restorePower' }] : [])], ctx, at: Date.now() });
+      await launchItem({ ...it, launch: withArgs(it.launch, o.args, it) });
+      if (notes.length) sendTo('toast', { text: notes.join(' · '), kind: 'error' });
       it.lastPlayed = Date.now();
       it.playCount = (it.playCount || 0) + 1;
       store.changed();
@@ -574,12 +737,7 @@ function registerIpc() {
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on('second-instance', () => {
-    if (win) {
-      if (win.isMinimized()) win.restore();
-      win.focus();
-    }
-  });
+  app.on('second-instance', () => showWindow());
 
   app.whenReady().then(async () => {
     store = new Store(path.join(app.getPath('userData'), 'library.json'));
@@ -591,7 +749,7 @@ if (!app.requestSingleInstanceLock()) {
     media = new MediaBridge((s) => sendTo('media:state', s));
     for (const c of BASIC_CATEGORIES) store.ensureCategoryPath(`Games/${c}`);
     steamInfo = new SteamInfo(store, () => { applyAutoCategories(); store.changed(); });
-    playtime = new PlaytimeTracker(store, () => { store.changed(); updatePresence(); });
+    playtime = new PlaytimeTracker(store, () => { store.changed(); updatePresence(); checkAfterActions(); });
     sizes = new SizeTracker(store, () => store.changed());
     xbox = new XboxLive(store);
     epic = new EpicClient(store);
@@ -599,6 +757,12 @@ if (!app.requestSingleInstanceLock()) {
     friends = new Friends(store, (s) => sendTo('friends:state', s), getSteamId, xbox, epic);
     registerIpc();
     createWindow();
+    setupTray();
+    applyStartup();
+    remote = new RemoteServer(store, remoteApi());
+    if (store.data.settings.remoteEnabled) remote.start();
+    setTimeout(() => deals(false).catch(() => {}), 60 * 1000);
+    setInterval(() => deals(true).catch(() => {}), services.SIX_HOURS);
     playtime.start();
     streamView = new StreamView(() => win, (st) => sendTo('stream:state', st));
     win.on('resize', () => { if (streamView.full) streamView.layout(); });
@@ -617,11 +781,14 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.on('before-quit', () => {
+    quitting = true;
+    globalShortcut.unregisterAll();
+    if (remote) remote.stop();
     if (playtime) playtime.flushSessions();
     rpc.set(null); rpc.close();
     if (store) store.saveNow();
     if (media) { media.enabled = false; media.stop(); }
     if (playtime) playtime.stop();
   });
-  app.on('window-all-closed', () => app.quit());
+  app.on('window-all-closed', () => { if (!tray || store.data.settings.closeToTray === false) app.quit(); });
 }

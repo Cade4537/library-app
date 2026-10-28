@@ -19,7 +19,7 @@ const DEFAULT_SETTINGS = {
   steamCollections: false,
 };
 
-const ITEM_PATCH_FIELDS = ['customName', 'favorite', 'hidden', 'categoryId', 'kind', 'ungrouped', 'suiteMain'];
+const ITEM_PATCH_FIELDS = ['customName', 'favorite', 'hidden', 'categoryId', 'kind', 'ungrouped', 'suiteMain', 'status', 'notes', 'rating', 'launchOpts', 'unmerged'];
 
 const newId = () => crypto.randomUUID();
 
