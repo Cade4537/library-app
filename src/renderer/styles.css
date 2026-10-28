@@ -913,3 +913,40 @@ body.discord-on #resumeBar { display: none; }
 .intro-name span { display: inline-block; animation: introLetter .5s cubic-bezier(.2,.8,.2,1) both; }
 @keyframes introLetter { from { opacity: 0; transform: translateY(14px); filter: blur(6px); } }
 body.resume-on #content { padding-bottom: 110px; }
+
+/* ---------- 0.9.9: Arcade ---------- */
+.arc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 18px; }
+.arc-tile { position: relative; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: var(--panel); padding: 0; text-align: left; transition: transform .18s, box-shadow .18s, border-color .18s; }
+.arc-tile:hover, .arc-tile:focus { transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 16px 40px rgba(0,0,0,.5), 0 0 30px var(--accent-soft); }
+.arc-preview { width: 100%; height: auto; aspect-ratio: 360 / 220; display: block; background: #0c0c0e; }
+.arc-info { padding: 14px 120px 18px 18px; display: flex; flex-direction: column; gap: 4px; }
+.arc-name { font: 800 22px/1.1 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif; }
+.arc-sub { color: var(--muted); font-size: 13px; }
+.arc-best { margin-top: 6px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.arc-play { position: absolute; right: 16px; bottom: 18px; display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 16px; border-radius: 999px; background: var(--accent); color: #fff; font-weight: 700; font-size: 13px; }
+.arc-play .ic { width: 12px; height: 12px; }
+
+.game { position: fixed; inset: 0; z-index: 72; display: flex; flex-direction: column; background: radial-gradient(1000px 500px at 50% -10%, var(--accent-soft), transparent 70%), #050506; opacity: 0; transition: opacity .2s; }
+.game.in { opacity: 1; } .game.out { opacity: 0; }
+.game-top { display: flex; align-items: center; gap: 10px; padding: 16px 24px; }
+.game-title { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); }
+.game-top .spacer { flex: 1; }
+.game-body { flex: 1; min-height: 0; display: flex; gap: 28px; padding: 0 32px 28px; justify-content: center; }
+.game-stage { position: relative; flex: 1; min-width: 0; max-width: 900px; display: grid; place-items: center; }
+.game-canvas { border-radius: 10px; box-shadow: 0 0 0 1px #26262b, 0 30px 80px rgba(0,0,0,.6); background: #0b0b0d; }
+.game-side { width: 220px; flex: none; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+.gs-box { padding: 12px 14px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; }
+.gs-box canvas { width: 120px; align-self: center; }
+.gs-next { height: 230px; } .gs-hold { height: 90px; }
+.gs-l { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); margin-top: 4px; }
+.gs-v { font: 800 24px/1.1 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+.gs-s { font-size: 12px; color: var(--muted); }
+.gs-actions { gap: 8px; }
+.gs-actions .btn { justify-content: center; }
+.gs-keys { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; padding: 4px 4px 0; }
+.gs-keys b { color: var(--text); font-weight: 700; }
+.gs-note { margin-top: 6px; color: var(--faint); }
+.game-msg { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: rgba(5,5,6,.72); backdrop-filter: blur(4px); border-radius: 10px; text-align: center; }
+.game-msg.on { display: flex; animation: viewIn .3s cubic-bezier(.2,.8,.2,1); }
+.gm-t { font: 800 40px/1 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif; }
+.gm-s { color: var(--muted); margin-bottom: 8px; }

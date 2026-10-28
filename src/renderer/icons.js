@@ -1,6 +1,7 @@
 // Small inline line icons. Use <span data-icon="name"></span> or icon('name').
 (function () {
   const P = {
+    joystick: '<rect x="3" y="14" width="18" height="6" rx="2"/><path d="M12 14V8"/><circle cx="12" cy="6" r="2.6"/><path d="M7 17h2"/>',
     grid: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
     rows: '<rect x="4" y="5" width="16" height="5" rx="1.5"/><rect x="4" y="14" width="16" height="5" rx="1.5"/>',
     chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',

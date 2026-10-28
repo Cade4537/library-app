@@ -249,6 +249,7 @@ function viewTitle(view = S.view) {
     case 'discord': return 'Discord';
     case 'remoteplay': return 'Xbox Remote Play';
     case 'stats': return 'Stats';
+    case 'arcade': return 'Arcade';
     case 'launcher': return `${SOURCES[view.source] || view.source} games`;
     case 'category': return (S.cats.get(view.id) || {}).name || 'Category';
     default: return 'Library';
@@ -394,19 +395,22 @@ function render() {
   const lv = S.view.type === 'launchers';
   const sv = S.view.type === 'storage';
   const tv2 = S.view.type === 'stats';
+  const av = S.view.type === 'arcade';
   $('#statsView').hidden = !tv2;
-  if (tv2) {
+  $('#arcadeView').hidden = !av;
+  if (tv2 || av) {
     for (const id of ['#friendsView', '#launchersView', '#storageView', '#grid', '#filters', '#jump', '#collections', '#empty', '#discordView', '#streamView']) $(id).hidden = true;
     document.body.classList.remove('discord-on');
     renderSidebar();
     renderHeader();
-    if (!render.statsShown) renderStats();
-    render.statsShown = true;
+    if (av) { if (render.shownView !== 'arcade') renderArcade(); }
+    else if (render.shownView !== 'stats') renderStats();
+    render.shownView = S.view.type;
     renderResume();
     syncDiscord();
     return;
   }
-  render.statsShown = false;
+  render.shownView = null;
   const dv = S.view.type === 'discord';
   const rv = S.view.type === 'remoteplay';
   document.body.classList.toggle('discord-on', dv || rv);
@@ -484,6 +488,7 @@ function renderSidebar() {
     navButton('favorites', 'Favorites', 'star', vis.filter((i) => i.favorite).length),
     navButton('recent', 'Recently played', 'clock', null),
     navButton('stats', 'Stats', 'chart', null),
+    navButton('arcade', 'Arcade', 'joystick', null),
     navButton('uncategorized', 'Uncategorized', 'inbox', vis.filter((i) => !i.categoryId || !S.cats.has(i.categoryId)).length || null),
     navButton('hidden', 'Hidden', 'eyeOff', S.lib.items.filter((i) => i.hidden).length || null),
     navButton('launchers', 'Launchers', 'rocket', null),
@@ -593,7 +598,7 @@ function renderHeader() {
     }
   }
   const total = S.view.type === 'friends' ? (S.friends.people || []).length : viewItems().length;
-  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : S.view.type === 'storage' ? (S.drives ? `${fmtBytes(S.drives.reduce((a, d) => a + d.free, 0))} free` : '') : S.view.type === 'discord' || S.view.type === 'remoteplay' || S.view.type === 'stats' ? '' : `${total} ${total === 1 ? 'item' : 'items'}`)));
+  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : S.view.type === 'storage' ? (S.drives ? `${fmtBytes(S.drives.reduce((a, d) => a + d.free, 0))} free` : '') : S.view.type === 'discord' || S.view.type === 'remoteplay' || S.view.type === 'stats' || S.view.type === 'arcade' ? '' : `${total} ${total === 1 ? 'item' : 'items'}`)));
   if (S.view.type === 'discord') {
     kids.push(h('div', { class: 'discord-bar' },
       h('span', { class: 'help', style: { flex: 1 } }, 'Discord\'s own app, right here. Voice calls keep going while you switch pages.'),

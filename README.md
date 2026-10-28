@@ -80,6 +80,13 @@ Hours come from Steam, Epic, GOG Galaxy, Xbox and Ubisoft when connected. For ev
 
 Steam, Xbox and Epic friends, sorted into Playing, Online, Away and Offline. Epic only shares when someone was last online. The same person on more than one platform is matched by name automatically; click a friend to link or unlink accounts by hand.
 
+## Arcade
+
+Two mini games in the Arcade tab, for mouse, keyboard or controller:
+
+- **Vault Blocks:** a falling block puzzle. Clear lines to score; the level and speed go up every 10 lines. Hold, next pieces, ghost piece and a best score. Keys: arrows move, Space or Up hard drops, X rotates, Z rotates back, C holds, P or Esc pauses. Controller: D-pad or stick, A and B rotate, Up, Y or RB hard drop, LB holds, Menu pauses, View quits.
+- **Peg Drop:** drop balls through rows of pegs into slots worth x0.3 to x10. Pick a bet, aim, drop one at a time or turn on auto drop. Pretend points only (start at 1,000, refill any time); nothing is real money.
+
 ## Discord
 
 - **Discord tab:** Discord's own web app in the sidebar, signed in once and kept. Voice calls keep going while you switch pages, and screen share asks which screen or window to share. Turn the tab off in Settings > Discord.

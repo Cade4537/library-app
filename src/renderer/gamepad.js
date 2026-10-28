@@ -129,6 +129,20 @@
         left: pressed(14) || axis(0) < -0.5,
         right: pressed(15) || axis(0) > 0.5,
       };
+      // A mini game in the Arcade takes the controller while it is open.
+      if (window.arcadeInput) {
+        for (const [d, on] of Object.entries(dirs)) {
+          const first = on && !hold[d];
+          repeat(d, on, now, () => window.arcadeInput(d, !first));
+        }
+        for (const [i, name] of Object.entries(BUTTONS)) {
+          const on = pressed(+i);
+          if (on && !prev[name]) window.arcadeInput(name, false);
+          prev[name] = on;
+        }
+        requestAnimationFrame(poll);
+        return;
+      }
       for (const [d, on] of Object.entries(dirs)) {
         repeat(d, on, now, () => {
           if (!document.body.classList.contains('pad')) { setPadMode(true); if (!document.activeElement || document.activeElement === document.body) return focusDefault(); }
