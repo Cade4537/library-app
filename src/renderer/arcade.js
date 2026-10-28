@@ -7,7 +7,7 @@
 const ARCADE = [
   { id: 'blocks', name: 'Vault Blocks', sub: 'Stack falling blocks and clear lines', best: () => prefs.get('blocksBest', 0), bestLabel: 'Best score' },
   { id: 'pegs', name: 'Peg Drop', sub: 'Drop balls through the pegs into point slots', best: () => prefs.get('pegsBank', 1000), bestLabel: 'Points' },
-  { id: 'bj', name: 'Blackjack', sub: 'Beat the dealer to 21 without going over', best: () => prefs.get('pegsBank', 1000), bestLabel: 'Points' },
+  { id: 'bj', name: 'Blackjack', sub: 'Beat the dealer to 21 without going over', best: () => prefs.get('bjBank', 10000), bestLabel: 'Points' },
   { id: 'breaker', name: 'Block Breaker', sub: 'Bounce the ball and smash every brick', best: () => prefs.get('breakerBest', 0), bestLabel: 'Best score' },
   { id: 'snake', name: 'Snake', sub: 'Eat, grow and don\'t hit yourself', best: () => prefs.get('snakeBest', 0), bestLabel: 'Best score' },
   { id: 'duel', name: 'Paddle Duel', sub: 'Classic paddle tennis, against the computer or a friend', best: () => prefs.get('duelWins', 0), bestLabel: 'Wins' },
@@ -21,7 +21,7 @@ function renderArcade() {
       h('div', { class: 'arc-info' }, h('div', { class: 'arc-name' }, g.name), h('div', { class: 'arc-sub' }, g.sub),
         h('div', { class: 'arc-best' }, `${g.bestLabel}: ${fmtBig(Number(g.best()) || 0)}`)),
       h('span', { class: 'arc-play' }, icon('play'), 'Play')))),
-    h('div', { class: 'help', style: { marginTop: '14px' } }, 'Works with mouse, keyboard or controller. Peg Drop and Blackjack share pretend points that only live in this app.'));
+    h('div', { class: 'help', style: { marginTop: '14px' } }, 'Works with mouse, keyboard or controller. Peg Drop and Blackjack use pretend points that only live in this app.'));
   box.querySelectorAll('.arc-preview').forEach(drawPreview);
 }
 
@@ -102,6 +102,8 @@ function drawCell(x, px, py, s, color, alpha = 1) {
 function vaultBlocks() {
   const W = 10, H = 20;
   let grid, cur, bag, next, hold, canHold, score, lines, level, dropMs, acc, last, over, paused, raf, clearing;
+  const fx = makeFx();
+  const vis = { x: 0, y: 0 }; // where the falling piece is drawn; glides toward its real spot
   const best = () => prefs.get('blocksBest', 0);
   const scoreEl = h('div', { class: 'gs-v' }); const linesEl = h('div', { class: 'gs-v' }); const levelEl = h('div', { class: 'gs-v' }); const bestEl = h('div', { class: 'gs-v' });
   const nextC = h('canvas', { class: 'gs-next', width: 120, height: 230 }); const holdC = h('canvas', { class: 'gs-hold', width: 120, height: 90 });
@@ -137,6 +139,7 @@ function vaultBlocks() {
   const spawn = (t) => {
     const m = SHAPES[t].map((r) => r.slice());
     cur = { t, m, x: Math.floor((W - m[0].length) / 2), y: t === 1 ? -1 : 0 };
+    vis.x = cur.x; vis.y = cur.y;
     canHold = true;
     if (collide(cur.m, cur.x, cur.y)) { over = true; finish(); }
   };
@@ -164,9 +167,17 @@ function vaultBlocks() {
     for (let y = 0; y < H; y++) if (grid[y].every(Boolean)) full.push(y);
     if (full.length) {
       clearing = { rows: full, t: performance.now() };
-      score += [0, 100, 300, 500, 800][full.length] * level;
+      const gained = [0, 100, 300, 500, 800][full.length] * level;
+      score += gained;
       lines += full.length;
+      const before = level;
       level = 1 + Math.floor(lines / 10);
+      for (const y of full) for (let x = 0; x < W; x++) fx.burst((x + 0.5) * cell, (y + 0.5) * cell, [BLOCK_COLORS[grid[y][x]] || '#fff', '#ffffff'], 3, 3.5, { size: cell * 0.22, lift: 1.5 });
+      fx.text(W * cell / 2, full[0] * cell, `+${gained.toLocaleString()}`, '#ffd257', Math.round(cell * 0.8), 1000);
+      if (full.length >= 2) fx.banner(['', '', 'Double!', 'Triple!', 'Quad!'][full.length], null, full.length === 4 ? '#ffd257' : '#ff6b8a', 1100);
+      fx.shake(full.length * 2.5);
+      if (full.length === 4) fx.flash('#ffffff', 0.35);
+      if (level > before) setTimeout(() => fx.banner(`Level ${level}`, 'Faster now', '#ff3b4b', 1400), full.length >= 2 ? 900 : 0);
       dropMs = Math.max(70, 800 * Math.pow(0.86, level - 1));
       if (full.length === 4) Sfx.land(); else Sfx.tick(0.7);
     } else Sfx.tick(0.6);
@@ -174,7 +185,17 @@ function vaultBlocks() {
     updateSide();
   };
   const step = () => { if (!collide(cur.m, cur.x, cur.y + 1)) { cur.y++; return true; } lock(); return false; };
-  const hard = () => { let n = 0; while (!collide(cur.m, cur.x, cur.y + 1)) { cur.y++; n++; } score += n * 2; lock(); };
+  const hard = () => {
+    let n = 0; while (!collide(cur.m, cur.x, cur.y + 1)) { cur.y++; n++; }
+    score += n * 2;
+    // A streak where the piece fell, and a thud where it landed.
+    cur.m.forEach((r, yy) => r.forEach((v, xx) => { if (v && cur.y + yy >= 0) fx.burst((cur.x + xx + 0.5) * cell, (cur.y + yy + 1) * cell, BLOCK_COLORS[v], 2, 2.2, { angle: -Math.PI / 2, spread: 1.6, size: cell * 0.16 }); }));
+    trail = { cells: cur.m.flatMap((r, yy) => r.map((v, xx) => (v ? [cur.x + xx, cur.y + yy, v] : null)).filter(Boolean)), n, t: performance.now() };
+    fx.shake(Math.min(5, 1 + n / 4));
+    vis.y = cur.y;
+    lock();
+  };
+  let trail = null;
   const doHold = () => {
     if (!canHold) return;
     const t = cur.t;
@@ -182,7 +203,7 @@ function vaultBlocks() {
     hold = t; canHold = false; updateSide();
   };
   const updateSide = () => {
-    scoreEl.textContent = score.toLocaleString(); linesEl.textContent = String(lines); levelEl.textContent = String(level); bestEl.textContent = Math.max(best(), score).toLocaleString();
+    bumpText(scoreEl, score.toLocaleString()); bumpText(linesEl, String(lines)); bumpText(levelEl, String(level)); bestEl.textContent = Math.max(best(), score).toLocaleString();
     const mini = (c, list) => {
       const x = c.getContext('2d'); x.clearRect(0, 0, c.width, c.height);
       list.forEach((t, i) => { const m = SHAPES[t]; const s = 18; const w = m[0].length * s; m.forEach((r, yy) => r.forEach((v, xx) => { if (v) drawCell(x, (c.width - w) / 2 + xx * s, 10 + i * 74 + yy * s, s, BLOCK_COLORS[v], c === holdC && !canHold ? 0.35 : 1); })); });
@@ -191,6 +212,7 @@ function vaultBlocks() {
     mini(nextC, next.slice(0, 3));
   };
   const finish = () => {
+    fx.shake(8); fx.flash('#ff3b4b', 0.3);
     if (score > best()) { prefs.set('blocksBest', score); showMsg('New best!', `${score.toLocaleString()} points · ${lines} lines`, true); Sfx.land(); }
     else showMsg('Game over', `${score.toLocaleString()} points · ${lines} lines`, true);
   };
@@ -205,26 +227,49 @@ function vaultBlocks() {
   };
   const setPause = (v) => { if (over) return; paused = v; if (v) showMsg('Paused', `${score.toLocaleString()} points · ${lines} lines`, false); else { msg.classList.remove('on'); last = performance.now(); } };
 
+  let lastDraw = performance.now();
   const draw = (now) => {
-    ctx.clearRect(0, 0, W * cell, H * cell);
-    ctx.fillStyle = '#0b0b0d'; ctx.fillRect(0, 0, W * cell, H * cell);
-    ctx.strokeStyle = 'rgba(255,255,255,.04)'; ctx.lineWidth = 1;
-    for (let x = 1; x < W; x++) { ctx.beginPath(); ctx.moveTo(x * cell + 0.5, 0); ctx.lineTo(x * cell + 0.5, H * cell); ctx.stroke(); }
-    for (let y = 1; y < H; y++) { ctx.beginPath(); ctx.moveTo(0, y * cell + 0.5); ctx.lineTo(W * cell, y * cell + 0.5); ctx.stroke(); }
-    const flash = clearing ? Math.min(1, (now - clearing.t) / 220) : 0;
+    const dt = Math.min(40, now - lastDraw); lastDraw = now;
+    fx.update(dt);
+    const BW = W * cell, BH = H * cell;
+    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#e11d2e';
+    ctx.clearRect(0, 0, BW, BH);
+    fx.begin(ctx);
+    drawBoardBg(ctx, BW, BH, now, accent, cell);
+    const flash = clearing ? Math.min(1, (now - clearing.t) / 260) : 0;
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (grid[y][x]) {
-      if (clearing && clearing.rows.includes(y)) { ctx.fillStyle = `rgba(255,255,255,${1 - flash})`; ctx.fillRect(x * cell, y * cell, cell, cell); }
-      else drawCell(ctx, x * cell, y * cell, cell, BLOCK_COLORS[grid[y][x]]);
+      if (clearing && clearing.rows.includes(y)) {
+        // The row lights up from the middle outward, then vanishes.
+        const d = Math.abs(x - (W - 1) / 2) / (W / 2);
+        const u = Math.max(0, Math.min(1, flash * 1.6 - d * 0.6));
+        drawCell(ctx, x * cell, y * cell, cell, BLOCK_COLORS[grid[y][x]], 1 - u);
+        ctx.fillStyle = `rgba(255,255,255,${(1 - u) * 0.9 * Math.min(1, flash * 4)})`; ctx.fillRect(x * cell, y * cell, cell, cell);
+      } else drawCell(ctx, x * cell, y * cell, cell, BLOCK_COLORS[grid[y][x]]);
+    }
+    if (trail && now - trail.t < 220) {
+      const a = 1 - (now - trail.t) / 220;
+      for (const [cx, cy, v] of trail.cells) {
+        const g = ctx.createLinearGradient(0, (cy - trail.n) * cell, 0, cy * cell);
+        g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(1, hexA(BLOCK_COLORS[v], 0.45 * a));
+        ctx.fillStyle = g; ctx.fillRect(cx * cell + 2, (cy - trail.n) * cell, cell - 4, trail.n * cell);
+      }
     }
     if (!over && cur) {
+      // Glide toward the real position so moves and drops look smooth.
+      const k = Math.min(1, dt / 45);
+      vis.x += (cur.x - vis.x) * k * 1.6; vis.y += (cur.y - vis.y) * k * 1.6;
+      if (Math.abs(cur.x - vis.x) < 0.02) vis.x = cur.x; if (Math.abs(cur.y - vis.y) < 0.02 || vis.y > cur.y) vis.y = cur.y;
       const gy = ghostY();
-      cur.m.forEach((r, yy) => r.forEach((v, xx) => { if (v && gy + yy >= 0) { ctx.strokeStyle = BLOCK_COLORS[v]; ctx.globalAlpha = 0.45; ctx.strokeRect(( cur.x + xx) * cell + 2.5, (gy + yy) * cell + 2.5, cell - 5, cell - 5); ctx.globalAlpha = 1; } }));
-      cur.m.forEach((r, yy) => r.forEach((v, xx) => { if (v && cur.y + yy >= 0) drawCell(ctx, (cur.x + xx) * cell, (cur.y + yy) * cell, cell, BLOCK_COLORS[v]); }));
+      cur.m.forEach((r, yy) => r.forEach((v, xx) => { if (v && gy + yy >= 0) { ctx.fillStyle = hexA(BLOCK_COLORS[v], 0.12); ctx.fillRect((cur.x + xx) * cell + 2, (gy + yy) * cell + 2, cell - 4, cell - 4); ctx.strokeStyle = hexA(BLOCK_COLORS[v], 0.55); ctx.lineWidth = 1.5; ctx.strokeRect((cur.x + xx) * cell + 2.5, (gy + yy) * cell + 2.5, cell - 5, cell - 5); } }));
+      ctx.shadowColor = BLOCK_COLORS[cur.t]; ctx.shadowBlur = 14;
+      cur.m.forEach((r, yy) => r.forEach((v, xx) => { if (v && vis.y + yy > -1) drawCell(ctx, (vis.x + xx) * cell, (vis.y + yy) * cell, cell, BLOCK_COLORS[v]); }));
+      ctx.shadowBlur = 0;
     }
     if (clearing && flash >= 1) {
       for (const y of clearing.rows) { grid.splice(y, 1); grid.unshift(Array(W).fill(0)); }
       clearing = null;
     }
+    fx.end(ctx, BW, BH);
   };
   const loop = (now) => {
     raf = requestAnimationFrame(loop);
@@ -241,8 +286,8 @@ function vaultBlocks() {
     if (k === 'menu' || k === 'p') return setPause(!paused);
     if (paused) { if (k === 'a') setPause(false); return true; }
     if (clearing) return true;
-    if (k === 'left') { if (!collide(cur.m, cur.x - 1, cur.y)) { cur.x--; Sfx.tick(1.6); } }
-    else if (k === 'right') { if (!collide(cur.m, cur.x + 1, cur.y)) { cur.x++; Sfx.tick(1.6); } }
+    if (k === 'left') { if (!collide(cur.m, cur.x - 1, cur.y)) { cur.x--; Sfx.tick(1.6); } else fx.shake(1.2); }
+    else if (k === 'right') { if (!collide(cur.m, cur.x + 1, cur.y)) { cur.x++; Sfx.tick(1.6); } else fx.shake(1.2); }
     else if (k === 'down') { if (step()) score += 1; acc = 0; updateSide(); }
     else if (k === 'up' || k === 'y' || k === 'rb') { if (!rep) hard(); }
     else if (k === 'a') rotate(1);
@@ -265,7 +310,8 @@ function vaultBlocks() {
   function start() {
     grid = Array.from({ length: H }, () => Array(W).fill(0));
     bag = newBag(); next = [take(), take(), take(), take()]; hold = 0; canHold = true;
-    score = 0; lines = 0; level = 1; dropMs = 800; acc = 0; last = performance.now(); over = false; paused = false; clearing = null;
+    score = 0; lines = 0; level = 1; dropMs = 800; acc = 0; last = performance.now(); over = false; paused = false; clearing = null; trail = null;
+    fx.clear(); fx.banner('Go!', null, '#ff3b4b', 900);
     msg.classList.remove('on');
     spawn(take());
     updateSide();
@@ -318,6 +364,7 @@ function pegDrop() {
   let risk = RISKS[prefs.get('pegsRisk', 'medium')] ? prefs.get('pegsRisk', 'medium') : 'medium';
   let aim = 0.5, auto = false, autoT = 0, paused = false, raf, last = performance.now(), resetArm = 0, best = Number(prefs.get('pegsBest', 1000)) || 1000;
   const balls = [], queue = [], pops = [], hits = new Map();
+  const fx = makeFx();
   let queueT = 0;
   const slots = () => RISKS[risk].slots;
 
@@ -364,7 +411,7 @@ function pegDrop() {
   countIn.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') countIn.blur(); });
   const inFlight = () => balls.length + queue.length;
   function upd() {
-    bankEl.textContent = fmtBig(Math.floor(bank));
+    bumpText(bankEl, fmtBig(Math.floor(bank)));
     const word = Object.entries(BIG_FULL).find(([k]) => fmtBig(bank).endsWith(k));
     bankEl.title = word ? `${bank.toLocaleString()} (${word[1]})` : bank.toLocaleString();
     bestEl.textContent = `Best: ${fmtBig(Math.floor(best))}`;
@@ -445,7 +492,7 @@ function pegDrop() {
             b.vx += (Math.random() - 0.5) * 0.22 * gap / 40; // unpredictable kick
             b.vy *= 0.72;
             if (Math.abs(b.vx) < 0.02) b.vx += (Math.random() < 0.5 ? -1 : 1) * 0.05; // never balance on a peg
-            if (!p.lit || now - p.lit > 90) { p.lit = now; if (balls.length < 12) Sfx.tick(1.2 + (b.y / Ht) * 0.6); }
+            if (!p.lit || now - p.lit > 90) { p.lit = now; if (balls.length < 12) Sfx.tick(1.2 + (b.y / Ht) * 0.6); if (balls.length < 30) fx.burst(p.x, p.y, '#ffffff', 2, 1.4, { size: 2, gravity: 0.05 }); }
           }
         }
         const lo = left + R(), hi = left + slots().length * slotW - R();
@@ -460,6 +507,9 @@ function pegDrop() {
         if (bank > best) best = bank;
         hits.set(idx, now);
         if (pops.length < 40) pops.push({ x: left + idx * slotW + slotW / 2, y: slotY, t: now, text: win ? `+${fmtBig(Math.round(win))}` : '0', big: sl[idx] >= 10 });
+        const sx = left + idx * slotW + slotW / 2;
+        fx.burst(sx, slotY, [slotColor(sl[idx]), '#ffffff'], sl[idx] >= 10 ? 40 : sl[idx] >= 2 ? 14 : 6, sl[idx] >= 10 ? 5 : 3, { angle: -Math.PI / 2, spread: 1.8, size: 4 });
+        if (sl[idx] >= 10) { fx.shake(Math.min(10, 3 + Math.log10(sl[idx]) * 3)); fx.flash(slotColor(sl[idx]), 0.25); fx.banner(`x${sl[idx]}!`, `+${fmtBig(Math.round(win))} points`, '#ffd257', 1400); }
         lastEl.textContent = `Last: x${sl[idx]} = ${fmtBig(Math.round(win))} points`;
         if (sl[idx] >= 10) Sfx.land(); else if (balls.length < 12) Sfx.tick(sl[idx] >= 1 ? 1.8 : 0.5);
         balls.splice(i, 1);
@@ -469,9 +519,16 @@ function pegDrop() {
     }
   }
   const slotColor = (m) => (m >= 50 ? '#ff2a3a' : m >= 10 ? '#ff3040' : m >= 4 ? '#f0452a' : m >= 2 ? '#e0336a' : m >= 1 ? '#6b6b75' : m > 0 ? '#3a3a42' : '#202024');
+  let lastDraw = performance.now();
   function draw(now) {
+    const dtd = Math.min(40, now - lastDraw); lastDraw = now;
+    fx.update(dtd);
     ctx.clearRect(0, 0, Wd, Ht);
     const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#e11d2e';
+    fx.begin(ctx);
+    drawBoardBg(ctx, Wd, Ht, now, accent, 0);
+    // Soft glow under the slots that pay the most.
+    slots().forEach((m, i) => { if (m >= 10) { const gx = left + i * slotW + slotW / 2; const gr = ctx.createRadialGradient(gx, slotY, 0, gx, slotY, gap * 1.6); gr.addColorStop(0, hexA(slotColor(m), 0.22 + Math.sin(now / 300 + i) * 0.06)); gr.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = gr; ctx.fillRect(gx - gap * 2, slotY - gap * 2, gap * 4, gap * 3); } });
     const ax = Wd / 2 + (aim - 0.5) * gap * 0.9;
     ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.beginPath(); ctx.moveTo(ax - 8, 6); ctx.lineTo(ax + 8, 6); ctx.lineTo(ax, 18); ctx.fill();
     for (const p of pegs) {
@@ -482,7 +539,10 @@ function pegDrop() {
     }
     slots().forEach((m, i) => {
       const x = left + i * slotW; const hit = hits.get(i); const bump = hit && now - hit < 300 ? (1 - (now - hit) / 300) * 6 : 0;
-      ctx.fillStyle = slotColor(m); ctx.beginPath(); ctx.roundRect(x + 2, slotY + bump, slotW - 4, gap * 0.55, 5); ctx.fill();
+      const sg = ctx.createLinearGradient(0, slotY, 0, slotY + gap * 0.55);
+      sg.addColorStop(0, slotColor(m)); sg.addColorStop(1, hexA(slotColor(m).length === 7 ? slotColor(m) : '#3a3a42', 0.7));
+      ctx.fillStyle = sg; ctx.beginPath(); ctx.roundRect(x + 2, slotY + bump, slotW - 4, gap * 0.55, 6); ctx.fill();
+      if (hit && now - hit < 300) { ctx.strokeStyle = `rgba(255,255,255,${1 - (now - hit) / 300})`; ctx.lineWidth = 2; ctx.stroke(); }
       ctx.fillStyle = '#fff'; ctx.font = `700 ${Math.max(9, gap * (String(m).length > 3 ? 0.2 : 0.25))}px Segoe UI, system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(`x${m}`, x + slotW / 2, slotY + bump + gap * 0.28);
     });
@@ -497,6 +557,7 @@ function pegDrop() {
       ctx.globalAlpha = 1 - t; ctx.fillStyle = p.big ? '#ffd257' : '#fff'; ctx.font = `800 ${p.big ? 22 : 15}px Segoe UI, system-ui`; ctx.textAlign = 'center';
       ctx.fillText(p.text, p.x, p.y - 14 - t * 40); ctx.globalAlpha = 1;
     }
+    fx.end(ctx, Wd, Ht);
   }
   function loop(now) {
     raf = requestAnimationFrame(loop);
