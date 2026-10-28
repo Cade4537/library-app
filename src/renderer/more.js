@@ -237,11 +237,44 @@ function renderSmartSidebar() {
 // ---------- news ----------
 function newsCard(n) {
   const it = S.lib.items.find((x) => String(x.steamAppId) === String(n.appid));
-  return h('button', { class: 'news-card', onclick: () => api.openExternal(n.url) },
+  return h('button', { class: 'news-card', onclick: () => openNews(n) },
     h('div', { class: 'news-top' }, it ? h('span', { class: 'news-game' }, displayName(it)) : null, h('span', { class: 'news-date' }, timeAgo(n.date))),
     h('div', { class: 'news-title' }, n.title),
     n.text ? h('div', { class: 'news-text' }, n.text.slice(0, 180) + (n.text.length > 180 ? '…' : '')) : null);
 }
+// The full post inside Crimson Vault, with buttons to open the original in Steam or the browser.
+function openNews(n) {
+  const it = S.lib.items.find((x) => String(x.steamAppId) === String(n.appid));
+  const body = h('div', { class: 'news-body' });
+  let list = null;
+  const kids = [];
+  for (const b of n.blocks || []) {
+    if (b.t === 'li') { if (!list) { list = h('ul', {}); kids.push(list); } list.append(h('li', {}, b.text)); continue; }
+    list = null;
+    if (b.t === 'h') kids.push(h('h3', {}, b.text));
+    else if (b.t === 'p') kids.push(h('p', {}, b.text));
+    else if (b.t === 'img') { const img = h('img', { src: b.src, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' }); img.addEventListener('error', () => img.remove()); kids.push(img); }
+    else if (b.t === 'vid') kids.push(h('button', { class: 'btn news-vid', onclick: () => api.openExternal(b.url) }, icon('play'), 'Watch the video'));
+  }
+  if (!kids.length) kids.push(h('p', {}, n.text || 'This post has no text. Open it to read it.'));
+  fillEl(body, ...kids);
+  const steamUrl = `steam://openurl/${n.url}`;
+  const m = openModal({
+    title: n.title,
+    cls: 'wide news-modal',
+    body: h('div', {},
+      h('div', { class: 'news-meta' }, it ? h('b', {}, displayName(it)) : null, h('span', {}, new Date(n.date).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })), n.feed ? h('span', {}, n.feed) : null),
+      body),
+    actions: [
+      { label: 'Open in browser', left: true, run: () => { api.openExternal(n.url); return false; } },
+      { label: 'Close' },
+      { label: 'Open in Steam', primary: true, run: () => { api.openUrl(steamUrl); } },
+    ],
+  });
+  // Start at the top of the post, not at the first button inside it.
+  setTimeout(() => { const pb = m.panel.querySelector('.modal-body'); if (pb) pb.scrollTop = 0; const f = m.panel.querySelector('.modal-foot .btn.primary'); if (f) f.focus({ preventScroll: true }); }, 20);
+}
+
 let newsKey = '';
 function renderNews() {
   const sec = $('#news');
@@ -259,6 +292,48 @@ function renderNews() {
     fillEl(sec, h('div', { class: 'sec-head' }, h('h3', { class: 'section-title' }, 'News for your games'), h('button', { class: 'link-btn', onclick: () => { prefs.set('showNews', false); sec.hidden = true; } }, 'Hide')),
       h('div', { class: 'news-list' }, list.slice(0, 6).map(newsCard)));
   }).catch(() => { sec.hidden = true; });
+}
+
+// ---------- store pages: launcher or browser ----------
+const STORE_NAMES = { epic: 'Epic', steam: 'Steam', gog: 'GOG', ubisoft: 'Ubisoft' };
+function launcherFor(url, store, appid) {
+  const u = String(url || '');
+  if (appid) return { name: 'Steam', url: `steam://store/${appid}` };
+  const app = u.match(/store\.steampowered\.com\/app\/(\d+)/);
+  if (app) return { name: 'Steam', url: `steam://store/${app[1]}` };
+  if (/^https:\/\/(store\.steampowered|steamcommunity)\.com/.test(u) || (store === 'steam' && /^https:/.test(u))) return { name: 'Steam', url: `steam://openurl/${u}` };
+  const ep = u.match(/store\.epicgames\.com\/(?:[a-z-]+\/)?p\/([^/?#]+)/i);
+  if (ep) return { name: 'Epic', url: `com.epicgames.launcher://store/p/${ep[1]}` };
+  if (/store\.epicgames\.com\/(?:[a-z-]+\/)?free-games/i.test(u)) return { name: 'Epic', url: 'com.epicgames.launcher://store/free-games' };
+  if (/^https:\/\/(www\.)?gog\.com\//.test(u)) return { name: 'GOG Galaxy', url: `goggalaxy://openStoreUrl/${u.replace(/^https:\/\//, '')}` };
+  return null;
+}
+function openStore(url, store, appid) {
+  const l = launcherFor(url, store, appid);
+  const mode = prefs.get('storeOpen', 'launcher');
+  if (!l || mode === 'browser') return api.openExternal(url);
+  if (mode === 'launcher') return api.openUrl(l.url);
+  let remember = false;
+  openModal({
+    title: 'Open the store page',
+    body: h('div', {}, h('p', { class: 'help', style: { fontSize: '14px', marginTop: 0 } }, `Open it in ${l.name} or in your web browser?`),
+      toggleRow('Remember my choice', 'Change it later in Settings > App', false, (v) => { remember = v; })),
+    actions: [
+      { label: 'Cancel' },
+      { label: 'Browser', run: () => { if (remember) prefs.set('storeOpen', 'browser'); api.openExternal(url); } },
+      { label: l.name, primary: true, run: () => { if (remember) prefs.set('storeOpen', 'launcher'); api.openUrl(l.url); } },
+    ],
+  });
+}
+function freeCard(f) {
+  const date = (t) => new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const when = f.now ? (f.end ? `Free until ${date(f.end)}` : 'Free for a limited time') : `Free from ${date(f.start)}`;
+  return h('button', { class: `free-card st-${f.store || 'epic'}` + (f.now ? ' now' : ''), onclick: () => openStore(f.url, f.store) },
+    f.img ? h('img', { src: f.img, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer', onerror: (e) => e.target.remove() }) : h('div', { class: 'wish-ph' }, h('span', {}, f.title)),
+    h('div', { class: 'free-info' },
+      h('div', { class: 'row', style: { gap: '8px', alignItems: 'center' } }, h('span', { class: 'free-store' }, STORE_NAMES[f.store] || 'Epic'), h('span', { class: 'free-tag' }, f.now ? 'Free now' : 'Coming soon')),
+      h('div', { class: 'free-title' }, f.title),
+      h('div', { class: 'help' }, when, f.worth ? h('s', { style: { marginLeft: '8px' } }, f.worth) : null)));
 }
 
 // ---------- deals ----------
@@ -279,16 +354,13 @@ async function renderDeals(force) {
     h('div', { class: 'deal-head' },
       h('div', {}, h('div', { class: 'help' }, d.at ? `Updated ${timeAgo(d.at).toLowerCase()}. Checks again every 6 hours and tells you when a price drops.` : '')),
       h('button', { class: 'btn', onclick: () => renderDeals(true) }, icon('refresh'), 'Check now')),
-    free.length ? h('div', {}, h('h3', { class: 'section-title' }, 'Free on Epic'),
-      h('div', { class: 'free-row' }, free.map((f) => h('button', { class: 'free-card' + (f.now ? ' now' : ''), onclick: () => api.openExternal(f.url) },
-        f.img ? h('img', { src: f.img, alt: '', loading: 'lazy' }) : null,
-        h('div', { class: 'free-info' }, h('span', { class: 'free-tag' }, f.now ? 'Free now' : 'Coming soon'), h('div', { class: 'free-title' }, f.title),
-          h('div', { class: 'help' }, f.now ? `Until ${new Date(f.end).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : `From ${new Date(f.start).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`)))))) : null,
+    free.length ? h('div', {}, h('h3', { class: 'section-title' }, `Free to keep · ${[...new Set(free.map((f) => STORE_NAMES[f.store] || 'Epic'))].join(', ')}`),
+      h('div', { class: 'free-row' }, [...free].sort((a, b) => (b.now - a.now) || (a.end || 9e15) - (b.end || 9e15)).map(freeCard))) : h('div', { class: 'help', style: { marginBottom: '8px' } }, 'No free games on Epic, Steam, GOG or Ubisoft right now.'),
     h('div', { class: 'sec-head', style: { marginTop: '22px' } },
       h('h3', { class: 'section-title' }, `Your Steam wishlist${wish.length ? ` · ${wish.length} games, ${onSale} on sale` : ''}`),
       wish.length ? h('div', { class: 'seg' }, [['discount', 'Biggest sale'], ['price', 'Cheapest'], ['name', 'A to Z']].map(([k, n]) => h('button', { class: sort === k ? 'on' : '', onclick: () => { prefs.set('dealSort', k); renderDeals(); } }, n))) : null),
     d.wish && d.wish.error ? h('div', { class: 'note err' }, d.wish.error) : null,
-    wish.length ? h('div', { class: 'wish-grid' }, sorted.map((w) => h('button', { class: 'wish' + (w.discount ? ' sale' : ''), onclick: () => api.openExternal(w.url) },
+    wish.length ? h('div', { class: 'wish-grid' }, sorted.map((w) => h('button', { class: 'wish' + (w.discount ? ' sale' : ''), onclick: () => openStore(w.url, 'steam', w.appid) },
       h('div', { class: 'wish-img' }, wishImg(w), w.discount ? h('span', { class: 'wish-off' }, `−${w.discount}%`) : null),
       h('div', { class: 'wish-info' }, h('div', { class: 'wish-name' }, w.name),
         h('div', { class: 'wish-price' }, w.comingSoon ? h('span', { class: 'help' }, 'Coming soon') : [w.discount ? h('s', {}, money(w.original)) : null, h('b', {}, money(w.price))],
@@ -324,6 +396,12 @@ function friendAlerts(st) {
 }
 
 // ---------- settings: app, alerts, phone remote ----------
+function storeSeg() {
+  const seg = h('div', { class: 'seg' });
+  const draw = () => fillEl(seg, ...[['launcher', 'The launcher'], ['ask', 'Ask each time'], ['browser', 'Browser']].map(([k, n]) => h('button', { class: prefs.get('storeOpen', 'launcher') === k ? 'on' : '', onclick: () => { prefs.set('storeOpen', k); draw(); } }, n)));
+  draw();
+  return h('div', {}, seg, h('div', { class: 'help' }, 'For Steam, Epic and GOG pages from Deals. Ubisoft pages always open in the browser.'));
+}
 function moreSettingsSections(s, state) {
   state.closeToTray = s.closeToTray !== false;
   state.startWithWindows = !!s.startWithWindows;
@@ -362,6 +440,7 @@ function moreSettingsSections(s, state) {
     h('div', { class: 'field' }, toggleRow('Keep running in the tray', 'Closing the window keeps Crimson Vault in the tray, so tracking and alerts keep working', state.closeToTray, (v) => { state.closeToTray = v; })),
     h('div', { class: 'field' }, toggleRow('Start with Windows', 'Opens quietly in the tray when you sign in', state.startWithWindows, (v) => { state.startWithWindows = v; })),
     h('div', { class: 'field' }, h('label', {}, 'Show / hide shortcut'), hk, h('div', { class: 'help' }, 'Works from anywhere, even in other apps. Click the box and press keys; Backspace turns it off.')),
+    h('div', { class: 'field' }, h('label', {}, 'Open store pages in'), storeSeg()),
     h('div', { class: 'section-label' }, 'Alerts'),
     h('div', { class: 'field' }, toggleRow('Friend alerts', 'A pop up when a friend starts playing a game you own', prefs.get('friendAlerts', true), (v) => prefs.set('friendAlerts', v))),
     h('div', { class: 'field' }, toggleRow('Deal alerts', 'A pop up when a wishlist game drops in price or Epic has new free games', state.dealAlerts, (v) => { state.dealAlerts = v; })),

@@ -404,19 +404,23 @@ async function remoteInfo() {
 // Deals page data, cached for 6 hours. Price drops pop a Windows notification.
 async function deals(force) {
   if (!force && dealsCache && Date.now() - dealsCache.at < services.SIX_HOURS) return dealsCache;
-  const [wish, free] = await Promise.all([
+  const [wish, epic, other] = await Promise.all([
     services.wishlist(store, await getSteamId()).catch((e) => ({ error: e.message })),
     services.epicFree().catch(() => []),
+    services.otherFree().catch(() => []),
   ]);
+  const free = [...epic, ...other];
   dealsCache = { wish, free, at: Date.now() };
   store.changed();
   const s = store.data.settings;
   if (s.dealAlerts !== false && Notification.isSupported()) {
     for (const d of (wish.drops || []).slice(0, 3)) new Notification({ title: `Price drop: ${d.name}`, body: `$${d.from.toFixed(2)} → $${d.to.toFixed(2)}${d.discount ? ` (${d.discount}% off)` : ''}` }).show();
     const seen = new Set(store.data.seenFree || []);
-    const fresh = free.filter((f) => f.now && !seen.has(f.title));
-    if (fresh.length && store.data.seenFree) new Notification({ title: 'Free on Epic this week', body: fresh.map((f) => f.title).join(', ') }).show();
-    store.data.seenFree = free.filter((f) => f.now).map((f) => f.title);
+    const fkey = (f) => `${f.store}:${f.title}`;
+    const fresh = free.filter((f) => f.now && !seen.has(fkey(f)) && !seen.has(f.title));
+    const NAMES = { epic: 'Epic', steam: 'Steam', gog: 'GOG', ubisoft: 'Ubisoft' };
+    if (fresh.length && store.data.seenFree) new Notification({ title: 'Free games to keep', body: fresh.slice(0, 5).map((f) => `${f.title} (${NAMES[f.store] || f.store})`).join(', ') }).show();
+    store.data.seenFree = free.filter((f) => f.now).map(fkey);
   }
   return dealsCache;
 }

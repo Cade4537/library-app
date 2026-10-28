@@ -1137,3 +1137,19 @@ body.resume-on #content { padding-bottom: 110px; }
 .act-row > .help, .act-row > .row { flex: 1; }
 .wish-ph { width: 100%; aspect-ratio: 460 / 215; display: grid; place-items: center; padding: 14px; text-align: center; font-weight: 800; font-size: 17px; line-height: 1.2; color: rgba(255, 255, 255, .9); background: radial-gradient(circle at 30% 20%, hsl(var(--h, 350) 55% 32%), hsl(var(--h, 350) 40% 10%)); }
 .wish-ph span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-shadow: 0 2px 10px rgba(0, 0, 0, .5); }
+.free-store { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; padding: 2px 7px; border-radius: 5px; background: rgba(255, 255, 255, .1); color: #fff; }
+.free-card.st-steam .free-store { background: #1b2838; color: #66c0f4; }
+.free-card.st-gog .free-store { background: #3b1a5a; color: #d7a6ff; }
+.free-card.st-ubisoft .free-store { background: #0f2a5c; color: #7fb2ff; }
+.free-card.st-epic .free-store { background: #2a2a2a; color: #f0f0f0; }
+.free-card .wish-ph { aspect-ratio: 16 / 8; }
+.news-modal .modal-body { max-height: 70vh; }
+.news-meta { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 14px; text-transform: uppercase; letter-spacing: .04em; }
+.news-meta b { color: var(--accent-hover); }
+.news-body { font-size: 14.5px; line-height: 1.6; color: #dcdce2; user-select: text; }
+.news-body h3 { font-size: 17px; margin: 20px 0 8px; color: var(--text); }
+.news-body p { margin: 0 0 10px; }
+.news-body ul { margin: 0 0 12px; padding-left: 22px; }
+.news-body li { margin: 3px 0; }
+.news-body img { display: block; max-width: 100%; border-radius: 10px; margin: 12px auto; }
+.news-vid { margin: 6px 0 12px; }

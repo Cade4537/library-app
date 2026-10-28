@@ -79,8 +79,8 @@ Owned games that are not installed show when the Installed / All owned switch ab
 
 - **Backlog:** set a status on any game (Backlog, Playing, Beaten, 100%, Dropped), give it stars and keep notes, all in its details. The Backlog page lists them with a filter per status, and cards show their status. "How long to beat?" opens HowLongToBeat for the game.
 - **Smart collections:** folders that fill themselves from rules: status, hours played, played or never played, played in the last X days, installed, size, launcher, folder and your rating. Add them under the categories in the sidebar; right click to edit or delete.
-- **Deals:** your Steam wishlist with current prices, sales and the lowest price seen, plus Epic's free games. Checked every 6 hours, with a pop up when a wishlist game drops in price or new free games appear. The wishlist needs your SteamID and a public wishlist.
-- **News:** Steam news for the games you played last shows on Home and in each Steam game's details.
+- **Deals:** your Steam wishlist with current prices, sales and the lowest price seen, plus free to keep games on Epic, Steam, GOG and Ubisoft. Store pages open in Steam, Epic or GOG Galaxy by default; Settings > App can switch that to the browser or ask each time. Checked every 6 hours, with a pop up when a wishlist game drops in price or new free games appear. The wishlist needs your SteamID and a public wishlist.
+- **News:** Steam news for the games you played last shows on Home and in each Steam game's details. Click a post to read it in Crimson Vault, then open the original in Steam or the browser.
 - **Friend alerts:** a pop up when a friend starts playing a game you own.
 
 ## Tray, startup and shortcut
