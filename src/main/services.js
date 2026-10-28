@@ -15,6 +15,17 @@ async function wishlistIds(steamId) {
   return ((j.response && j.response.items) || []).map((x) => ({ appid: x.appid, added: (x.date_added || 0) * 1000, priority: x.priority }));
 }
 
+// Newer Steam games keep their art in hashed folders, so the old /apps/<id>/header.jpg link is
+// missing for them. GetItems says where each picture really is; older links stay as a fallback.
+const ASSET_BASE = 'https://shared.akamai.steamstatic.com/store_item_assets/';
+function assetUrls(it) {
+  const a = it.assets || {};
+  const fmt = a.asset_url_format;
+  const out = [];
+  if (fmt) for (const f of [a.header, a.main_capsule, a.small_capsule]) if (f) out.push(ASSET_BASE + fmt.replace('${FILENAME}', f));
+  return out;
+}
+
 // Names, art and prices for up to 50 apps at once.
 async function storeItems(appids) {
   const out = new Map();
@@ -32,6 +43,7 @@ async function storeItems(appids) {
           discount: p.discount_pct || 0,
           free: !!it.is_free,
           comingSoon: !!(it.release && it.release.is_coming_soon),
+          imgs: assetUrls(it),
         });
       }
     } catch {}
@@ -57,7 +69,8 @@ async function wishlist(store, steamId) {
     return {
       appid: x.appid, name: i.name || `App ${x.appid}`, added: x.added, priority: x.priority,
       price: i.final, original: i.original, discount: i.discount || 0, free: i.free, comingSoon: i.comingSoon,
-      img: `https://cdn.cloudflare.steamstatic.com/steam/apps/${x.appid}/header.jpg`,
+      imgs: [...(i.imgs || []), `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${x.appid}/header.jpg`, `https://cdn.cloudflare.steamstatic.com/steam/apps/${x.appid}/header.jpg`],
+      img: (i.imgs && i.imgs[0]) || `https://cdn.cloudflare.steamstatic.com/steam/apps/${x.appid}/header.jpg`,
       url: `https://store.steampowered.com/app/${x.appid}/`,
       low: Number.isFinite(low) ? low : null,
     };

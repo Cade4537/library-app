@@ -289,10 +289,21 @@ async function renderDeals(force) {
       wish.length ? h('div', { class: 'seg' }, [['discount', 'Biggest sale'], ['price', 'Cheapest'], ['name', 'A to Z']].map(([k, n]) => h('button', { class: sort === k ? 'on' : '', onclick: () => { prefs.set('dealSort', k); renderDeals(); } }, n))) : null),
     d.wish && d.wish.error ? h('div', { class: 'note err' }, d.wish.error) : null,
     wish.length ? h('div', { class: 'wish-grid' }, sorted.map((w) => h('button', { class: 'wish' + (w.discount ? ' sale' : ''), onclick: () => api.openExternal(w.url) },
-      h('div', { class: 'wish-img' }, h('img', { src: w.img, alt: '', loading: 'lazy' }), w.discount ? h('span', { class: 'wish-off' }, `−${w.discount}%`) : null),
+      h('div', { class: 'wish-img' }, wishImg(w), w.discount ? h('span', { class: 'wish-off' }, `−${w.discount}%`) : null),
       h('div', { class: 'wish-info' }, h('div', { class: 'wish-name' }, w.name),
         h('div', { class: 'wish-price' }, w.comingSoon ? h('span', { class: 'help' }, 'Coming soon') : [w.discount ? h('s', {}, money(w.original)) : null, h('b', {}, money(w.price))],
           w.low != null && w.price != null && w.price <= w.low && w.discount ? h('span', { class: 'wish-low' }, 'Lowest seen') : null))))) : d.wish && !d.wish.error ? h('div', { class: 'loading' }, 'Your wishlist is empty.') : null);
+}
+
+// Wishlist art: tries each picture Steam lists, then falls back to a tile with the name.
+function wishImg(w) {
+  const list = [...new Set([...(w.imgs || []), w.img].filter(Boolean))];
+  const ph = h('div', { class: 'wish-ph', style: { '--h': String(hashHue ? hashHue(w.name) : 0) } }, h('span', {}, w.name));
+  if (!list.length) return ph;
+  let n = 0;
+  const img = h('img', { src: list[0], alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' });
+  img.addEventListener('error', () => { n++; if (n < list.length) img.src = list[n]; else img.replaceWith(ph); });
+  return img;
 }
 
 // ---------- friend alerts ----------
@@ -333,13 +344,16 @@ function moreSettingsSections(s, state) {
   const remoteToggle = toggleRow('Phone remote', 'Browse your library, start games, install and uninstall from your phone on the same Wi-Fi', !!s.remoteEnabled, async (v) => { drawRemote(await api.remoteSet(v)); });
   const drawRemote = (info) => {
     if (!info || !info.enabled) { fillEl(qr, h('div', { class: 'help' }, 'Turn on to pair your phone. Windows may ask to allow Crimson Vault on private networks: click Allow.')); return; }
-    if (!info.url) { fillEl(qr, h('div', { class: 'note err' }, info.error || 'No home network found.')); return; }
-    fillEl(qr, 
+    if (!info.url) { fillEl(qr, h('div', { class: 'note err', style: { margin: 0 } }, info.error || info.qrError || 'No home network found.')); return; }
+    const others = (info.ips || []).slice(1);
+    fillEl(qr,
       info.qr ? h('img', { src: info.qr, alt: 'QR code to pair your phone', class: 'qr-img' }) : null,
       h('div', { class: 'qr-side' },
-        h('div', { class: 'help' }, 'Scan with your phone\'s camera, then add the page to your home screen. Your phone must be on the same Wi-Fi.'),
-        h('code', { class: 'qr-url' }, info.url.replace(/\?t=.*/, '')),
-        info.error ? h('div', { class: 'note err' }, info.error) : null,
+        info.qrError ? h('div', { class: 'note err', style: { margin: 0 } }, info.qrError) : h('div', { class: 'help' }, 'Scan with your phone\'s camera, then add the page to your home screen. Your phone must be on the same Wi-Fi.'),
+        h('code', { class: 'qr-url' }, info.qr ? info.url.replace(/\?t=.*/, '') : info.url),
+        info.qr ? null : h('button', { class: 'btn', style: { justifySelf: 'start' }, onclick: () => { api.copyText(info.url); showToast('Pairing link copied'); } }, 'Copy pairing link'),
+        others.length ? h('div', { class: 'help' }, `Phone can't connect? This PC also has ${others.join(', ')}. Swap it into the link if that is your Wi-Fi.`) : null,
+        info.error ? h('div', { class: 'note err', style: { margin: 0 } }, info.error) : null,
         h('button', { class: 'link-btn', onclick: async () => { if (await confirmBox('Make a new pairing code?', 'Phones paired before will need to scan the new code.', 'New code')) drawRemote(await api.remoteNewToken()); } }, 'Unpair all phones (new code)')));
   };
   api.remoteInfo().then(drawRemote).catch(() => {});

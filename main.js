@@ -393,8 +393,12 @@ function remoteApi() {
 async function remoteInfo() {
   const i = remote.info();
   let qr = null;
-  if (i.url) { try { qr = await require('qrcode').toDataURL(i.url, { margin: 1, width: 240, color: { dark: '#0a0a0b', light: '#ffffff' } }); } catch {} }
-  return { ...i, qr, enabled: !!store.data.settings.remoteEnabled };
+  let qrError = null;
+  if (i.url) {
+    try { qr = await require('qrcode').toDataURL(i.url, { margin: 1, width: 240, color: { dark: '#0a0a0b', light: '#ffffff' } }); }
+    catch (e) { qrError = /Cannot find module/.test(e.message) ? 'The QR code part is missing. Close Crimson Vault, run npm install in the app folder, then start it again. You can still type the link below into your phone.' : 'Could not make the QR code. Type the link below into your phone instead.'; }
+  } else if (!i.error) qrError = 'No home network found. Connect this PC to your Wi-Fi or router and try again.';
+  return { ...i, qr, qrError, enabled: !!store.data.settings.remoteEnabled };
 }
 
 // Deals page data, cached for 6 hours. Price drops pop a Windows notification.

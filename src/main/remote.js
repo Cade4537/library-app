@@ -10,12 +10,24 @@ const crypto = require('crypto');
 
 const PORT = 47820;
 
+// Your PC's address on the home network. Virtual adapters (Hyper-V, WSL, VirtualBox, VMware,
+// VPNs) also have private addresses, but a phone can't reach them, so they go last.
+const VIRTUAL = /vethernet|virtual|vmware|vbox|hyper-v|wsl|loopback|tailscale|zerotier|hamachi|radmin|nordlynx|wireguard|tap|tun|docker|bluetooth/i;
 function lanAddresses() {
   const out = [];
-  for (const list of Object.values(os.networkInterfaces())) {
-    for (const a of list || []) if (a.family === 'IPv4' && !a.internal && isPrivate(a.address)) out.push(a.address);
+  for (const [name, list] of Object.entries(os.networkInterfaces())) {
+    for (const a of list || []) {
+      if (a.family !== 'IPv4' && a.family !== 4) continue;
+      if (a.internal || !isPrivate(a.address) || /^169\.254\./.test(a.address)) continue;
+      let score = 0;
+      if (VIRTUAL.test(name)) score -= 10;
+      if (/wi-?fi|wlan|wireless|ethernet/i.test(name)) score += 2;
+      if (/^192\.168\./.test(a.address)) score += 1;
+      if (/^192\.168\.56\./.test(a.address)) score -= 10; // VirtualBox host only
+      out.push({ ip: a.address, score });
+    }
   }
-  return out;
+  return out.sort((x, y) => y.score - x.score).map((x) => x.ip);
 }
 function isPrivate(ip) {
   const v = String(ip || '').replace(/^::ffff:/, '');
