@@ -31,6 +31,7 @@ function openGuide(tab) {
   if (tab) S.guideTab = tab;
   if (!S.guideTab) S.guideTab = 'home';
   const g = guideEl();
+  refreshGuideExtras();
   if (S.guideOpen) { renderGuide(); return; }
   S.guideOpen = true;
   if (g) { g.classList.add('gd-anim'); clearTimeout(openGuide.t); openGuide.t = setTimeout(() => g.classList.remove('gd-anim'), 700); }
@@ -77,6 +78,7 @@ function guideHome() {
   const online = (S.friends.people || []).filter((p) => p.status && p.status !== 'offline');
   const recent = S.lib.items.filter((it) => it.kind === 'game' && !it.hidden && !isGrouped(it) && it.lastPlayed && !it.running && (it.installed || it.manual)).sort((a, b) => b.lastPlayed - a.lastPlayed).slice(0, 5);
   return [
+    guideDownloads(),
     running ? h('div', { class: 'gd-game', style: '--d:0' }, h('div', { class: 'gd-art' }, artFor(running)),
       h('div', { class: 'gd-gtext' }, h('span', { class: 'gd-kicker' }, h('span', { class: 'live-dot' }), 'Playing now'), h('b', {}, displayName(running)),
         h('span', { class: 'gd-sub' }, fmtHours(groupMinutes(running)) || ''),
@@ -158,10 +160,12 @@ function renderGuide() {
   keepFocus(g, () => fillEl(g,
     h('div', { class: 'gd-head' },
       h('div', { class: 'gd-me' }, h('div', { class: 'gd-avatar' }, (me[0] || 'P').toUpperCase(), h('span', { class: 'f-badge st-online' })), h('div', { class: 'gd-metext' }, h('b', {}, me), h('span', {}, 'Online'))),
+      batteryBadge(),
       h('div', { class: 'gd-time' }, h('b', {}, clockText()), h('span', {}, new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })))),
     h('div', { class: 'gd-tabs' },
       h('b', { class: 'pb sh gd-lb' }, 'LB'),
       GUIDE_TABS.map(([k, label, ic]) => h('button', { class: 'gd-tab' + (tab === k ? ' on' : ''), 'data-k': `t:${k}`, title: label, onclick: () => { S.guideTab = k; renderGuide(); } }, icon(ic),
+        k === 'home' && QOL.downloads.length ? h('i', { class: 'gd-dot dl' }, String(QOL.downloads.length)) : null,
         k === 'friends' && online ? h('i', { class: 'gd-dot' }, String(online)) : null,
         k === 'music' && st.active && st.status === 'Playing' ? h('i', { class: 'gd-eq' }, h('span'), h('span'), h('span')) : null)),
       h('b', { class: 'pb sh gd-rb' }, 'RB')),
@@ -237,7 +241,7 @@ function renderLibraryHub() {
       const kids = childrenOf(c.id);
       const b = collTile(`cat:${c.id}`, c.name, `${counts.get(c.id) || 0}${kids.length ? ` · ${kids.length} folders` : ''}`, list, () => setView({ type: 'category', id: c.id }));
       b.addEventListener('contextmenu', (e) => { e.preventDefault(); categoryMenu(c.id, { x: e.clientX, y: e.clientY }); });
-      dropTarget(b, { item: (id) => { api.updateItem(id, { categoryId: c.id }); showToast(`Moved to ${c.name}`); } });
+      dropTarget(b, { item: (id) => undoable(id, { categoryId: c.id }, `Moved to ${c.name}`) });
       return b;
     };
     build = () => [

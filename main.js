@@ -7,6 +7,7 @@ const services = require('./src/main/services');
 const { runActions, withArgs } = require('./src/main/actions');
 const { RemoteServer } = require('./src/main/remote');
 const path = require('path');
+const fs = require('fs');
 const { pathToFileURL } = require('url');
 const { Store } = require('./src/main/store');
 const { scanAll } = require('./src/main/scanners');
@@ -26,6 +27,7 @@ const { getLaunchers, openLauncher } = require('./src/main/launchers');
 const { getDrives, SizeTracker, uninstall } = require('./src/main/storage');
 const { runPowerShell, psStats } = require('./src/main/util');
 const diag = require('./src/main/diag');
+const { Qol } = require('./src/main/qol');
 
 const { openRemotePlayWindow, openXboxAppAndConnect } = require('./src/main/remoteplay');
 const XBOX_APP_AUMID = 'Microsoft.GamingApp_8wekyb3d8bbwe!Microsoft.Xbox.App';
@@ -48,6 +50,7 @@ let epic = null;
 let sizes = null;
 let collections = [];
 let lastRegistry = {};
+let qol = null;
 let steamIdCache = null;
 let discordView = null;
 let streamView = null;
@@ -255,6 +258,7 @@ async function rescan(silent = false) {
     collections = store.data.settings.steamCollections === true ? cols : [];
     applyAutoCategories();
     steamInfo.refresh();
+    if (qol) qol.watch().catch(() => {});
     sizes.run();
     if (ubisoft && ubisoft.connected) ubisoft.refresh(false).then((r) => { if (r && !r.skipped) store.changed(); }).catch(() => {});
     lastOwnedStatus = { counts: ownedCounts, errors: ownedErrors, steamId: detectedSteamId || null, at: Date.now() };
@@ -441,12 +445,12 @@ async function deals(force) {
   store.changed();
   const s = store.data.settings;
   if (s.dealAlerts !== false && Notification.isSupported()) {
-    for (const d of (wish.drops || []).slice(0, 3)) new Notification({ title: `Price drop: ${d.name}`, body: `$${d.from.toFixed(2)} → $${d.to.toFixed(2)}${d.discount ? ` (${d.discount}% off)` : ''}` }).show();
+    for (const d of (wish.drops || []).slice(0, 3)) qol.notify({ hold: true, title: `Price drop: ${d.name}`, body: `$${d.from.toFixed(2)} → $${d.to.toFixed(2)}${d.discount ? ` (${d.discount}% off)` : ''}`, click: () => { showWindow(); sendTo('app:command', 'deals'); } });
     const seen = new Set(store.data.seenFree || []);
     const fkey = (f) => `${f.store}:${f.title}`;
     const fresh = free.filter((f) => f.now && !seen.has(fkey(f)) && !seen.has(f.title));
     const NAMES = { epic: 'Epic', steam: 'Steam', gog: 'GOG', ubisoft: 'Ubisoft' };
-    if (fresh.length && store.data.seenFree) new Notification({ title: 'Free games to keep', body: fresh.slice(0, 5).map((f) => `${f.title} (${NAMES[f.store] || f.store})`).join(', ') }).show();
+    if (fresh.length && store.data.seenFree) qol.notify({ hold: true, title: 'Free games to keep', body: fresh.slice(0, 5).map((f) => `${f.title} (${NAMES[f.store] || f.store})`).join(', '), click: () => { showWindow(); sendTo('app:command', 'deals'); } });
     store.data.seenFree = free.filter((f) => f.now).map(fkey);
   }
   return dealsCache;
@@ -732,6 +736,10 @@ function registerIpc() {
   });
   ipcMain.handle('friends:get', () => friends.state);
   ipcMain.handle('storage:drives', () => getDrives().catch(() => []));
+  ipcMain.handle('qol:downloads', () => (qol ? qol.downloads().catch(() => []) : []));
+  ipcMain.handle('qol:battery', () => (qol ? qol.battery().catch(() => null) : null));
+  ipcMain.handle('qol:screenshots', async (_e, id) => (qol ? (await qol.screenshots(item(id)).catch(() => [])).map((f) => ({ url: fileUrl(f.path), t: f.t, path: f.path })) : []));
+  ipcMain.handle('qol:showFile', (_e, p) => { if (typeof p === 'string' && /\.(png|jpe?g)$/i.test(p) && fs.existsSync(p)) shell.showItemInFolder(p); });
   ipcMain.handle('item:uninstall', async (_e, id) => {
     const it = item(id);
     if (!it) return { ok: false, error: 'Not found' };
@@ -798,7 +806,17 @@ if (!app.requestSingleInstanceLock()) {
     media = new MediaBridge((s) => sendTo('media:state', s));
     for (const c of BASIC_CATEGORIES) store.ensureCategoryPath(`Games/${c}`);
     steamInfo = new SteamInfo(store, () => { applyAutoCategories(); store.changed(); });
-    playtime = new PlaytimeTracker(store, () => { store.changed(); updatePresence(); checkAfterActions(); });
+    playtime = new PlaytimeTracker(store, () => { store.changed(); updatePresence(); checkAfterActions(); if (qol) qol.tick(); });
+    qol = new Qol({
+      store,
+      running: () => (playtime ? playtime.running : new Set()),
+      registry: () => lastRegistry,
+      rescan: () => rescan(true),
+      getDrives: () => getDrives(),
+      achievements: async (it, force) => getAchievements(store, it, await getSteamId(), xbox, epic, force),
+      sendTo: (ch, v) => sendTo(ch, v),
+      showWindow: () => showWindow(),
+    });
     sizes = new SizeTracker(store, () => store.changed());
     xbox = new XboxLive(store);
     epic = new EpicClient(store);
@@ -817,6 +835,7 @@ if (!app.requestSingleInstanceLock()) {
     setTimeout(() => deals(false).catch(() => {}), 60 * 1000);
     setInterval(() => deals(true).catch(() => {}), services.SIX_HOURS);
     playtime.start();
+    qol.start();
     streamView = new StreamView(() => win, (st) => sendTo('stream:state', st));
     win.on('resize', () => { if (streamView.full) streamView.layout(); });
     discordView = new DiscordView(() => win, (list) => new Promise((resolve) => {

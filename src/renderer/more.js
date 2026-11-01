@@ -38,7 +38,7 @@ const groupMinutes = (it) => (it.minutes || 0) + dupesOf(it).reduce((a, o) => a 
 
 // ---------- backlog ----------
 const STATUS_NAMES = { backlog: 'Backlog', playing: 'Playing', beaten: 'Beaten', completed: '100%', dropped: 'Dropped' };
-function setStatus(it, status) { api.updateItem(it.id, { status: status || null }); if (status) showToast(`${displayName(it)}: ${STATUS_NAMES[status]}`); }
+function setStatus(it, status) { undoable(it.id, { status: status || null }, status ? `${displayName(it)}: ${STATUS_NAMES[status]}` : `${displayName(it)}: no status`); }
 
 function backlogBox(it) {
   const seg = h('div', { class: 'seg det-status' });
@@ -81,7 +81,7 @@ function detailsExtras(it, getModal) {
       fillEl(news, h('h3', { class: 'section-title', style: { marginTop: '24px' } }, 'News'), h('div', { class: 'news-list' }, list.slice(0, 4).map(newsCard)));
     }).catch(() => {});
   }
-  return { via, more, backlog: it.kind === 'game' ? backlogBox(it) : null, news };
+  return { via, more, backlog: it.kind === 'game' ? backlogBox(it) : null, news: h('div', {}, it.kind === 'game' ? shotsSection(it) : null, news) };
 }
 
 // ---------- launch options ----------
@@ -389,6 +389,7 @@ function friendAlerts(st) {
       if (prevPlaying.has(k) && prevPlaying.get(k).what === v.what) continue;
       const mine = S.lib.items.find((it) => it.kind === 'game' && (it.installed || it.owned) && norm(displayName(it)).length > 2 && norm(v.what).startsWith(norm(displayName(it))));
       if (!mine) continue;
+      if (holdAlert(`${v.who} started ${displayName(mine)}`)) continue;
       showToast(`${v.who} started playing ${displayName(mine)}`);
       if (!document.hasFocus() && 'Notification' in window) { try { new Notification(`${v.who} is playing ${displayName(mine)}`, { body: 'You own this game. Jump in?', silent: false, icon: v.avatar || undefined }); } catch {} }
     }
@@ -448,6 +449,7 @@ function moreSettingsSections(s, state) {
     h('div', { class: 'field' }, toggleRow('News on Home', 'The latest Steam news from your 3 most played games', prefs.get('showNews', true), (v) => { prefs.set('showNews', v); newsKey = ''; })),
     h('div', { class: 'section-label' }, 'Phone remote'),
     h('div', { class: 'field' }, remoteToggle, qr),
+    ...qolSettings(s),
     ...healthSection(),
   ];
 }
@@ -490,7 +492,7 @@ function wireMore() {
   window.addEventListener('focus', idle);
   document.addEventListener('visibilitychange', idle);
   idle();
-  if (api.onCommand) api.onCommand((c) => { if (c === 'surprise') window.surprise && surprise(); if (c === 'tv') window.setTV && setTV(true); });
+  if (api.onCommand) api.onCommand((c) => { if (c === 'surprise') setView({ type: 'surprise' }); if (c === 'tv') setTV(true); if (c === 'storage') setView({ type: 'storage' }); if (c === 'deals') setView({ type: 'deals' }); });
   if ('Notification' in window && Notification.permission === 'default') { try { Notification.requestPermission(); } catch {} }
 }
 document.addEventListener('DOMContentLoaded', wireMore);

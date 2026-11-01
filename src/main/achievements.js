@@ -129,10 +129,10 @@ async function epicAchievements(epic, it) {
   return playerError ? { list, notice: playerError } : { list };
 }
 
-async function getAchievements(store, it, steamId, xbox, epic) {
+async function getAchievements(store, it, steamId, xbox, epic, force = false) {
   const k = it.id;
   const hit = cache.get(k);
-  if (hit && Date.now() - hit.t < TTL) return hit.v;
+  if (!force && hit && Date.now() - hit.t < TTL) return hit.v;
   let v;
   try {
     if (it.source === 'xbox' && it.meta && it.meta.xboxTitleId) v = await xboxAchievements(xbox, it.meta.xboxTitleId);

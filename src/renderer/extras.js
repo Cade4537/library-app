@@ -97,7 +97,9 @@ async function renderStats() {
     .sort((a, b) => (b.meta.achievements.have / b.meta.achievements.total) - (a.meta.achievements.have / a.meta.achievements.total)).slice(0, 6);
 
   const weekBox = h('div', { class: 'st-card' }, h('h3', { class: 'section-title' }, 'Last 14 days'), h('div', { class: 'loading' }, h('span', { class: 'spinner' }), 'Loading'));
+  const recapBox = h('div', { class: 'st-card st-recap' });
   box.replaceChildren(
+    recapBox,
     h('div', { class: 'st-tiles' },
       tile('Hours played', fmtHours(totalMin) || '0 hrs', `across ${games.filter((g) => g.minutes).length} games`),
       tile('Games', String(games.length), `${installed.length} installed`),
@@ -116,6 +118,7 @@ async function renderStats() {
 
   // Daily play time from the sessions Crimson Vault saw.
   const sessions = (await api.sessions().catch(() => [])) || [];
+  weeklyRecap(recapBox, sessions);
   const today = dayStart(Date.now());
   const days = Array.from({ length: 14 }, (_, i) => ({ t: today - (13 - i) * DAY, m: 0, games: new Map() }));
   for (const s of sessions) {
@@ -155,3 +158,31 @@ function wireExtras() {
   playIntro();
 }
 document.addEventListener('DOMContentLoaded', wireExtras);
+
+// This week vs last week, from the play sessions Crimson Vault saw.
+function weeklyRecap(box, sessions) {
+  const now = Date.now();
+  const inRange = (from, to) => sessions.filter((x) => x.e > from && x.s < to).map((x) => ({ ...x, m: (Math.min(x.e, to) - Math.max(x.s, from)) / 60000 }));
+  const week = inRange(now - 7 * DAY, now);
+  const prev = inRange(now - 14 * DAY, now - 7 * DAY);
+  const sum = (l) => l.reduce((a, x) => a + x.m, 0);
+  const mins = sum(week);
+  const before = sum(prev);
+  if (!week.length && !prev.length) { box.remove(); return; }
+  const byGame = new Map();
+  for (const x of week) byGame.set(x.id, (byGame.get(x.id) || 0) + x.m);
+  const topGames = [...byGame].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([id, m]) => [S.byId.get(id), m]).filter(([it]) => it);
+  const longest = week.reduce((a, x) => (x.m > (a ? a.m : 0) ? x : a), null);
+  const days = new Set(week.map((x) => dayStart(x.s))).size;
+  const diff = before ? Math.round(((mins - before) / before) * 100) : null;
+  box.replaceChildren(
+    h('div', { class: 'sec-head' }, h('h3', { class: 'section-title' }, 'Your week'), h('span', { class: 'help' }, 'Last 7 days')),
+    h('div', { class: 'recap' },
+      h('div', { class: 'recap-big' }, h('b', {}, fmtHours(mins) || '0 min'), h('span', {}, diff == null ? 'played' : `played · ${diff >= 0 ? '+' : ''}${diff}% vs the week before`)),
+      h('div', { class: 'recap-facts' },
+        h('div', {}, h('b', {}, String(days)), h('span', {}, days === 1 ? 'day you played' : 'days you played')),
+        h('div', {}, h('b', {}, String(week.length)), h('span', {}, week.length === 1 ? 'session' : 'sessions')),
+        longest && S.byId.get(longest.id) ? h('div', {}, h('b', {}, fmtHours(longest.m)), h('span', {}, `longest, ${displayName(S.byId.get(longest.id))}`)) : null),
+      topGames.length ? h('div', { class: 'recap-top' }, topGames.map(([it, m], i) => h('button', { class: 'recap-game', onclick: () => openDetails(it.id) },
+        h('span', { class: 'recap-rank' }, String(i + 1)), h('div', { class: 'recap-art' }, artFor(it)), h('div', {}, h('b', {}, displayName(it)), h('span', {}, fmtHours(m)))))) : null));
+}

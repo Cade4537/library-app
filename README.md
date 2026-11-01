@@ -182,6 +182,24 @@ The player at the bottom of the sidebar reads what is playing from Windows media
 
 Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpers restart themselves every few hours, song artwork and achievement caches are capped, cards for removed games are dropped, and the music player only sends updates when something changes. The Discord tab and the Remote Play stream are the heavy parts; Close tab and End stream free them.
 
+## Quality of life
+
+- **Find anything (Ctrl+K):** type to launch a game, open a page or run an action (settings, controller mode, rescan, sleep, restart and more). Enter opens, Shift+Enter shows details.
+- **Undo:** hiding, moving, favorites, status and game or app changes show Undo on the pop up. Ctrl+Z works too.
+- **Pick several cards:** Ctrl+click or Shift+click cards, then Favorite, Move, Status or Hide them together. Esc clears.
+- **Back keeps your place:** going back returns to where you had scrolled.
+- **New installs show up by themselves:** Steam and Epic folders are watched, and a quiet rescan runs every 2 hours.
+- **Session summary:** when a game closes you see how long you played and any achievements you unlocked. Stats has a "Your week" recap.
+- **Do not disturb while playing:** friend and deal pop ups wait until you close the game, then show together.
+- **Downloads:** Steam downloads and updates (and unfinished Epic installs) show in the guide with progress.
+- **Controller battery** in the guide header for Xbox controllers.
+- **Play time reminders:** an optional nudge after 1 to 4 hours in one sitting.
+- **Auto controller mode:** picking up a controller switches to controller mode; moving the mouse switches back.
+- **Your screenshots:** Steam and Xbox Game Bar captures show in each game's details.
+- **Low space warning:** a pop up when a drive drops under the amount you choose.
+
+All of these can be changed in Settings > Quality of life.
+
 ## Speed
 
 Big libraries open fast: lists are sorted once and remembered, cards far down the page are drawn when you scroll near them, off screen cards are skipped by the browser, and library updates are drawn at most once per frame. With 1,700 items, switching pages went from about 85 ms to about 3 ms and opening Everything from about 220 ms to about 11 ms.

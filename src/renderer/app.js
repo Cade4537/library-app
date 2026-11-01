@@ -293,7 +293,7 @@ function setView(v, back) {
   S.source = 'all';
   prefs.set('view', v);
   const c = $('#content');
-  const draw = () => { render(); c.scrollTop = 0; };
+  const draw = () => { render(); c.style.scrollBehavior = 'auto'; c.scrollTop = v._scroll || 0; c.style.scrollBehavior = ''; };
   // A quick cross fade between pages (skipped in Reduce motion, and while in the background).
   if (document.startViewTransition && !document.body.classList.contains('calm') && document.hasFocus() && !S.modals.length) {
     if (!setView.vt) {
@@ -376,7 +376,7 @@ function cardSig(it) {
 function buildCard(id) {
   const card = h('button', { class: 'card', 'data-id': id, draggable: 'true' });
   // Clicking a card opens its details; the Play button on the card (and in details) launches it.
-  card.addEventListener('click', () => openDetails(id));
+  card.addEventListener('click', (e) => { if (selectClick(e, id)) return; openDetails(id); });
   card.addEventListener('contextmenu', (e) => { e.preventDefault(); itemMenu(id, { x: e.clientX, y: e.clientY }); });
   card.addEventListener('dragstart', (e) => {
     e.dataTransfer.setData('application/x-item', id);
@@ -552,8 +552,7 @@ function navButton(type, label, ic, count) {
   if (type === 'favorites' || type === 'hidden') {
     dropTarget(b, {
       item: (id) => {
-        api.updateItem(id, type === 'favorites' ? { favorite: true } : { hidden: true });
-        showToast(type === 'favorites' ? 'Added to favorites' : 'Hidden');
+        undoable(id, type === 'favorites' ? { favorite: true } : { hidden: true }, type === 'favorites' ? 'Added to favorites' : 'Hidden');
       },
     });
   }
@@ -624,7 +623,7 @@ function renderSidebar() {
       btn.addEventListener('dragstart', (e) => { e.dataTransfer.setData('application/x-cat', c.id); e.dataTransfer.effectAllowed = 'move'; });
       const row = h('div', { class: 'cat-row' }, twisty, btn);
       dropTarget(row, {
-        item: (id) => { api.updateItem(id, { categoryId: c.id }); showToast(`Moved to ${c.name}`); },
+        item: (id) => undoable(id, { categoryId: c.id }, `Moved to ${c.name}`),
         cat: (id, before) => {
           if (id === c.id) return;
           if (before) api.moveCategory(id, c.parentId, c.id);
@@ -726,7 +725,7 @@ function renderHeader() {
     const chips = subs.map((c) => {
       const n = baseItems({ type: 'category', id: c.id }).length;
       const chip = h('button', { class: 'chip', onclick: () => setView({ type: 'category', id: c.id }) }, c.name, h('span', { class: 'count' }, n));
-      dropTarget(chip, { item: (id) => { api.updateItem(id, { categoryId: c.id }); showToast(`Moved to ${c.name}`); } });
+      dropTarget(chip, { item: (id) => undoable(id, { categoryId: c.id }, `Moved to ${c.name}`) });
       return chip;
     });
     chips.push(h('button', { class: 'chip ghost', onclick: () => newCategory(S.view.id) }, icon('plus'), 'Subcategory'));
@@ -887,12 +886,12 @@ function itemMenu(id, pos) {
   openMenu([
     { label: notInstalled(it) ? 'Install' : it.kind === 'game' ? 'Play' : 'Open', run: () => launch(id) },
     { label: 'Details', run: () => openDetails(id) },
-    { label: it.favorite ? 'Remove from favorites' : 'Add to favorites', run: () => api.updateItem(id, { favorite: !it.favorite }) },
+    { label: it.favorite ? 'Remove from favorites' : 'Add to favorites', run: () => undoable(id, { favorite: !it.favorite }, it.favorite ? 'Removed from favorites' : 'Added to favorites') },
     '-',
     { label: 'Change cover', run: () => coverPicker(id) },
     { label: 'Rename', run: () => renameItem(id) },
-    { label: 'Move to category', run: () => pickCategory(it.categoryId).then((c) => { if (c !== undefined) api.updateItem(id, { categoryId: c }); }) },
-    { label: `Set as ${it.kind === 'game' ? 'app' : 'game'}`, run: () => api.updateItem(id, { kind: it.kind === 'game' ? 'app' : 'game' }) },
+    { label: 'Move to category', run: () => pickCategory(it.categoryId).then((c) => { if (c !== undefined) undoable(id, { categoryId: c }, c ? `Moved to ${(S.cats.get(c) || {}).name || 'category'}` : 'Moved out of its category'); }) },
+    { label: `Set as ${it.kind === 'game' ? 'app' : 'game'}`, run: () => undoable(id, { kind: it.kind === 'game' ? 'app' : 'game' }, `Now an ${it.kind === 'game' ? 'app' : 'game'}`.replace('an game', 'a game')) },
     { label: 'Open install folder', disabled: !it.installDir, run: () => api.openFolder(id) },
     it.installed && !it.manual && it.kind === 'game' ? { label: 'Uninstall', danger: true, run: () => uninstallGame(id) } : null,
     relatedOf(id).length ? { label: `Related apps (${relatedOf(id).length})`, run: () => relatedModal(id) } : null,
@@ -900,7 +899,7 @@ function itemMenu(id, pos) {
     isGrouped(it) ? { label: 'Make this the main app', run: () => { api.updateItem(id, { suiteMain: true }); showToast(`${displayName(it)} is now the main app`); } } : null,
     it.parentId && it.ungrouped && S.byId.has(it.parentId) ? { label: `Group under ${displayName(S.byId.get(it.parentId))}`, run: () => api.updateItem(id, { ungrouped: false }) } : null,
     '-',
-    { label: it.hidden ? 'Unhide' : 'Hide', run: () => api.updateItem(id, { hidden: !it.hidden }) },
+    { label: it.hidden ? 'Unhide' : 'Hide', run: () => undoable(id, { hidden: !it.hidden }, it.hidden ? `${displayName(it)} is back` : `${displayName(it)} hidden`) },
     it.manual ? { label: 'Remove from library', danger: true, run: () => confirmBox('Remove from library?', `${displayName(it)} will be removed. The program itself is not touched.`, 'Remove').then((ok) => ok && api.removeItem(id)) } : null,
   ].filter(Boolean), pos);
 }
@@ -1998,7 +1997,7 @@ window.padActions = {
     if (goBack()) setTimeout(() => spatial.focusDefault(), 40);
   },
   x: () => { if (!S.modals.length || (S.spin && document.querySelector('.spin'))) surprise(); },
-  y: () => { const id = focusedCardId(); if (id) { const it = S.byId.get(id); api.updateItem(id, { favorite: !it.favorite }); showToast(it.favorite ? 'Removed from favorites' : 'Added to favorites'); } },
+  y: () => { const id = focusedCardId(); if (id) { const it = S.byId.get(id); undoable(id, { favorite: !it.favorite }, it.favorite ? 'Removed from favorites' : 'Added to favorites'); } },
   lb: () => { if (S.modals.length) return; if (S.guideOpen) guideTab(-1); else cycleView(-1); },
   rb: () => { if (S.modals.length) return; if (S.guideOpen) guideTab(1); else cycleView(1); },
   menu: () => {
@@ -2015,6 +2014,7 @@ window.padActions = {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (closeTopLayer()) { e.preventDefault(); return; }
+    if (clearSelection()) { e.preventDefault(); return; }
     if (document.activeElement === $('#search') && S.search) { $('#search').value = ''; S.search = ''; render(); return; }
     const t = document.activeElement;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) { t.blur(); return; }

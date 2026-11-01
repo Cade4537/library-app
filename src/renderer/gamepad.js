@@ -95,6 +95,7 @@
   let announced = false;
 
   function setPadMode(on) {
+    if (document.body.classList.contains('pad') !== on) window.dispatchEvent(new CustomEvent('padmode', { detail: on }));
     document.body.classList.toggle('pad', on);
     const hints = document.getElementById('padHints');
     if (hints) hints.hidden = !on;

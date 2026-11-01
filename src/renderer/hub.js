@@ -281,9 +281,11 @@ function socialTabs() {
 
 // ---------- Back ----------
 const NAV_BACK = [];
+const viewKey = (v) => JSON.stringify({ ...v, _scroll: undefined });
 function pushHistory(from, to) {
-  if (!from || JSON.stringify(from) === JSON.stringify(to)) return;
-  NAV_BACK.push(from);
+  if (!from || viewKey(from) === viewKey(to)) return;
+  const c = document.getElementById('content');
+  NAV_BACK.push({ ...from, _scroll: c ? c.scrollTop : 0 });
   if (NAV_BACK.length > 30) NAV_BACK.shift();
 }
 function goBack() {
