@@ -1580,3 +1580,58 @@ body.selecting #resumeBar { display: none; }
 .recap-art { width: 40px; flex: none; } .recap-art .art { border-radius: 6px; }
 .recap-art .fallback .fname { display: none; }
 .gd-body > * { flex-shrink: 0; }
+
+/* ---------- 0.15.0: polish ---------- */
+/* Guide alerts */
+.gd-dot.al { background: var(--accent); color: #fff; }
+.gd-alert { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 11px; border: 0; background: none; color: var(--text); text-align: left; min-width: 0; }
+.gd-alert:hover, .gd-alert:focus { background: rgba(255,255,255,.07); }
+.gd-aic { width: 32px; height: 32px; flex: none; border-radius: 9px; display: grid; place-items: center; background: rgba(255,255,255,.06); }
+.gd-aic .ic { width: 16px; height: 16px; }
+.gd-alert.k-friend .gd-aic { color: #3ddc84; } .gd-alert.k-deal .gd-aic { color: #beee11; } .gd-alert.k-download .gd-aic { color: #4fa3ff; }
+.gd-alert.k-storage .gd-aic, .gd-alert.k-reminder .gd-aic { color: #ffd257; } .gd-alert.k-session .gd-aic { color: var(--accent-hover); }
+.gd-alert .hf-text { flex: 1; }
+.gd-alert .hf-text span { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.gd-atime { font-size: 11px; color: var(--faint); flex: none; align-self: flex-start; margin-top: 2px; }
+
+/* Details: play history and more like this */
+.hist-facts { display: flex; gap: 26px; flex-wrap: wrap; margin-bottom: 12px; }
+.hist-facts div { display: flex; flex-direction: column; }
+.hist-facts b { font-size: 17px; }
+.hist-facts span { font-size: 11.5px; color: var(--muted); }
+.hist-chart { display: flex; align-items: flex-end; gap: 3px; height: 70px; padding: 8px 10px; border-radius: 12px; background: var(--panel-2); }
+.hist-chart span { flex: 1; border-radius: 3px 3px 1px 1px; background: rgba(255,255,255,.07); min-height: 3px; }
+.hist-chart span.on { background: linear-gradient(180deg, var(--accent-hover), var(--accent)); }
+.hist-axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--faint); margin-top: 4px; }
+.more-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 12px; }
+.more-card { display: flex; flex-direction: column; gap: 6px; padding: 0; border: 0; background: none; color: var(--text); text-align: left; min-width: 0; }
+.more-card .art { border-radius: 9px; transition: transform .15s, box-shadow .15s; }
+.more-card:hover .art, .more-card:focus .art { transform: translateY(-3px); box-shadow: 0 0 0 2px var(--accent), 0 12px 26px rgba(0,0,0,.5); }
+.more-card span { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.more-card small { font-size: 11px; color: var(--muted); margin-top: -4px; }
+
+/* Friends: join the game a friend is playing */
+.friend { position: relative; }
+.f-join { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 9px; background: #3ddc84; color: #04210f; font-weight: 800; font-size: 12.5px; opacity: .9; transition: opacity .15s, transform .15s; }
+.f-join:hover { opacity: 1; transform: translateY(-50%) scale(1.05); }
+.f-join .ic { width: 14px; height: 14px; }
+
+/* Deals: tools and owned badge */
+.deal-tools { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.search-mini { position: relative; flex: 1; max-width: 320px; }
+.search-mini > .ic { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--faint); }
+.search-mini input { width: 100%; padding-left: 32px; height: 34px; }
+.wish { position: relative; }
+.wish-owned { position: absolute; left: 8px; top: 8px; z-index: 2; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 800; background: rgba(8,8,10,.82); color: #8ff0a4; border: 1px solid rgba(143,240,164,.35); }
+
+/* Home banner: up next */
+.hh-next { position: absolute; right: 22px; bottom: 22px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.hh-nlabel { font-size: 10.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: rgba(255,255,255,.65); }
+.hh-nrow { display: flex; gap: 8px; }
+.hh-ncard { width: 62px; padding: 0; border: 0; background: none; border-radius: 8px; transition: transform .15s; }
+.hh-ncard .art { border-radius: 8px; box-shadow: 0 8px 20px rgba(0,0,0,.55); }
+.hh-ncard .fallback .fname { display: none; }
+.hh-ncard:hover, .hh-ncard:focus { transform: translateY(-3px); }
+.hh-ncard:focus .art { outline: 2px solid #fff; outline-offset: 2px; }
+@media (max-width: 1250px) { .hh-next { display: none; } }
+.friend:has(.f-join) .f-body { padding-right: 86px; min-width: 0; }

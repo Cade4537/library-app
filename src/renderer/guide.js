@@ -26,7 +26,7 @@ function pageOf(type) {
 
 function guideEl() { return document.getElementById('guide'); }
 // Guide tabs, like the Xbox guide: Home, Friends, Music and Quick settings. LB / RB switch them.
-const GUIDE_TABS = [['home', 'Home', 'home'], ['friends', 'Friends', 'users'], ['music', 'Music', 'music'], ['quick', 'Quick settings', 'gear']];
+const GUIDE_TABS = [['home', 'Home', 'home'], ['friends', 'Friends', 'users'], ['alerts', 'Alerts', 'bell'], ['music', 'Music', 'music'], ['quick', 'Quick settings', 'gear']];
 function openGuide(tab) {
   if (tab) S.guideTab = tab;
   if (!S.guideTab) S.guideTab = 'home';
@@ -156,7 +156,8 @@ function renderGuide() {
   const online = (S.friends.people || []).filter((p) => p.status && p.status !== 'offline').length;
   const st = (typeof NP !== 'undefined' && NP.state) || {};
   const me = S.lib.settings.xboxGamertag || S.lib.settings.epicName || 'Player';
-  const body = tab === 'friends' ? guideFriends() : tab === 'music' ? guideMusic() : tab === 'quick' ? guideQuick() : guideHome();
+  const unread = tab === 'alerts' ? 0 : unreadAlerts();
+  const body = tab === 'friends' ? guideFriends() : tab === 'alerts' ? guideAlerts() : tab === 'music' ? guideMusic() : tab === 'quick' ? guideQuick() : guideHome();
   keepFocus(g, () => fillEl(g,
     h('div', { class: 'gd-head' },
       h('div', { class: 'gd-me' }, h('div', { class: 'gd-avatar' }, (me[0] || 'P').toUpperCase(), h('span', { class: 'f-badge st-online' })), h('div', { class: 'gd-metext' }, h('b', {}, me), h('span', {}, 'Online'))),
@@ -166,6 +167,7 @@ function renderGuide() {
       h('b', { class: 'pb sh gd-lb' }, 'LB'),
       GUIDE_TABS.map(([k, label, ic]) => h('button', { class: 'gd-tab' + (tab === k ? ' on' : ''), 'data-k': `t:${k}`, title: label, onclick: () => { S.guideTab = k; renderGuide(); } }, icon(ic),
         k === 'home' && QOL.downloads.length ? h('i', { class: 'gd-dot dl' }, String(QOL.downloads.length)) : null,
+        k === 'alerts' && unread ? h('i', { class: 'gd-dot al' }, String(Math.min(unread, 99))) : null,
         k === 'friends' && online ? h('i', { class: 'gd-dot' }, String(online)) : null,
         k === 'music' && st.active && st.status === 'Playing' ? h('i', { class: 'gd-eq' }, h('span'), h('span'), h('span')) : null)),
       h('b', { class: 'pb sh gd-rb' }, 'RB')),
@@ -297,7 +299,12 @@ function surpriseFromPage() {
     && (f.only !== 'backlog' || it.status === 'backlog')
     && (f.only !== 'favorites' || it.favorite)
     && (f.only !== 'short' || (it.meta && it.meta.sizeBytes && it.meta.sizeBytes < 8e9)));
-  return { pool, from: 'your picks' };
+  // Skip the last few picks so the same game does not keep coming up (when there are enough others).
+  const recent = new Set(prefs.get('spinHistory', []).slice(0, 5).map((x) => x.id));
+  let out = pool.length > recent.size + 3 && prefs.get('spinFresh', true) ? pool.filter((it) => !recent.has(it.id)) : pool;
+  // Backlog and never played games get a second ticket.
+  if (prefs.get('spinNudge', true)) out = [...out, ...out.filter((it) => it.status === 'backlog' || !(groupMinutes(it) > 0 || it.lastPlayed))];
+  return { pool: out, from: 'your picks' };
 }
 function onSurpriseLanded(it) {
   const list = prefs.get('spinHistory', []).filter((x) => x.id !== it.id);
@@ -327,7 +334,7 @@ function renderSurprisePage() {
       h('div', { class: 'sp-text' },
         h('div', { class: 'hero-kicker' }, 'Surprise me'),
         h('div', { class: 'sp-title' }, 'Can\'t decide? Spin for it.'),
-        h('div', { class: 'hero-sub' }, pool.length ? `Picks from ${pool.length} ${pool.length === 1 ? 'game' : 'games'}` : 'No games match these choices'),
+        h('div', { class: 'hero-sub' }, pool.length ? `Picks from ${new Set(pool).size} ${new Set(pool).size === 1 ? 'game' : 'games'}` : 'No games match these choices'),
         h('button', { class: 'btn primary big sp-go', 'data-k': 'sp:go', disabled: !pool.length, onclick: () => surprise() }, icon('dice'), 'Spin'))),
     h('section', { class: 'hub-sec sp-opts' },
       h('div', { class: 'sp-row' }, h('label', {}, 'Pick from'), h('div', { class: 'chip-row' },
@@ -337,6 +344,9 @@ function renderSurprisePage() {
         [['', 'Anything'], ['unplayed', 'Never played'], ['backlog', 'Backlog'], ['favorites', 'Favorites'], ['short', 'Small games (under 8 GB)']].map(([k, n]) => chip(`sp:o:${k}`, n, (f.only || '') === k, () => setF({ only: k }))))),
       folders.length ? h('div', { class: 'sp-row' }, h('label', {}, 'Genre'), h('div', { class: 'chip-row' },
         chip('sp:g:', 'Any', !f.folder, () => setF({ folder: '' })), folders.map((c) => chip(`sp:g:${c.id}`, c.name, f.folder === c.id, () => setF({ folder: c.id }))))) : null,
+      h('div', { class: 'sp-row' }, h('label', {}, 'Mix'), h('div', { class: 'chip-row' },
+        chip('sp:fresh', 'Skip recent picks', prefs.get('spinFresh', true), () => { prefs.set('spinFresh', !prefs.get('spinFresh', true)); box.dataset.sig = ''; renderSurprisePage(); }),
+        chip('sp:nudge', 'Favor backlog and unplayed', prefs.get('spinNudge', true), () => { prefs.set('spinNudge', !prefs.get('spinNudge', true)); box.dataset.sig = ''; renderSurprisePage(); }))),
       h('div', { class: 'sp-row' }, h('label', {}, 'Launcher'), h('div', { class: 'chip-row' },
         chip('sp:s:', 'Any', !f.source, () => setF({ source: '' })), sources.map((src) => chip(`sp:s:${src}`, SOURCES[src] || src, f.source === src, () => setF({ source: src })))))),
     hist.length ? h('section', { class: 'hub-sec' }, h('div', { class: 'sec-head' }, h('h3', { class: 'section-title' }, 'Past picks'),

@@ -99,7 +99,7 @@ function renderHub() {
     box.dataset.sig = sig;
     keepFocus(box, () => fillEl(box,
       h('div', { class: 'hub-head' },
-        h('div', {}, h('div', { class: 'hub-greet' }, greet()), h('div', { class: 'hub-date' }, dateText())),
+        h('div', {}, h('div', { class: 'hub-greet' }, `${greet()}${S.lib.settings.xboxGamertag ? `, ${S.lib.settings.xboxGamertag}` : ''}`), h('div', { class: 'hub-date' }, dateText())),
         h('div', { class: 'hub-clock', id: 'hubClock' }, clockText())),
       h('div', { class: 'hub-main' }, hubHero(last), hubSide(online, playing)),
       h('div', { class: 'hub-tiles' },
@@ -158,7 +158,15 @@ function hubHero(it) {
       h('div', { class: 'hero-sub' }, [mins ? `${fmtHours(mins)} played` : null, it.lastPlayed && !it.running ? `Last played ${timeAgo(it.lastPlayed).toLowerCase()}` : null, it.status && STATUS_NAMES[it.status] ? STATUS_NAMES[it.status] : null].filter(Boolean).join(' · ')),
       ach ? h('div', { class: 'hero-ach', title: `${ach.have} of ${ach.total} achievements` }, h('span', { style: { width: `${Math.round((ach.have / ach.total) * 100)}%` } })) : null,
       h('div', { class: 'hero-actions' }, play,
-        h('button', { class: 'btn glass big', 'data-k': 'hero:details', onclick: () => openDetails(it.id) }, icon('more'), 'Details'))));
+        h('button', { class: 'btn glass big', 'data-k': 'hero:details', onclick: () => openDetails(it.id) }, icon('more'), 'Details'))),
+    heroNext(it));
+}
+// The next few games you played, small in the corner of the banner.
+function heroNext(it) {
+  const next = S.lib.items.filter((x) => x.id !== it.id && x.kind === 'game' && !x.hidden && !isGrouped(x) && !isDupe(x) && x.lastPlayed && (x.installed || x.manual)).sort((a, b) => b.lastPlayed - a.lastPlayed).slice(0, 3);
+  if (!next.length) return null;
+  return h('div', { class: 'hh-next' }, h('span', { class: 'hh-nlabel' }, 'Up next'),
+    h('div', { class: 'hh-nrow' }, next.map((x) => h('button', { class: 'hh-ncard', 'data-k': `next:${x.id}`, title: `${displayName(x)} · ${timeAgo(x.lastPlayed)}`, onclick: () => openDetails(x.id) }, artFor(x)))));
 }
 
 function hubSide(online, playing) {

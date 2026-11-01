@@ -78,6 +78,7 @@ contextBridge.exposeInMainWorld('library', {
   padBattery: call('qol:battery'),
   screenshots: call('qol:screenshots'),
   showFile: call('qol:showFile'),
+  onAlert: (cb) => ipcRenderer.on('qol:alert', (_e, a) => cb(a)),
   onCommand: (cb) => ipcRenderer.on('app:command', (_e, c) => cb(c)),
   ubisoftSignIn: call('auth:ubisoftSignIn'),
   ubisoftSignOut: call('auth:ubisoftSignOut'),

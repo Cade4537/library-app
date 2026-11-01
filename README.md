@@ -182,6 +182,17 @@ The player at the bottom of the sidebar reads what is playing from Windows media
 
 Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpers restart themselves every few hours, song artwork and achievement caches are capped, cards for removed games are dropped, and the music player only sends updates when something changes. The Discord tab and the Remote Play stream are the heavy parts; Close tab and End stream free them.
 
+## What's new in 0.15
+
+- **Guide Alerts tab:** friend activity, session summaries, price drops, finished downloads and storage warnings are kept so you can read the ones you missed. A red badge counts new ones.
+- **Ready to play:** a pop up when a Steam download finishes.
+- **Game details:** your play history (sessions, average and longest session, last time, first seen, and a 30 day chart) and "More like this" from the same genre in your library.
+- **Friends:** a Join button on a friend who is playing a game you own launches it (or installs it).
+- **Deals:** search your wishlist, filter by On sale, $10 or less or Don't own, and see "Owned on …" when you already have a wishlist game on another launcher.
+- **Surprise me:** skips your last 5 picks and gives backlog and never played games a better chance (both can be turned off on the page).
+- **Home:** greets you by gamertag and shows your next 3 recent games in the corner of the banner.
+- **Stats:** hours by genre and this month's most played.
+
 ## Quality of life
 
 - **Find anything (Ctrl+K):** type to launch a game, open a page or run an action (settings, controller mode, rescan, sleep, restart and more). Enter opens, Shift+Enter shows details.

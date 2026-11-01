@@ -20,6 +20,7 @@ class Qol {
     this.d = deps;
     this.sessions = new Map(); // id -> { start, ach, reminded }
     this.queue = []; // notifications held back while you play
+    this.dlPrev = new Map(); // downloads seen last time, to tell when one finishes
     this.lowWarned = new Set();
     this.watchers = [];
     this.batt = { t: 0, v: null };
@@ -30,7 +31,9 @@ class Qol {
 
   // ---------- notifications ----------
   // Shows a Windows notification. With "hold" set, it waits while a game is running (do not disturb).
-  notify({ title, body, hold, click }) {
+  notify({ title, body, hold, click, kind }) {
+    // Every alert also goes to the guide's Alerts tab, so a missed pop up can be read later.
+    if (kind !== 'summary-batch') this.d.sendTo('qol:alert', { title, body, at: Date.now(), kind: kind || 'info' });
     if (hold && this.s.dndWhilePlaying !== false && this.gameRunning()) { this.queue.push({ title, body }); return; }
     if (!Notification.isSupported()) return;
     try {
@@ -43,7 +46,7 @@ class Qol {
     if (!this.queue.length || this.gameRunning()) return;
     const q = this.queue.splice(0);
     if (q.length === 1) this.notify(q[0]);
-    else this.notify({ title: `While you played: ${q.length} updates`, body: q.slice(0, 4).map((n) => n.title).join(' · '), click: () => this.d.showWindow() });
+    else this.notify({ kind: 'summary-batch', title: `While you played: ${q.length} updates`, body: q.slice(0, 4).map((n) => n.title).join(' · '), click: () => this.d.showWindow() });
   }
 
   // ---------- sessions: summary and reminders (called on every play time check) ----------
@@ -61,7 +64,7 @@ class Qol {
         const hours = Math.floor((t - ses.start) / (every * HOUR));
         if (hours > ses.reminded) {
           ses.reminded = hours;
-          this.notify({ title: `${hours * every} ${hours * every === 1 ? 'hour' : 'hours'} of ${it.customName || it.name}`, body: 'A good moment for a break, some water and a stretch.' });
+          this.notify({ kind: 'reminder', title: `${hours * every} ${hours * every === 1 ? 'hour' : 'hours'} of ${it.customName || it.name}`, body: 'A good moment for a break, some water and a stretch.' });
         }
       }
     }
@@ -89,7 +92,7 @@ class Qol {
     } catch {}
     const total = it.minutes || 0;
     const body = `You played ${fmtMins(mins)}${achText}. ${total ? `${Math.round(total / 60)} h in total.` : ''}`.trim();
-    this.notify({ title: `Session over: ${name}`, body, click: () => this.d.showWindow() });
+    this.notify({ kind: 'session', title: `Session over: ${name}`, body, click: () => this.d.showWindow() });
     this.d.sendTo('toast', { text: `${name}: played ${fmtMins(mins)}${achText}` });
   }
 
@@ -103,7 +106,7 @@ class Qol {
       const freeGB = dv.free / 1e9;
       if (freeGB < limit && !this.lowWarned.has(dv.id)) {
         this.lowWarned.add(dv.id);
-        this.notify({ title: `${dv.id} is almost full`, body: `${freeGB.toFixed(1)} GB free. Click to see the biggest games.`, hold: true, click: () => { this.d.showWindow(); this.d.sendTo('app:command', 'storage'); } });
+        this.notify({ kind: 'storage', title: `${dv.id} is almost full`, body: `${freeGB.toFixed(1)} GB free. Click to see the biggest games.`, hold: true, click: () => { this.d.showWindow(); this.d.sendTo('app:command', 'storage'); } });
       } else if (freeGB > limit * 1.15) this.lowWarned.delete(dv.id);
     }
   }
@@ -233,8 +236,22 @@ $r -join ';'
     return this.batt.v;
   }
 
+  // A download that was running and is gone from the list has finished: say it is ready to play.
+  async checkDownloads() {
+    const list = await this.downloads().catch(() => null);
+    if (!list) return;
+    const now = new Map(list.map((d) => [d.id || d.name, d]));
+    for (const [k, d] of this.dlPrev) {
+      if (now.has(k) || d.paused || d.queued) continue;
+      this.notify({ title: `Ready to play: ${d.name}`, body: d.total ? `Finished downloading ${(d.total / 1e9).toFixed(1)} GB.` : 'Finished installing.', hold: true, kind: 'download', click: () => this.d.showWindow() });
+    }
+    this.dlPrev = now;
+  }
+
   start() {
     this.watch().catch(() => {});
+    setTimeout(() => this.checkDownloads(), 30000);
+    this.dlTimer = setInterval(() => this.checkDownloads(), 60000);
     setTimeout(() => this.checkSpace(), 90000);
     this.spaceTimer = setInterval(() => this.checkSpace(), 10 * 60 * 1000);
     // A quiet rescan now and then catches installs the folder watch cannot see (Xbox, GOG, Ubisoft).

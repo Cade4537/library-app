@@ -106,6 +106,12 @@ async function renderStats() {
       tile('Achievements', achTotal ? `${achHave.toLocaleString()}` : '0', achTotal ? `${Math.round((achHave / achTotal) * 100)}% of ${achTotal.toLocaleString()} in opened games` : 'Open a game\'s details to load them'),
       tile('Completed', String(perfect), perfect === 1 ? 'game with every achievement' : 'games with every achievement')),
     weekBox,
+    (() => {
+      const genres = genreRows();
+      return genres.length ? h('div', { class: 'st-grid' },
+        h('div', { class: 'st-card' }, h('h3', { class: 'section-title' }, 'Hours by genre'), bars(genres, fmtHours)),
+        h('div', { class: 'st-card st-month' }, h('h3', { class: 'section-title' }, 'This month'), h('div', { class: 'loading' }, h('span', { class: 'spinner' }), 'Loading'))) : null;
+    })(),
     h('div', { class: 'st-grid' },
       h('div', { class: 'st-card' }, h('h3', { class: 'section-title' }, 'Most played'), top.length ? bars(top, fmtHours) : h('div', { class: 'loading' }, 'Play something and it shows up here.')),
       h('div', { class: 'st-card' }, h('h3', { class: 'section-title' }, 'Hours by launcher'), srcRows.length ? bars(srcRows, fmtHours) : h('div', { class: 'loading' }, 'No hours yet.'))),
@@ -119,6 +125,14 @@ async function renderStats() {
   // Daily play time from the sessions Crimson Vault saw.
   const sessions = (await api.sessions().catch(() => [])) || [];
   weeklyRecap(recapBox, sessions);
+  const monthBox = box.querySelector('.st-month');
+  if (monthBox) {
+    const from = new Date(); from.setDate(1); from.setHours(0, 0, 0, 0);
+    const m = new Map();
+    for (const x of sessions) if (x.e > from.getTime()) m.set(x.id, (m.get(x.id) || 0) + (x.e - Math.max(x.s, from.getTime())) / 60000);
+    const rows = [...m].map(([id, v]) => ({ it: S.byId.get(id), v })).filter((r) => r.it).sort((a, b) => b.v - a.v).slice(0, 8).map((r) => ({ label: displayName(r.it), v: r.v, go: () => openDetails(r.it.id) }));
+    monthBox.replaceChildren(h('h3', { class: 'section-title' }, `This month · ${new Date().toLocaleDateString(undefined, { month: 'long' })}`), rows.length ? bars(rows, fmtHours) : h('div', { class: 'loading' }, 'Nothing played this month yet.'));
+  }
   const today = dayStart(Date.now());
   const days = Array.from({ length: 14 }, (_, i) => ({ t: today - (13 - i) * DAY, m: 0, games: new Map() }));
   for (const s of sessions) {

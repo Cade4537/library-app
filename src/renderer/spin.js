@@ -138,7 +138,7 @@ function spinOverlay(pool, from) {
   };
 
   const pickWinner = () => {
-    if (pool.length === 1) return pool[0];
+    if (new Set(pool).size === 1) return pool[0];
     let w;
     do { w = pool[Math.floor(Math.random() * pool.length)]; } while (w === last);
     return w;

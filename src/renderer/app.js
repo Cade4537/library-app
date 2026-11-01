@@ -1220,11 +1220,15 @@ function friendCard(p) {
     h('span', { class: `f-plat src-${a.platform}` }, PLAT[a.platform] || a.platform),
     h('span', { class: 'f-name' }, a.name),
     h('span', { class: 'f-act' }, a.activity || STATUS_LABEL[a.status])));
+  const playingAcc = p.status === 'ingame' ? p.accounts.find((a) => a.activity) : null;
+  const together = playingAcc ? gameFromActivity(playingAcc.activity) : null;
+  const joinBtn = together ? h('span', { class: 'f-join', role: 'button', title: notInstalled(together) ? `Install ${displayName(together)}` : `Play ${displayName(together)} too`, onclick: (e) => { e.stopPropagation(); launch(together.id); } }, icon(notInstalled(together) ? 'download' : 'play'), notInstalled(together) ? 'Install' : 'Join') : null;
   const card = h('button', { class: `friend st-${p.status}` },
     h('div', { class: 'f-avwrap' }, av, h('span', { class: `f-badge st-${p.status}` })),
     h('div', { class: 'f-body' },
       h('div', { class: 'f-title' }, p.name, p.accounts.length > 1 ? h('span', { class: 'f-linked', title: p.manual ? 'Linked by you' : 'Matched by name' }, icon('link')) : null),
-      acc));
+      acc),
+    joinBtn);
   const menu = (pos) => openMenu([
     ...p.accounts.map((a) => ({ label: `Open ${PLAT[a.platform] || a.platform} profile`, run: () => api.openExternal(a.profile) })),
     '-',

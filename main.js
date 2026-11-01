@@ -445,12 +445,12 @@ async function deals(force) {
   store.changed();
   const s = store.data.settings;
   if (s.dealAlerts !== false && Notification.isSupported()) {
-    for (const d of (wish.drops || []).slice(0, 3)) qol.notify({ hold: true, title: `Price drop: ${d.name}`, body: `$${d.from.toFixed(2)} → $${d.to.toFixed(2)}${d.discount ? ` (${d.discount}% off)` : ''}`, click: () => { showWindow(); sendTo('app:command', 'deals'); } });
+    for (const d of (wish.drops || []).slice(0, 3)) qol.notify({ hold: true, kind: 'deal', title: `Price drop: ${d.name}`, body: `$${d.from.toFixed(2)} → $${d.to.toFixed(2)}${d.discount ? ` (${d.discount}% off)` : ''}`, click: () => { showWindow(); sendTo('app:command', 'deals'); } });
     const seen = new Set(store.data.seenFree || []);
     const fkey = (f) => `${f.store}:${f.title}`;
     const fresh = free.filter((f) => f.now && !seen.has(fkey(f)) && !seen.has(f.title));
     const NAMES = { epic: 'Epic', steam: 'Steam', gog: 'GOG', ubisoft: 'Ubisoft' };
-    if (fresh.length && store.data.seenFree) qol.notify({ hold: true, title: 'Free games to keep', body: fresh.slice(0, 5).map((f) => `${f.title} (${NAMES[f.store] || f.store})`).join(', '), click: () => { showWindow(); sendTo('app:command', 'deals'); } });
+    if (fresh.length && store.data.seenFree) qol.notify({ hold: true, kind: 'deal', title: 'Free games to keep', body: fresh.slice(0, 5).map((f) => `${f.title} (${NAMES[f.store] || f.store})`).join(', '), click: () => { showWindow(); sendTo('app:command', 'deals'); } });
     store.data.seenFree = free.filter((f) => f.now).map(fkey);
   }
   return dealsCache;

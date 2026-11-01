@@ -81,7 +81,7 @@ function detailsExtras(it, getModal) {
       fillEl(news, h('h3', { class: 'section-title', style: { marginTop: '24px' } }, 'News'), h('div', { class: 'news-list' }, list.slice(0, 4).map(newsCard)));
     }).catch(() => {});
   }
-  return { via, more, backlog: it.kind === 'game' ? backlogBox(it) : null, news: h('div', {}, it.kind === 'game' ? shotsSection(it) : null, news) };
+  return { via, more, backlog: it.kind === 'game' ? backlogBox(it) : null, news: h('div', {}, it.kind === 'game' ? playHistory(it) : null, it.kind === 'game' ? shotsSection(it) : null, moreLikeThis(it), news) };
 }
 
 // ---------- launch options ----------
@@ -348,6 +348,13 @@ async function renderDeals(force) {
   const wish = (d.wish && d.wish.items) || [];
   const sort = prefs.get('dealSort', 'discount');
   const sorted = [...wish].sort((a, b) => sort === 'price' ? (a.price ?? 1e9) - (b.price ?? 1e9) : sort === 'name' ? a.name.localeCompare(b.name) : (b.discount - a.discount) || ((a.price ?? 1e9) - (b.price ?? 1e9)));
+  // You may already own a wishlist game on another launcher.
+  const ownedBy = new Map();
+  for (const it of S.lib.items) if (it.kind === 'game' && (it.installed || it.owned || it.manual)) ownedBy.set(norm(it.name), it);
+  const ownedOf = (w) => ownedBy.get(norm(w.name)) || null;
+  const filt = prefs.get('dealFilter', 'all');
+  const show = (w) => (filt !== 'sale' || w.discount > 0) && (filt !== 'cheap' || (w.price != null && w.price <= 10)) && (filt !== 'new' || !ownedOf(w))
+    && (!dealsQuery || norm(w.name).includes(norm(dealsQuery)));
   const onSale = wish.filter((w) => w.discount > 0).length;
   const money = (v) => (v == null ? '' : v === 0 ? 'Free' : `$${v.toFixed(2)}`);
   fillEl(box, 
@@ -360,7 +367,11 @@ async function renderDeals(force) {
       h('h3', { class: 'section-title' }, `Your Steam wishlist${wish.length ? ` · ${wish.length} games, ${onSale} on sale` : ''}`),
       wish.length ? h('div', { class: 'seg' }, [['discount', 'Biggest sale'], ['price', 'Cheapest'], ['name', 'A to Z']].map(([k, n]) => h('button', { class: sort === k ? 'on' : '', onclick: () => { prefs.set('dealSort', k); renderDeals(); } }, n))) : null),
     d.wish && d.wish.error ? h('div', { class: 'note err' }, d.wish.error) : null,
-    wish.length ? h('div', { class: 'wish-grid' }, sorted.map((w) => h('button', { class: 'wish' + (w.discount ? ' sale' : ''), onclick: () => openStore(w.url, 'steam', w.appid) },
+    wish.length ? h('div', { class: 'deal-tools' },
+      h('div', { class: 'search-mini' }, icon('search'), (() => { const inp = h('input', { class: 'text-input', placeholder: 'Find in wishlist', value: dealsQuery, spellcheck: 'false' }); inp.addEventListener('input', () => { dealsQuery = inp.value; applyDealFilter(); }); inp.addEventListener('keydown', (e) => e.stopPropagation()); return inp; })()),
+      h('div', { class: 'seg' }, [['all', 'All'], ['sale', 'On sale'], ['cheap', '$10 or less'], ['new', "Don't own"]].map(([k, n]) => h('button', { class: filt === k ? 'on' : '', onclick: () => { prefs.set('dealFilter', k); renderDeals(); } }, n)))) : null,
+    wish.length ? h('div', { class: 'wish-grid' }, sorted.map((w) => h('button', { class: 'wish' + (w.discount ? ' sale' : ''), hidden: !show(w), 'data-name': norm(w.name), 'data-ok': show(w) ? '1' : '', onclick: () => openStore(w.url, 'steam', w.appid) },
+      ownedOf(w) ? h('span', { class: 'wish-owned', title: 'Already in your library' }, `Owned on ${SOURCES[ownedOf(w).source] || ownedOf(w).source}`) : null,
       h('div', { class: 'wish-img' }, wishImg(w), w.discount ? h('span', { class: 'wish-off' }, `−${w.discount}%`) : null),
       h('div', { class: 'wish-info' }, h('div', { class: 'wish-name' }, w.name),
         h('div', { class: 'wish-price' }, w.comingSoon ? h('span', { class: 'help' }, 'Coming soon') : [w.discount ? h('s', {}, money(w.original)) : null, h('b', {}, money(w.price))],
@@ -379,6 +390,13 @@ function wishImg(w) {
   return img;
 }
 
+let dealsQuery = '';
+// Search narrows the wishlist in place, so typing never loses focus.
+function applyDealFilter() {
+  const q = norm(dealsQuery);
+  for (const el of document.querySelectorAll('#dealsView .wish')) el.hidden = !el.dataset.ok || (q && !el.dataset.name.includes(q));
+}
+
 // ---------- friend alerts ----------
 let prevPlaying = null;
 function friendAlerts(st) {
@@ -389,6 +407,7 @@ function friendAlerts(st) {
       if (prevPlaying.has(k) && prevPlaying.get(k).what === v.what) continue;
       const mine = S.lib.items.find((it) => it.kind === 'game' && (it.installed || it.owned) && norm(displayName(it)).length > 2 && norm(v.what).startsWith(norm(displayName(it))));
       if (!mine) continue;
+      pushAlert({ kind: 'friend', title: `${v.who} started ${displayName(mine)}`, body: 'You own this game', id: mine.id });
       if (holdAlert(`${v.who} started ${displayName(mine)}`)) continue;
       showToast(`${v.who} started playing ${displayName(mine)}`);
       if (!document.hasFocus() && 'Notification' in window) { try { new Notification(`${v.who} is playing ${displayName(mine)}`, { body: 'You own this game. Jump in?', silent: false, icon: v.avatar || undefined }); } catch {} }
