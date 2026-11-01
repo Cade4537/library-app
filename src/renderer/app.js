@@ -56,6 +56,9 @@ const SOURCES = {
 };
 const SOURCE_ORDER = Object.keys(SOURCES);
 
+// One shared collator: creating one per comparison made sorting big libraries slow.
+const COLLATE = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+
 // ---------- state ----------
 const S = {
   lib: { items: [], categories: [], settings: {} },
@@ -97,14 +100,15 @@ function indexLibrary(snap) {
     if (!S.kids.has(k)) S.kids.set(k, []);
     S.kids.get(k).push(c);
   }
-  for (const list of S.kids.values()) list.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+  for (const list of S.kids.values()) list.sort((a, b) => a.order - b.order || COLLATE.compare(a.name, b.name));
   S.related = new Map();
   for (const it of snap.items) {
     if (!isGrouped(it)) continue;
     if (!S.related.has(it.parentId)) S.related.set(it.parentId, []);
     S.related.get(it.parentId).push(it);
   }
-  for (const list of S.related.values()) list.sort((a, b) => displayName(a).localeCompare(displayName(b)));
+  for (const list of S.related.values()) list.sort((a, b) => COLLATE.compare(displayName(a), displayName(b)));
+  viewItems.memo = null;
   if (S.view.type === 'category' && !S.cats.has(S.view.id)) S.view = { type: 'home' };
   computeMerge();
   // Forget cards and store info for items that left the library, so they do not pile up.
@@ -212,20 +216,32 @@ function baseItems(view = S.view) {
   return list;
 }
 
+// The visible list for the current page. Remembered until the library, page, search or sort changes,
+// because the header and the grid both ask for it during one draw.
 function viewItems() {
+  const key = [S.view.type, S.view.id, S.view.source, S.source, S.search, S.sort, S.sortDir, S.libMode, S.statusFilter].join('|');
+  const m = viewItems.memo;
+  if (m && m.lib === S.lib && m.key === key && m.friends === S.friendGames) return m.list.slice();
+  const list = viewItemsUncached();
+  viewItems.memo = { lib: S.lib, key, friends: S.friendGames, list };
+  return list.slice();
+}
+function viewItemsUncached() {
   let list = baseItems();
   if (S.source !== 'all') list = list.filter((it) => it.source === S.source);
   if (S.search) {
     const words = norm(S.search).split(' ').filter(Boolean);
     list = list.filter((it) => { const n = norm(displayName(it)); return words.every((w) => n.includes(w)); });
   }
-  const byName = (a, b) => displayName(a).localeCompare(displayName(b), undefined, { sensitivity: 'base', numeric: true });
+  const names = new Map();
+  const nameOf = (it) => { let n = names.get(it); if (n === undefined) { n = displayName(it); names.set(it, n); } return n; };
+  const byName = (a, b) => COLLATE.compare(nameOf(a), nameOf(b));
   const sort = S.view.type === 'recent' ? 'played' : S.view.type === 'added' ? 'added' : S.sort;
   const flip = S.sortDir === 'reverse' ? -1 : 1;
   if (sort === 'played') list.sort((a, b) => flip * ((b.lastPlayed || 0) - (a.lastPlayed || 0)) || byName(a, b));
   else if (sort === 'added') list.sort((a, b) => flip * ((b.addedAt || 0) - (a.addedAt || 0)) || byName(a, b));
   else if (sort === 'most') list.sort((a, b) => flip * ((b.minutes || 0) - (a.minutes || 0) || (b.playCount || 0) - (a.playCount || 0)) || byName(a, b));
-  else if (sort === 'category') list.sort((a, b) => flip * catLabel(a).localeCompare(catLabel(b), undefined, { sensitivity: 'base' }) || byName(a, b));
+  else if (sort === 'category') { const labels = new Map(list.map((it) => [it, catLabel(it)])); list.sort((a, b) => flip * COLLATE.compare(labels.get(a), labels.get(b)) || byName(a, b)); }
   else list.sort((a, b) => flip * byName(a, b));
   return list;
 }
@@ -276,9 +292,22 @@ function setView(v, back) {
   S.view = v;
   S.source = 'all';
   prefs.set('view', v);
-  render();
-  $('#content').scrollTop = 0;
   const c = $('#content');
+  const draw = () => { render(); c.scrollTop = 0; };
+  // A quick cross fade between pages (skipped in Reduce motion, and while in the background).
+  if (document.startViewTransition && !document.body.classList.contains('calm') && document.hasFocus() && !S.modals.length) {
+    if (!setView.vt) {
+      try {
+        const t = document.startViewTransition(draw);
+        setView.vt = t;
+        const done = () => { if (setView.vt === t) setView.vt = null; };
+        t.ready.catch(() => {}); t.updateCallbackDone.catch(() => {});
+        t.finished.then(done, done);
+        return;
+      } catch { setView.vt = null; }
+    }
+  }
+  draw();
   c.classList.remove('enter'); void c.offsetWidth; c.classList.add('enter');
 }
 
@@ -288,7 +317,7 @@ function artFor(it) {
   if (it.coverUrl) {
     if (it.coverFit === 'contain') art.append(h('img', { class: 'bg', src: it.coverUrl, alt: '', draggable: 'false' }));
     art.classList.add('loading');
-    const img = h('img', { class: 'cover', src: it.coverUrl, alt: '', draggable: 'false', loading: 'lazy' });
+    const img = h('img', { class: 'cover', src: it.coverUrl, alt: '', draggable: 'false', loading: 'lazy', decoding: 'async' });
     const done = () => art.classList.remove('loading');
     img.addEventListener('load', done);
     img.addEventListener('error', done);
@@ -359,6 +388,9 @@ function buildCard(id) {
 }
 
 function fillCard(card, it) {
+  // Same item object and same friends list as last time: nothing can have changed.
+  if (card._it === it && card._fg === S.friendGames) return;
+  card._it = it; card._fg = S.friendGames;
   const sig = cardSig(it);
   if (card.dataset.sig === sig) return;
   card.dataset.sig = sig;
@@ -399,14 +431,39 @@ function fillCard(card, it) {
   card.title = displayName(it);
 }
 
-function cardFor(it) {
+// Cards past the first screenful are drawn when they scroll near view, so big libraries
+// open instantly. Until then they show a placeholder of the same size.
+const lazyCards = 'IntersectionObserver' in window ? new IntersectionObserver((entries) => {
+  for (const e of entries) {
+    if (!e.isIntersecting) continue;
+    const card = e.target;
+    lazyCards.unobserve(card);
+    card._lazy = false;
+    const it = S.byId.get(card.dataset.id);
+    if (it) fillCard(card, it);
+  }
+}, { root: document.getElementById('content'), rootMargin: '900px 0px' }) : null;
+function cardFor(it, index = 0) {
   let c = cardCache.get(it.id);
   if (!c) { c = buildCard(it.id); cardCache.set(it.id, c); }
+  if (lazyCards && index > 48 && !c.dataset.sig) {
+    if (!c._lazy) { c._lazy = true; c.replaceChildren(h('div', { class: 'art ph' }), h('div', { class: 'card-text' }, h('div', { class: 'title' }, displayName(it)))); lazyCards.observe(c); }
+    return c;
+  }
+  if (c._lazy) { c._lazy = false; lazyCards.unobserve(c); }
   fillCard(c, it);
   return c;
 }
 
 // ---------- rendering ----------
+// Library updates can arrive in bursts (scans, covers, play time). Draw once per frame at most.
+let renderQueued = false;
+function scheduleRender() {
+  if (renderQueued) return;
+  renderQueued = true;
+  requestAnimationFrame(() => { renderQueued = false; render(); });
+}
+
 function render() {
   renderNowPlaying();
   if (S.tv) renderTV();
@@ -514,6 +571,8 @@ function hideEmpty(c, counts) {
 }
 
 function renderSidebar() {
+  // The sidebar is replaced by the guide and stays hidden; nothing to draw.
+  if (!renderSidebar.force) return;
   const vis = S.lib.items.filter(visible);
   const nav = $('#nav');
   const social = navButton('friends', 'Social', 'users', (S.friends.people || []).filter((p) => p.status !== 'offline').length || null);
@@ -640,7 +699,8 @@ function renderHeader() {
       ])));
     }
   }
-  const total = S.view.type === 'friends' ? (S.friends.people || []).length : viewItems().length;
+  const noCount = ['discord', 'remoteplay', 'stats', 'arcade', 'deals', 'hub', 'library', 'libcollections', 'libcategories', 'liblaunchers', 'libmanage', 'surprise', 'launchers', 'storage'].includes(S.view.type);
+  const total = S.view.type === 'friends' ? (S.friends.people || []).length : noCount ? 0 : viewItems().length;
   kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : S.view.type === 'storage' ? (S.drives ? `${fmtBytes(S.drives.reduce((a, d) => a + d.free, 0))} free` : '') : ['discord', 'remoteplay', 'stats', 'arcade', 'deals', 'hub', 'library', 'libcollections', 'libcategories', 'liblaunchers', 'libmanage', 'surprise'].includes(S.view.type) ? '' : `${total} ${total === 1 ? 'item' : 'items'}`)));
   if (S.view.type === 'friends' || S.view.type === 'discord') kids.push(socialTabs());
   if (isLibraryView(S.view.type)) kids.unshift(libTabs());
@@ -790,7 +850,7 @@ function renderGrid() {
       const g = catLabel(it);
       if (g !== lastGroup) { want.push(groupHeader(g, list.filter((x) => catLabel(x) === g).length)); lastGroup = g; }
     }
-    want.push(cardFor(it));
+    want.push(cardFor(it, want.length));
   }
   const keep = new Set(want);
   for (const c of [...grid.children]) if (!keep.has(c)) c.remove();
@@ -1939,8 +1999,8 @@ window.padActions = {
   },
   x: () => { if (!S.modals.length || (S.spin && document.querySelector('.spin'))) surprise(); },
   y: () => { const id = focusedCardId(); if (id) { const it = S.byId.get(id); api.updateItem(id, { favorite: !it.favorite }); showToast(it.favorite ? 'Removed from favorites' : 'Added to favorites'); } },
-  lb: () => { if (S.modals.length) return; cycleView(-1); },
-  rb: () => { if (S.modals.length) return; cycleView(1); },
+  lb: () => { if (S.modals.length) return; if (S.guideOpen) guideTab(-1); else cycleView(-1); },
+  rb: () => { if (S.modals.length) return; if (S.guideOpen) guideTab(1); else cycleView(1); },
   menu: () => {
     const el = document.activeElement;
     if (el && el.classList && el.classList.contains('nav-action')) return remotePlayMenu({ el });
@@ -1982,6 +2042,9 @@ document.addEventListener('keydown', (e) => {
 // ---------- wiring ----------
 function wire() {
   hydrateIcons();
+  const content = $('#content');
+  let scrolled = false;
+  content.addEventListener('scroll', () => { const on = content.scrollTop > 8; if (on !== scrolled) { scrolled = on; document.body.classList.toggle('scrolled', on); } }, { passive: true });
   const search = $('#search');
   search.addEventListener('input', () => {
     S.search = search.value.trim();
@@ -2007,7 +2070,7 @@ function wire() {
   api.onFullscreen((v) => document.body.classList.toggle('fullscreen', v));
   api.onChange((snap) => {
     indexLibrary(snap);
-    render();
+    scheduleRender();
     if (snap.coverKeyError && !S.keyErrorShown) { S.keyErrorShown = true; showToast('SteamGridDB rejected your API key. Check it in Settings.', 'error'); }
   });
 }

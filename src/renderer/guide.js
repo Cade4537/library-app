@@ -1,7 +1,8 @@
 /* global api, S, $, h, icon, prefs, displayName, visible, isGrouped, isDupe, notInstalled, artFor, fmtHours, timeAgo, SOURCES,
    setView, launch, openDetails, openMenu, showToast, surprise, openSettings, spatial, setTV, fillEl, hashHue, render, syncDiscord,
    childrenOf, descendants, catPath, categoryMenu, newCategory, dropTarget, addManual, smartList, smartEditor, matchSmart,
-   groupMinutes, NP, sendMedia, openAppleMusic, powerMenu, keepFocus, tile, renderLibraryOverview, STATUS_NAMES, clockText */
+   groupMinutes, NP, sendMedia, openAppleMusic, powerMenu, keepFocus, tile, renderLibraryOverview, STATUS_NAMES, clockText,
+   confirmBox, ACCENTS, applyAccent */
 // 0.12.1: the guide (an Xbox style menu that slides over any page), the Library tabs,
 // and the Surprise me page.
 
@@ -24,13 +25,25 @@ function pageOf(type) {
 }
 
 function guideEl() { return document.getElementById('guide'); }
-function openGuide() {
-  if (S.guideOpen) return;
+// Guide tabs, like the Xbox guide: Home, Friends, Music and Quick settings. LB / RB switch them.
+const GUIDE_TABS = [['home', 'Home', 'home'], ['friends', 'Friends', 'users'], ['music', 'Music', 'music'], ['quick', 'Quick settings', 'gear']];
+function openGuide(tab) {
+  if (tab) S.guideTab = tab;
+  if (!S.guideTab) S.guideTab = 'home';
+  const g = guideEl();
+  if (S.guideOpen) { renderGuide(); return; }
   S.guideOpen = true;
+  if (g) { g.classList.add('gd-anim'); clearTimeout(openGuide.t); openGuide.t = setTimeout(() => g.classList.remove('gd-anim'), 700); }
   renderGuide();
   document.body.classList.add('guide-open');
   syncDiscord();
-  setTimeout(() => { const g = guideEl(); const f = g && (g.querySelector('.gd-page.active') || g.querySelector('button')); if (f) spatial.focusEl(f); }, 60);
+  setTimeout(() => focusGuide(), 60);
+}
+function focusGuide() {
+  const g = guideEl();
+  if (!g) return;
+  const f = g.querySelector('.gd-body .gd-page.active') || g.querySelector('.gd-body [data-first]') || g.querySelector('.gd-body button') || g.querySelector('.gd-tabs .on');
+  if (f) spatial.focusEl(f);
 }
 function closeGuide() {
   if (!S.guideOpen) return false;
@@ -41,46 +54,120 @@ function closeGuide() {
   return true;
 }
 function toggleGuide() { if (S.guideOpen) closeGuide(); else openGuide(); }
+function guideTab(delta) {
+  const i = GUIDE_TABS.findIndex(([k]) => k === S.guideTab);
+  const next = GUIDE_TABS[(i + delta + GUIDE_TABS.length) % GUIDE_TABS.length][0];
+  S.guideTab = next;
+  renderGuide();
+  setTimeout(focusGuide, 20);
+}
 // Runs an action from the guide: close it first so the page or dialog is in front.
 const fromGuide = (fn) => () => { closeGuide(); setTimeout(fn, 10); };
+
+function guideFriendRow(p, i) {
+  const act = (() => { const a = (p.accounts || []).find((x) => x.activity); return a ? a.activity : p.status === 'ingame' ? 'In a game' : p.status === 'away' ? 'Away' : p.status === 'offline' ? 'Offline' : 'Online'; })();
+  const av = p.avatar ? h('img', { class: 'f-av', src: p.avatar, alt: '', loading: 'lazy' }) : h('div', { class: 'f-av f-init' }, (p.name[0] || '?').toUpperCase());
+  return h('button', { class: `gd-friend st-${p.status}`, 'data-k': `fr:${p.name}`, style: `--d:${Math.min(i, 10)}`, onclick: fromGuide(() => setView({ type: 'friends' })) },
+    h('div', { class: 'f-avwrap' }, av, h('span', { class: `f-badge st-${p.status}` })), h('div', { class: 'hf-text' }, h('b', {}, p.name), h('span', {}, act)));
+}
+
+function guideHome() {
+  const running = S.lib.items.find((it) => it.running && it.kind === 'game');
+  const cur = pageOf(S.view.type);
+  const online = (S.friends.people || []).filter((p) => p.status && p.status !== 'offline');
+  const recent = S.lib.items.filter((it) => it.kind === 'game' && !it.hidden && !isGrouped(it) && it.lastPlayed && !it.running && (it.installed || it.manual)).sort((a, b) => b.lastPlayed - a.lastPlayed).slice(0, 5);
+  return [
+    running ? h('div', { class: 'gd-game', style: '--d:0' }, h('div', { class: 'gd-art' }, artFor(running)),
+      h('div', { class: 'gd-gtext' }, h('span', { class: 'gd-kicker' }, h('span', { class: 'live-dot' }), 'Playing now'), h('b', {}, displayName(running)),
+        h('span', { class: 'gd-sub' }, fmtHours(groupMinutes(running)) || ''),
+        h('button', { class: 'btn primary', 'data-k': 'g:back', 'data-first': '', onclick: fromGuide(async () => { const r = await api.focusGame(running.id); if (!r || !r.ok) launch(running.id); }) }, icon('play'), 'Back to game'))) : null,
+    recent.length ? h('div', { class: 'gd-sec', style: '--d:1' }, h('div', { class: 'gd-label' }, 'Recent'),
+      h('div', { class: 'gd-recent' }, recent.map((it) => h('button', { class: 'gd-rcard', 'data-k': `r:${it.id}`, title: `Play ${displayName(it)}`, onclick: fromGuide(() => launch(it.id)) }, artFor(it))))) : null,
+    h('nav', { class: 'gd-pages' }, MAIN_PAGES.map(([type, label, ic], i) => h('button', { class: 'gd-page' + (cur === type ? ' active' : ''), 'data-k': `p:${type}`, style: `--d:${i + 2}`, onclick: fromGuide(() => setView({ type })) },
+      icon(ic), h('span', {}, label),
+      type === 'friends' && online.length ? h('span', { class: 'count' }, `${online.length} online`) : null,
+      type === 'remoteplay' && S.stream.open ? h('span', { class: 'live-dot' }) : null))),
+  ];
+}
+
+function guideFriends() {
+  const people = S.friends.people || [];
+  const order = { ingame: 0, online: 1, busy: 1, away: 2, offline: 3 };
+  const on = people.filter((p) => p.status && p.status !== 'offline').sort((a, b) => (order[a.status] ?? 4) - (order[b.status] ?? 4) || a.name.localeCompare(b.name));
+  const off = people.length - on.length;
+  return [
+    h('div', { class: 'gd-label' }, on.length ? `${on.length} online` : 'Friends'),
+    on.length ? h('div', { class: 'gd-flist' }, on.map(guideFriendRow))
+      : h('div', { class: 'gd-empty' }, icon('users'), h('span', {}, S.friends.configured ? 'Nobody is online right now.' : 'Connect Steam, Xbox or Epic in Settings to see friends.')),
+    h('button', { class: 'gd-wide', 'data-k': 'f:all', onclick: fromGuide(() => setView({ type: 'friends' })) }, icon('users'), off ? `All friends · ${off} offline` : 'Open Social'),
+  ];
+}
+
+function guideMusic() {
+  const st = (typeof NP !== 'undefined' && NP.state) || {};
+  if (S.lib.settings.musicEnabled === false) return [h('div', { class: 'gd-empty' }, icon('music'), h('span', {}, 'The music player is off. Turn it on in Settings.'))];
+  if (!st.active) return [h('div', { class: 'gd-empty' }, icon('music'), h('span', {}, 'Nothing playing')), h('button', { class: 'gd-wide', 'data-k': 'm:open', 'data-first': '', onclick: () => openAppleMusic() }, icon('music'), 'Open Apple Music')];
+  const playing = st.status === 'Playing';
+  const pos = Math.min(st.dur || 0, NP.base + (playing ? (Date.now() - NP.at) / 1000 : 0));
+  return [
+    h('div', { class: 'gd-player' },
+      st.art ? h('div', { class: 'gd-pbg', style: `background-image:url("${String(st.art).replace(/"/g, '%22')}")` }) : null,
+      st.art ? h('img', { class: 'gd-part', src: st.art, alt: '' }) : h('div', { class: 'gd-part' }, icon('music')),
+      h('b', { class: 'gd-ptitle' }, st.title || 'Unknown track'),
+      h('span', { class: 'gd-partist' }, String(st.artist || '').replace(/\s+—\s+/, ' · ')),
+      h('div', { class: 'gd-pbar' }, h('span', { style: { width: `${st.dur ? Math.round((pos / st.dur) * 100) : 0}%` } })),
+      h('div', { class: 'gd-pctrl' },
+        h('button', { class: 'icon-btn', 'data-k': 'm:prev', title: 'Previous', onclick: () => { sendMedia('prev'); } }, icon('prev')),
+        h('button', { class: 'icon-btn main', 'data-k': 'm:toggle', 'data-first': '', title: playing ? 'Pause' : 'Play', onclick: () => { sendMedia('toggle'); setTimeout(renderGuide, 60); } }, icon(playing ? 'pause' : 'play')),
+        h('button', { class: 'icon-btn', 'data-k': 'm:next', title: 'Next', onclick: () => { sendMedia('next'); } }, icon('next')))),
+    st.isApple ? h('button', { class: 'gd-wide', 'data-k': 'm:open', onclick: () => openAppleMusic() }, icon('music'), 'Open Apple Music') : null,
+  ];
+}
+
+function guideQuick() {
+  const ask = (label, text, action) => async () => { if (await confirmBox(`${label}?`, text, label)) { closeGuide(); const r = await api.power(action); if (r && r.error) showToast(r.error, 'error'); } };
+  const toggle = (k, label, on, run) => h('button', { class: 'gd-toggle' + (on ? ' on' : ''), 'data-k': k, onclick: () => { run(!on); setTimeout(renderGuide, 30); } }, h('span', {}, label), h('span', { class: 'knob' }));
+  return [
+    h('div', { class: 'gd-qgrid' },
+      h('button', { 'data-k': 'q:search', 'data-first': '', onclick: fromGuide(() => { $('#search').focus(); $('#search').select(); }) }, icon('search'), 'Search'),
+      h('button', { 'data-k': 'q:tv', onclick: fromGuide(() => setTV(!S.tv)) }, icon('tv'), S.tv ? 'Exit controller' : 'Controller mode'),
+      h('button', { 'data-k': 'q:fs', onclick: () => api.toggleFullscreen() }, icon('expand'), 'Full screen'),
+      h('button', { 'data-k': 'q:settings', onclick: fromGuide(() => openSettings()) }, icon('gear'), 'All settings')),
+    toggle('q:alerts', 'Friend alerts', prefs.get('friendAlerts', true), (v) => prefs.set('friendAlerts', v)),
+    toggle('q:anim', 'Reduce motion', document.body.classList.contains('calm'), (v) => { prefs.set('calm', v); document.body.classList.toggle('calm', v); }),
+    h('div', { class: 'gd-label' }, 'Accent'),
+    h('div', { class: 'gd-accents' }, Object.entries(ACCENTS).map(([k, a]) => h('button', { class: 'gd-swatch' + (S.accent === k ? ' on' : ''), 'data-k': `a:${k}`, title: a.name, style: `--c:${a.c}`, onclick: () => { applyAccent(k); renderGuide(); } }))),
+    h('div', { class: 'gd-label' }, 'Power'),
+    h('div', { class: 'gd-qgrid' },
+      h('button', { 'data-k': 'pw:sleep', onclick: ask('Sleep', 'Your PC goes to sleep.', 'sleep') }, icon('clock'), 'Sleep'),
+      h('button', { 'data-k': 'pw:lock', onclick: () => { closeGuide(); api.power('lock'); } }, icon('eyeOff'), 'Lock'),
+      h('button', { 'data-k': 'pw:restart', onclick: ask('Restart', 'Your PC restarts in a few seconds. Save your game first.', 'restart') }, icon('refresh'), 'Restart'),
+      h('button', { class: 'danger', 'data-k': 'pw:off', onclick: ask('Shut down', 'Your PC shuts down in a few seconds. Save your game first.', 'shutdown') }, icon('power'), 'Shut down')),
+    h('button', { class: 'gd-wide', 'data-k': 'pw:quit', onclick: () => api.power('quit') }, icon('exit'), 'Quit Crimson Vault'),
+  ];
+}
 
 function renderGuide() {
   const g = guideEl();
   if (!g) return;
-  const running = S.lib.items.find((it) => it.running && it.kind === 'game');
-  const online = (S.friends.people || []).filter((p) => p.status && p.status !== 'offline');
-  const playing = online.filter((p) => p.status === 'ingame');
-  const people = [...playing, ...online.filter((p) => !playing.includes(p))].slice(0, 5);
+  const tab = S.guideTab || 'home';
+  const online = (S.friends.people || []).filter((p) => p.status && p.status !== 'offline').length;
   const st = (typeof NP !== 'undefined' && NP.state) || {};
-  const cur = pageOf(S.view.type);
-  const act = (p) => { const a = (p.accounts || []).find((x) => x.activity); return a ? a.activity : p.status === 'ingame' ? 'In a game' : 'Online'; };
-  const av = (p) => (p.avatar ? h('img', { class: 'f-av', src: p.avatar, alt: '' }) : h('div', { class: 'f-av f-init' }, (p.name[0] || '?').toUpperCase()));
-  const music = S.lib.settings.musicEnabled !== false && st.active;
-  fillEl(g,
-    h('div', { class: 'gd-head' }, h('span', { class: 'brand-mark' }), h('span', { class: 'gd-brand' }, 'Crimson Vault'), h('span', { class: 'gd-clock' }, clockText())),
-    running || music ? h('div', { class: 'gd-now' },
-      running ? h('div', { class: 'gd-game' }, h('div', { class: 'gd-art' }, artFor(running)),
-        h('div', { class: 'gd-gtext' }, h('span', { class: 'gd-kicker' }, h('span', { class: 'live-dot' }), 'Playing now'), h('b', {}, displayName(running)),
-          h('button', { class: 'btn primary', onclick: fromGuide(async () => { const r = await api.focusGame(running.id); if (!r || !r.ok) launch(running.id); }) }, icon('play'), 'Back to game'))) : null,
-      music ? h('div', { class: 'gd-music' }, st.art ? h('img', { src: st.art, alt: '' }) : h('span', { class: 'gd-mart' }, icon('music')),
-        h('div', { class: 'gd-mtext' }, h('b', {}, st.title || 'Unknown track'), h('span', {}, String(st.artist || '').split(' — ')[0])),
-        h('button', { class: 'icon-btn', title: 'Previous', onclick: () => sendMedia('prev') }, icon('prev')),
-        h('button', { class: 'icon-btn', title: 'Play or pause', onclick: () => { sendMedia('toggle'); setTimeout(renderGuide, 60); } }, icon(st.status === 'Playing' ? 'pause' : 'play')),
-        h('button', { class: 'icon-btn', title: 'Next', onclick: () => sendMedia('next') }, icon('next'))) : null) : null,
-    h('nav', { class: 'gd-pages' }, MAIN_PAGES.map(([type, label, ic]) => h('button', { class: 'gd-page' + (cur === type ? ' active' : ''), onclick: fromGuide(() => setView({ type })) },
-      icon(ic), h('span', {}, label),
-      type === 'friends' && online.length ? h('span', { class: 'count' }, `${online.length} online`) : null,
-      type === 'remoteplay' && S.stream.open ? h('span', { class: 'live-dot' }) : null))),
-    h('div', { class: 'gd-sec' }, h('div', { class: 'gd-label' }, 'Friends online'),
-      people.length ? people.map((p) => h('button', { class: `gd-friend st-${p.status}`, onclick: fromGuide(() => setView({ type: 'friends' })) },
-        h('div', { class: 'f-avwrap' }, av(p), h('span', { class: `f-badge st-${p.status}` })), h('div', { class: 'hf-text' }, h('b', {}, p.name), h('span', {}, act(p)))))
-        : h('div', { class: 'help', style: { padding: '2px 4px' } }, S.friends.configured ? 'Nobody is online right now.' : 'Connect Steam, Xbox or Epic in Settings.')),
-    h('div', { class: 'gd-quick' },
-      h('button', { onclick: fromGuide(() => { $('#search').focus(); $('#search').select(); }) }, icon('search'), 'Search'),
-      h('button', { onclick: fromGuide(() => openSettings()) }, icon('gear'), 'Settings'),
-      h('button', { onclick: fromGuide(() => setTV(!S.tv)) }, icon('tv'), S.tv ? 'Exit controller' : 'Controller mode'),
-      h('button', { class: 'power', onclick: (e) => powerMenu({ el: e.currentTarget }) }, icon('power'), 'Power')),
-    h('div', { class: 'gd-hint' }, h('b', { class: 'pb sh' }, 'View'), 'opens the guide', h('b', { class: 'pb b' }, 'B'), 'closes'));
+  const me = S.lib.settings.xboxGamertag || S.lib.settings.epicName || 'Player';
+  const body = tab === 'friends' ? guideFriends() : tab === 'music' ? guideMusic() : tab === 'quick' ? guideQuick() : guideHome();
+  keepFocus(g, () => fillEl(g,
+    h('div', { class: 'gd-head' },
+      h('div', { class: 'gd-me' }, h('div', { class: 'gd-avatar' }, (me[0] || 'P').toUpperCase(), h('span', { class: 'f-badge st-online' })), h('div', { class: 'gd-metext' }, h('b', {}, me), h('span', {}, 'Online'))),
+      h('div', { class: 'gd-time' }, h('b', {}, clockText()), h('span', {}, new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })))),
+    h('div', { class: 'gd-tabs' },
+      h('b', { class: 'pb sh gd-lb' }, 'LB'),
+      GUIDE_TABS.map(([k, label, ic]) => h('button', { class: 'gd-tab' + (tab === k ? ' on' : ''), 'data-k': `t:${k}`, title: label, onclick: () => { S.guideTab = k; renderGuide(); } }, icon(ic),
+        k === 'friends' && online ? h('i', { class: 'gd-dot' }, String(online)) : null,
+        k === 'music' && st.active && st.status === 'Playing' ? h('i', { class: 'gd-eq' }, h('span'), h('span'), h('span')) : null)),
+      h('b', { class: 'pb sh gd-rb' }, 'RB')),
+    h('div', { class: 'gd-tabname' }, (GUIDE_TABS.find(([k]) => k === tab) || [])[1]),
+    h('div', { class: `gd-body gdt-${tab}` }, body),
+    h('div', { class: 'gd-hint' }, h('b', { class: 'pb a' }, 'A'), 'select', h('b', { class: 'pb b' }, 'B'), 'close', h('b', { class: 'pb sh' }, 'LB'), h('b', { class: 'pb sh' }, 'RB'), 'tabs')));
 }
 
 // ---------- Library tabs ----------
@@ -253,3 +340,19 @@ function renderSurprisePage() {
       h('div', { class: 'sp-hist' }, hist.map(({ it, at }) => h('button', { class: 'lr-card', 'data-k': `sph:${it.id}`, onclick: () => openDetails(it.id) }, artFor(it),
         h('div', { class: 'lr-info' }, h('b', {}, displayName(it)), h('span', {}, timeAgo(at))))))) : null));
 }
+
+// Music progress in the guide moves while it is open; keyboard Q / E switch guide tabs.
+setInterval(() => {
+  if (!S.guideOpen || S.guideTab !== 'music' || typeof NP === 'undefined') return;
+  const st = NP.state || {};
+  const bar = document.querySelector('#guide .gd-pbar span');
+  if (!bar || !st.dur) return;
+  const pos = Math.min(st.dur, NP.base + (st.status === 'Playing' ? (Date.now() - NP.at) / 1000 : 0));
+  bar.style.width = `${(pos / st.dur) * 100}%`;
+}, 1000);
+document.addEventListener('keydown', (e) => {
+  if (!S.guideOpen || e.ctrlKey || e.altKey || e.metaKey) return;
+  if (e.key === 'q' || e.key === 'Q' || e.key === '[') { e.preventDefault(); guideTab(-1); }
+  else if (e.key === 'e' || e.key === 'E' || e.key === ']') { e.preventDefault(); guideTab(1); }
+});
+document.addEventListener('DOMContentLoaded', () => { if (prefs.get('calm', false)) document.body.classList.add('calm'); });

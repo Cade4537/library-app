@@ -78,7 +78,7 @@ function pickShareSource({ id, list }) {
 function tvRows() {
   const games = S.lib.items.filter((it) => visible(it) && it.kind === 'game');
   const apps = S.lib.items.filter((it) => visible(it) && it.kind !== 'game');
-  const byName = (a, b) => displayName(a).localeCompare(displayName(b), undefined, { numeric: true, sensitivity: 'base' });
+  const byName = (a, b) => COLLATE.compare(displayName(a), displayName(b));
   const rows = [];
   const recent = S.lib.items.filter((it) => visible(it) && it.lastPlayed).sort((a, b) => (b.running ? 1 : 0) - (a.running ? 1 : 0) || b.lastPlayed - a.lastPlayed).slice(0, 14);
   if (recent.length) rows.push(['Continue playing', recent]);

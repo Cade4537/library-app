@@ -49,7 +49,7 @@ Owned games that are not installed show when the Installed / All owned switch ab
 
 Home is a menu of big tiles that works with a mouse, keyboard or controller. Each tile opens its own page.
 
-- **Guide:** the menu button at the top left, G on the keyboard, or View on a controller slides out the guide over any page: the game you are playing with Back to game, Apple Music, every main page, friends online, and Search, Settings, Controller mode and Power. B or Esc closes it.
+- **Guide:** the menu button at the top left, G on the keyboard, or View on a controller slides out the guide over any page. It has four tabs (LB / RB, or Q / E on the keyboard): **Home** (the game you are playing with Back to game, your 5 recent games to launch, and every main page), **Friends** (everyone online and what they are playing), **Music** (Apple Music with big art, progress and controls) and **Quick settings** (Search, Controller mode, Full screen, friend alerts, Reduce motion, accent color, and Sleep, Lock, Restart, Shut down). B or Esc closes it.
 
 - **Jump back in:** your last game (or the one running) with Play or Back to game, hours and achievement progress.
 - **Friends and music:** who is online and what they are playing, plus Apple Music with play, pause and skip.
@@ -181,6 +181,10 @@ The player at the bottom of the sidebar reads what is playing from Windows media
 ## Memory
 
 Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpers restart themselves every few hours, song artwork and achievement caches are capped, cards for removed games are dropped, and the music player only sends updates when something changes. The Discord tab and the Remote Play stream are the heavy parts; Close tab and End stream free them.
+
+## Speed
+
+Big libraries open fast: lists are sorted once and remembered, cards far down the page are drawn when you scroll near them, off screen cards are skipped by the browser, and library updates are drawn at most once per frame. With 1,700 items, switching pages went from about 85 ms to about 3 ms and opening Everything from about 220 ms to about 11 ms.
 
 ## Health and safety
 
