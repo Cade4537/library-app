@@ -81,7 +81,7 @@ const keyList = (...rows) => h('div', { class: 'gs-keys' }, rows.map(([k, t]) =>
 const statBox = (pairs) => h('div', { class: 'gs-box' }, pairs.flatMap(([label, el]) => [h('div', { class: 'gs-l' }, label), el]));
 
 // A standard action game: canvas, loop, pause menu, held input.
-function actionGame({ title, W, H, side, keys, onButton, reset, update, draw, pausedSub }) {
+function actionGame({ title, W, H, side, keys, onButton, reset, update, draw, pausedSub, noCountdown, onPointer }) {
   let raf, last = performance.now(), paused = false, over = false;
   const held = heldInput();
   let unKeys = () => {};
@@ -93,9 +93,11 @@ function actionGame({ title, W, H, side, keys, onButton, reset, update, draw, pa
   const fx = makeFx();
   let readyAt = 0;
   const api = {
-    held, ctx, W, H, fx,
+    held, ctx, W, H, fx, canvas,
+    // Where a mouse click landed, in the game's own units.
+    point(e) { const r = canvas.getBoundingClientRect(); return { x: ((e.clientX - r.left) / r.width) * W, y: ((e.clientY - r.top) / r.height) * H }; },
     get ready() { return performance.now() >= readyAt; },
-    countdown(ms = 1800) { readyAt = performance.now() + ms; },
+    countdown(ms = 1800) { readyAt = performance.now() + (noCountdown ? 0 : ms); },
     get paused() { return paused; },
     pause(v) { if (over) return; paused = v; if (v) msg.show('Paused', pausedSub ? pausedSub() : null, [['Resume', 'play', () => api.pause(false), true], ['Restart', 'refresh', () => api.restart()], ['Quit', 'exit', () => shell.close()]]); else { msg.hide(); last = performance.now(); } },
     gameOver(title2, sub) { over = true; fx.shake(8); setTimeout(() => { if (over) msg.show(title2, sub, [['Play again', 'refresh', () => api.restart(), true], ['Quit', 'exit', () => shell.close()]]); }, 650); },
@@ -116,6 +118,10 @@ function actionGame({ title, W, H, side, keys, onButton, reset, update, draw, pa
   };
   window.arcadeInput = (k, rep) => { if (!['up', 'down', 'left', 'right'].includes(k)) press(k, rep); };
   unKeys = gameKeys(keys, press, () => (over ? shell.close() : api.pause(!paused)));
+  if (onPointer) {
+    canvas.addEventListener('pointerdown', (e) => { if (!paused && !over && api.ready) onPointer(api, e); });
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
   reset(api);
   api.countdown();
   const loop = (now) => {
@@ -776,6 +782,8 @@ function drawPreview2(c) {
     x.strokeStyle = 'rgba(255,255,255,.15)'; x.setLineDash([6, 8]); x.beginPath(); x.moveTo(180, 10); x.lineTo(180, 210); x.stroke(); x.setLineDash([]);
     x.fillStyle = acc; x.fillRect(30, 70, 9, 60); x.fillStyle = '#e8e8ee'; x.fillRect(321, 100, 9, 60);
     x.fillStyle = '#fff'; x.beginPath(); x.arc(230, 90, 7, 0, 7); x.fill();
+  } else if (typeof drawPreview3 === 'function' && GAMES3[g]) {
+    drawPreview3(c, x, acc);
   } else if (g === 'bj') {
     const card = (cx, cy, r, s, red, rot) => { x.save(); x.translate(cx, cy); x.rotate(rot); x.fillStyle = '#f4f4f6'; x.beginPath(); x.roundRect(-36, -50, 72, 100, 8); x.fill(); x.fillStyle = red ? acc : '#16161a'; x.font = '800 20px Segoe UI'; x.textAlign = 'left'; x.fillText(r, -28, -26); x.font = '36px Segoe UI'; x.textAlign = 'center'; x.fillText(s, 0, 16); x.restore(); };
     card(150, 112, 'A', '♠', false, -0.12); card(210, 108, 'K', '♥', true, 0.1);

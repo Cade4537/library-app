@@ -245,6 +245,7 @@ function qolSettings(s) {
     h('div', { class: 'section-label' }, 'Quality of life'),
     h('div', { class: 'field' }, toggleRow('Do not disturb while playing', 'Friend and deal pop ups wait until you close the game, then show together', s.dndWhilePlaying !== false, (v) => api.updateSettings({ dndWhilePlaying: v }))),
     h('div', { class: 'field' }, toggleRow('Session summary', 'When a game closes: how long you played and any new achievements', s.sessionSummary !== false, (v) => api.updateSettings({ sessionSummary: v }))),
+    h('div', { class: 'field' }, toggleRow('Track Xbox console play', 'Uses your Xbox presence to log what you play on a console or through remote play, how long, and the achievements you unlocked', s.consoleTracking !== false, (v) => api.updateSettings({ consoleTracking: v }))),
     pick('Play time reminder', 'A gentle pop up after this long in one sitting', 'playReminderHours', [[0, 'Off'], [1, '1 h'], [2, '2 h'], [3, '3 h'], [4, '4 h']], 0),
     pick('Low space warning', 'A pop up when a drive has less free space than this', 'lowSpaceGB', [[0, 'Off'], [10, '10 GB'], [30, '30 GB'], [50, '50 GB'], [100, '100 GB']], 30),
     h('div', { class: 'field' }, toggleRow('Auto controller mode', 'Pick up a controller to switch to controller mode; move the mouse to switch back', prefs.get('autoTv', true), (v) => prefs.set('autoTv', v))),

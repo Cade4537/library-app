@@ -1,7 +1,7 @@
 // Finds cover art and icons for items and keeps them in a local cache folder.
 // Order for games: launcher hint, local Steam cache, Steam CDN, SteamGridDB, Steam store search.
 const path = require('path');
-const { fsp, exists, listDir, hash, similarity } = require('./util');
+const { fsp, exists, listDir, hash, similarity, runPowerShell } = require('./util');
 
 const SGDB = 'https://www.steamgriddb.com/api/v2';
 const STEAM_ASSETS = [
@@ -80,7 +80,42 @@ class CoverService {
       }
       changed = true;
     }
+    // No art anywhere: take the big icon from the program, shortcut or Store app instead.
+    if (!it.cover && !it.iconXlTried && process.platform === 'win32' && (it.iconPath || (it.launch && it.launch.type === 'aumid' && it.launch.target))) this.queueXl(it);
     if (changed) this.store.changed();
+  }
+
+  // Windows hands out large icons (up to 256 px) for any file, shortcut or Store app.
+  // They are collected and read in one PowerShell run, to keep things light.
+  queueXl(it) {
+    this.xlQueue = this.xlQueue || new Map();
+    this.xlQueue.set(it.id, it);
+    clearTimeout(this.xlTimer);
+    this.xlTimer = setTimeout(() => this.runXl().catch(() => {}), 2500);
+  }
+  async runXl() {
+    if (this.xlBusy) { this.xlTimer = setTimeout(() => this.runXl().catch(() => {}), 3000); return; }
+    const batch = [...this.xlQueue.values()].slice(0, 40);
+    if (!batch.length) return;
+    this.xlBusy = true;
+    for (const it of batch) this.xlQueue.delete(it.id);
+    const jobs = batch.map((it) => ({ id: it.id, src: it.launch && it.launch.type === 'aumid' ? `shell:AppsFolder\\${it.launch.target}` : it.iconPath, out: path.join(this.iconDir, `${hash(it.id)}_xl.png`) }));
+    const list = jobs.map((j) => `@('${String(j.src).replace(/'/g, "''")}','${j.out.replace(/'/g, "''")}')`).join(',');
+    const out = await runPowerShell(`${XL_SCRIPT}
+$jobs = @(${list})
+foreach ($j in $jobs) { try { $c = [CvIcon]::Save($j[0], $j[1], 256); Write-Output "$($j[1])|$c" } catch { Write-Output "$($j[1])|" } }`, 90000);
+    if (out == null) { this.xlBusy = false; return; }
+    const res = new Map(String(out || '').split(/\r?\n/).filter((l) => l.includes('|')).map((l) => { const [f, c] = l.trim().split('|'); return [f, c]; }));
+    for (const j of jobs) {
+      const it = this.store.data.items[j.id];
+      if (!it) continue;
+      it.iconXlTried = true;
+      const color = res.get(j.out);
+      if (color && await exists(j.out)) { it.iconXl = j.out; it.iconColor = color; }
+    }
+    this.xlBusy = false;
+    this.store.changed();
+    if (this.xlQueue.size) this.runXl().catch(() => {});
   }
 
   // ---------- finding art ----------
@@ -326,5 +361,47 @@ class CoverService {
     }
   }
 }
+
+// C#: asks the Windows shell for a big icon, keeps its transparency, saves it as PNG,
+// and returns the icon's main color (for the card background).
+const XL_SCRIPT = String.raw`
+Add-Type -ReferencedAssemblies System.Drawing @'
+using System; using System.Runtime.InteropServices; using System.Drawing; using System.Drawing.Imaging;
+[ComImport, Guid("bcc18b79-ba16-442f-80c4-8a59c30c463b"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface ICvImageFactory { [PreserveSig] int GetImage(CvSize size, int flags, out IntPtr phbm); }
+[StructLayout(LayoutKind.Sequential)] public struct CvSize { public int cx; public int cy; }
+public static class CvIcon {
+  [DllImport("shell32.dll", CharSet = CharSet.Unicode, PreserveSig = false)]
+  static extern void SHCreateItemFromParsingName(string path, IntPtr pbc, [MarshalAs(UnmanagedType.LPStruct)] Guid riid, [MarshalAs(UnmanagedType.Interface)] out ICvImageFactory ppv);
+  [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr h);
+  public static string Save(string src, string dst, int px) {
+    ICvImageFactory f;
+    SHCreateItemFromParsingName(src, IntPtr.Zero, typeof(ICvImageFactory).GUID, out f);
+    IntPtr hb;
+    if (f.GetImage(new CvSize { cx = px, cy = px }, 4, out hb) != 0) return "";
+    try {
+      using (Bitmap raw = Image.FromHbitmap(hb)) {
+        BitmapData d = raw.LockBits(new Rectangle(0, 0, raw.Width, raw.Height), ImageLockMode.ReadOnly, raw.PixelFormat);
+        try {
+          using (Bitmap argb = new Bitmap(d.Width, d.Height, d.Stride, PixelFormat.Format32bppArgb, d.Scan0)) {
+            long r = 0, g = 0, b = 0, n = 0;
+            for (int y = 0; y < argb.Height; y += 4) for (int x = 0; x < argb.Width; x += 4) {
+              Color c = argb.GetPixel(x, y);
+              if (c.A < 200) continue;
+              int mx = Math.Max(c.R, Math.Max(c.G, c.B)), mn = Math.Min(c.R, Math.Min(c.G, c.B));
+              if (mx - mn < 30 || mx < 50) continue;
+              r += c.R; g += c.G; b += c.B; n++;
+            }
+            argb.Save(dst, ImageFormat.Png);
+            if (n == 0) return "#3a3a42";
+            return String.Format("#{0:x2}{1:x2}{2:x2}", r / n, g / n, b / n);
+          }
+        } finally { raw.UnlockBits(d); }
+      }
+    } finally { DeleteObject(hb); }
+  }
+}
+'@
+`;
 
 module.exports = { CoverService };

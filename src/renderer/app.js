@@ -263,6 +263,7 @@ function viewTitle(view = S.view) {
     case 'hub': return 'Home';
     case 'library': case 'libcollections': case 'libcategories': case 'liblaunchers': case 'libmanage': return 'Library';
     case 'surprise': return 'Surprise me';
+    case 'settings': return 'Settings';
     case 'home': return 'Everything';
     case 'games': return 'Games';
     case 'apps': return 'Apps';
@@ -323,14 +324,24 @@ function artFor(it) {
     img.addEventListener('error', done);
     if (img.complete) done();
     art.append(img);
+  } else if (it.iconXlUrl || it.iconUrl) {
+    // No cover anywhere: a made up cover from the program's own big icon and its colors.
+    art.classList.add('made');
+    const c = it.iconColor || `hsl(${hashHue(it.name) % 360} 50% 40%)`;
+    art.style.setProperty('--ic', c);
+    art.append(h('div', { class: 'made-glow' }),
+      h('img', { class: 'made-icon' + (it.iconXlUrl ? '' : ' small'), src: it.iconXlUrl || it.iconUrl, alt: '', draggable: 'false', decoding: 'async' }),
+      h('div', { class: 'made-name' }, displayName(it)),
+      h('div', { class: 'made-kind' }, it.kind === 'game' ? 'Game' : SOURCES[it.source] || 'App'));
   } else {
     const hue = hashHue(it.name);
-    art.style.background = `linear-gradient(155deg, hsl(${hue % 360} 58% 27%), hsl(${(hue + 12) % 360} 35% 8%))`;
-    const fb = h('div', { class: 'fallback' });
-    if (it.iconUrl) fb.append(h('img', { src: it.iconUrl, alt: '', draggable: 'false' }));
-    else fb.append(h('div', { class: 'initial' }, (displayName(it).match(/[A-Za-z0-9]/) || ['?'])[0].toUpperCase()));
-    fb.append(h('div', { class: 'fname' }, displayName(it)));
-    art.append(fb);
+    art.classList.add('made', 'plain');
+    art.style.setProperty('--ic', `hsl(${hue % 360} 55% 42%)`);
+    const words = displayName(it).replace(/[^A-Za-z0-9 ]/g, ' ').trim().split(/\s+/).filter(Boolean);
+    const initials = (words.length > 1 ? words[0][0] + words[1][0] : (words[0] || '?').slice(0, 2)).toUpperCase();
+    art.append(h('div', { class: 'made-glow' }), h('div', { class: 'made-initials' }, initials),
+      h('div', { class: 'made-name' }, displayName(it)),
+      h('div', { class: 'made-kind' }, it.kind === 'game' ? 'Game' : SOURCES[it.source] || 'App'));
   }
   return art;
 }
@@ -476,7 +487,11 @@ function render() {
   const hb = S.view.type === 'hub';
   const lb = ['library', 'libcollections', 'libcategories', 'liblaunchers', 'libmanage'].includes(S.view.type);
   const sp = S.view.type === 'surprise';
+  const st = S.view.type === 'settings';
   $('#surpriseView').hidden = !sp;
+  $('#settingsView').hidden = !st;
+  // Leaving Settings with changes saves them.
+  if (render.shownView === 'settings' && !st && S.settingsDirty && S.settingsSave) S.settingsSave(true);
   $('#statsView').hidden = !tv2;
   $('#arcadeView').hidden = !av;
   $('#dealsView').hidden = !dl;
@@ -484,7 +499,7 @@ function render() {
   $('#libraryView').hidden = !lb;
   $('#news').hidden = true;
   document.body.classList.toggle('hub-on', hb);
-  if (tv2 || av || dl || hb || lb || sp) {
+  if (tv2 || av || dl || hb || lb || sp || st) {
     for (const id of ['#friendsView', '#launchersView', '#storageView', '#grid', '#filters', '#jump', '#collections', '#news', '#empty', '#discordView', '#streamView']) $(id).hidden = true;
     document.body.classList.remove('discord-on');
     renderSidebar();
@@ -492,6 +507,7 @@ function render() {
     if (hb) renderHub();
     else if (lb) renderLibraryHub();
     else if (sp) renderSurprisePage();
+    else if (st) { if (render.shownView !== 'settings') buildSettingsPage(); }
     else if (dl) { if (render.shownView !== 'deals') renderDeals(); }
     else if (av) { if (render.shownView !== 'arcade') renderArcade(); }
     else if (render.shownView !== 'stats') renderStats();
@@ -700,7 +716,7 @@ function renderHeader() {
   }
   const noCount = ['discord', 'remoteplay', 'stats', 'arcade', 'deals', 'hub', 'library', 'libcollections', 'libcategories', 'liblaunchers', 'libmanage', 'surprise', 'launchers', 'storage'].includes(S.view.type);
   const total = S.view.type === 'friends' ? (S.friends.people || []).length : noCount ? 0 : viewItems().length;
-  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : S.view.type === 'storage' ? (S.drives ? `${fmtBytes(S.drives.reduce((a, d) => a + d.free, 0))} free` : '') : ['discord', 'remoteplay', 'stats', 'arcade', 'deals', 'hub', 'library', 'libcollections', 'libcategories', 'liblaunchers', 'libmanage', 'surprise'].includes(S.view.type) ? '' : `${total} ${total === 1 ? 'item' : 'items'}`)));
+  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : S.view.type === 'storage' ? (S.drives ? `${fmtBytes(S.drives.reduce((a, d) => a + d.free, 0))} free` : '') : ['discord', 'remoteplay', 'stats', 'arcade', 'deals', 'hub', 'library', 'libcollections', 'libcategories', 'liblaunchers', 'libmanage', 'surprise', 'settings'].includes(S.view.type) ? '' : `${total} ${total === 1 ? 'item' : 'items'}`)));
   if (S.view.type === 'friends' || S.view.type === 'discord') kids.push(socialTabs());
   if (isLibraryView(S.view.type)) kids.unshift(libTabs());
   if (S.view.type === 'discord') {
@@ -714,6 +730,7 @@ function renderHeader() {
   if (S.view.type === 'smart' && !S.search && smartById(S.view.id)) kids.push(h('div', { class: 'discord-bar' }, h('span', { class: 'help', style: { flex: 1 } }, 'Fills itself from rules. New games that match show up here on their own.'), h('button', { class: 'btn', onclick: () => smartEditor(smartById(S.view.id)) }, icon('gear'), 'Edit rules')));
   if (S.view.type === 'remoteplay') {
     kids.push(h('div', { class: 'discord-bar' },
+      S.console && S.console.current ? h('button', { class: 'cv-pill', onclick: openConsoleHistory, title: 'Your Xbox play history' }, h('span', { class: 'live-dot' }), `On Xbox: ${S.console.current.name}`, h('span', { class: 'count' }, consoleTime(consoleMins(S.console.current)))) : S.console && S.console.enabled ? h('button', { class: 'btn', onclick: openConsoleHistory }, icon('clock'), 'Xbox play history') : null,
       h('span', { class: 'help', style: { flex: 1 } }, S.stream.open ? 'Streaming from your Xbox. Use your controller in the stream; it keeps going while you look at other pages.' : 'Play your Xbox console on this PC, right here next to the sidebar.'),
       S.stream.open ? h('button', { class: 'btn', onclick: () => api.streamFull(true) }, icon('expand'), 'Full screen') : null,
       h('button', { class: 'btn', onclick: (e) => remotePlayMenu({ el: e.currentTarget }) }, icon('more'), 'Other ways'),
@@ -1184,52 +1201,12 @@ function openShots(shots, start) {
 const PLAT = { steam: 'Steam', xbox: 'Xbox', epic: 'Epic' };
 const STATUS_LABEL = { ingame: 'In game', online: 'Online', busy: 'Busy', away: 'Away', offline: 'Offline' };
 
-function renderFriends() {
-  const box = $('#friendsView');
-  const f = S.friends;
-  const kids = [];
-  const refresh = h('button', { class: 'chip', onclick: async () => { refresh.disabled = true; setFriends(await api.refreshFriends()); } }, icon('refresh'), 'Refresh');
-  kids.push(h('div', { class: 'friends-bar' }, refresh, f.updated ? h('span', { class: 'count' }, `Updated ${timeAgo(f.updated).toLowerCase()}`) : null));
-  if (f.errors && f.errors.length) kids.push(h('div', { class: 'note err' }, f.errors.join(' ')));
-  if (!f.configured) {
-    kids.push(h('div', { class: 'friends-empty' },
-      h('h3', {}, 'Connect Steam, Xbox or Epic to see friends'),
-      h('p', {}, 'Add a Steam Web API key or an OpenXBL key in Settings. Friends with the same name on both are matched automatically.'),
-      h('div', { class: 'row', style: { justifyContent: 'center' } },
-        h('button', { class: 'btn primary', onclick: openSettings }, 'Open Settings'),
-        h('button', { class: 'btn', onclick: () => openConnectionsHelp('xbox') }, 'How to connect'))));
-    box.replaceChildren(...kids);
-    return;
-  }
-  const q = norm(S.search);
-  const people = (f.people || []).filter((p) => !q || p.accounts.some((a) => norm(a.name).includes(q)));
-  const groups = [['ingame', 'Playing'], ['online', 'Online'], ['away', 'Away'], ['offline', 'Offline']];
-  for (const [st, label] of groups) {
-    const list = people.filter((p) => (st === 'online' ? p.status === 'online' || p.status === 'busy' : p.status === st));
-    if (!list.length) continue;
-    kids.push(h('h3', { class: 'section-title' }, `${label} (${list.length})`), h('div', { class: 'friends-grid' }, list.map(friendCard)));
-  }
-  if (!people.length) kids.push(h('div', { class: 'friends-empty' }, h('h3', {}, S.search ? 'No friends match that search' : 'No friends found')));
-  box.replaceChildren(...kids);
-}
+function renderFriends() { renderFriendsPage(); }
 
-function friendCard(p) {
-  const av = p.avatar ? h('img', { class: 'f-av', src: p.avatar, alt: '' }) : h('div', { class: 'f-av f-init' }, (p.name[0] || '?').toUpperCase());
-  const acc = p.accounts.map((a) => h('div', { class: 'f-acc' },
-    h('span', { class: `f-dot st-${a.status}` }),
-    h('span', { class: `f-plat src-${a.platform}` }, PLAT[a.platform] || a.platform),
-    h('span', { class: 'f-name' }, a.name),
-    h('span', { class: 'f-act' }, a.activity || STATUS_LABEL[a.status])));
-  const playingAcc = p.status === 'ingame' ? p.accounts.find((a) => a.activity) : null;
-  const together = playingAcc ? gameFromActivity(playingAcc.activity) : null;
-  const joinBtn = together ? h('span', { class: 'f-join', role: 'button', title: notInstalled(together) ? `Install ${displayName(together)}` : `Play ${displayName(together)} too`, onclick: (e) => { e.stopPropagation(); launch(together.id); } }, icon(notInstalled(together) ? 'download' : 'play'), notInstalled(together) ? 'Install' : 'Join') : null;
-  const card = h('button', { class: `friend st-${p.status}` },
-    h('div', { class: 'f-avwrap' }, av, h('span', { class: `f-badge st-${p.status}` })),
-    h('div', { class: 'f-body' },
-      h('div', { class: 'f-title' }, p.name, p.accounts.length > 1 ? h('span', { class: 'f-linked', title: p.manual ? 'Linked by you' : 'Matched by name' }, icon('link')) : null),
-      acc),
-    joinBtn);
-  const menu = (pos) => openMenu([
+// The menu for a friend: profiles, linking accounts, removing.
+function friendMenu(p, pos) {
+  openMenu([
+    { label: 'View profile', run: () => openFriendProfile(p) },
     ...p.accounts.map((a) => ({ label: `Open ${PLAT[a.platform] || a.platform} profile`, run: () => api.openExternal(a.profile) })),
     '-',
     { label: 'Link with another friend', run: () => pickFriendToLink(p) },
@@ -1237,10 +1214,8 @@ function friendCard(p) {
     '-',
     ...p.accounts.map((a) => ({ label: a.platform === 'steam' ? 'Remove on Steam (opens profile)' : `Remove ${a.name} from ${PLAT[a.platform] || a.platform} friends`, danger: true, run: () => removeFriend(a) })),
   ].filter(Boolean), pos);
-  card.addEventListener('click', () => menu({ el: card }));
-  card.addEventListener('contextmenu', (e) => { e.preventDefault(); menu({ x: e.clientX, y: e.clientY }); });
-  return card;
 }
+function friendCard(p) { return friendCardV2(p); }
 
 async function removeFriend(a) {
   const plat = PLAT[a.platform] || a.platform;
@@ -1274,6 +1249,7 @@ function pickFriendToLink(p) {
 function setFriends(st) {
   S.friends = st || S.friends;
   try { friendAlerts(S.friends); } catch {}
+  try { trackFriendHistory(S.friends); } catch {}
   const before = [...S.friendGames.keys()].join('|');
   indexFriendGames();
   if (S.view.type === 'friends') { renderHeader(); renderFriends(); }
@@ -1513,7 +1489,9 @@ function connBlock(title, connected, statusText, helpId, ...kids) {
     kids);
 }
 
-function openSettings() {
+// Settings is a page now. openSettings() goes there; buildSettingsPage() draws it.
+function openSettings() { if (S.view.type !== 'settings') setView({ type: 'settings' }); }
+function buildSettingsPage() {
   const s = { ...S.lib.settings };
   const os = S.lib.ownedStatus || {};
   const counts = os.counts || {};
@@ -1649,9 +1627,8 @@ function openSettings() {
   fillAbout();
   S.refreshAbout = () => { if (document.contains(about)) fillAbout(); };
 
-  openModal({
+  showSettingsPage({
     title: 'Settings',
-    cls: 'settings-modal',
     body: h('div', {},
       about,
       h('div', { class: 'section-label' }, 'Connections'),

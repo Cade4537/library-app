@@ -115,7 +115,13 @@ Hours come from Steam, Epic, GOG Galaxy, Xbox and Ubisoft when connected. For ev
 
 ## Friends
 
-Steam, Xbox and Epic friends, sorted into Playing, Online, Away and Offline. Epic only shares when someone was last online. The same person on more than one platform is matched by name automatically; click a friend to link or unlink accounts by hand.
+Steam, Xbox and Epic friends, sorted into Playing, Online, Away and Offline, with counts at the top, a search box (names, accounts or games) and filters by status and platform. Long names and long game titles are cut off neatly with the full text on hover. A friend playing a game you own shows its cover and a Join (or Install) button. Epic only shares when someone was last online. The same person on more than one platform is matched by name automatically.
+
+Click a friend for their profile: status, what they are playing, every linked account with an Open profile button, and the games Crimson Vault has seen them play. Right click or More to link, unlink or remove.
+
+## Xbox console play
+
+Crimson Vault reads your own Xbox presence (Microsoft sign in or OpenXBL key) every minute or two, so it knows when you play on an Xbox console, through Xbox Remote Play or cloud gaming. Each session is saved with the game, the console, how long you played and the achievements you unlocked during it, and a pop up sums it up when you stop. You see it at the top of the Friends page, on the Home Xbox tile, on the Remote Play page and in each game's play history ("on Xbox"). It only works while Crimson Vault is running (the tray is fine), and sessions under 2 minutes are skipped. Turn it off in Settings, Quality of life.
 
 ## Arcade
 
@@ -128,6 +134,12 @@ Two mini games in the Arcade tab, for mouse, keyboard or controller:
 - **Block Breaker:** bounce the ball off your paddle to smash the bricks; top rows take two hits, later levels are faster. Catch falling W for a wide paddle and + for an extra ball. A / D or the mouse move, Space launches.
 - **Snake:** eat to grow, speed goes up as you go, gold food is worth 5 and fades. W A S D or arrows to turn.
 - **Paddle Duel:** paddle tennis to 7 against the computer (Easy, Normal, Hard) or a friend on the same keyboard (W / S and ↑ / ↓).
+- **Gem Merge:** slide the board to merge matching gems into bigger ones. Arrows, W A S D or the stick.
+- **Vault Sweeper:** find every hidden trap on the grid using the number clues. Click to open, right click or F to flag; opening a number that has all its flags opens the squares around it.
+- **Ember Flight:** tap Space or click to keep the ember flying through the gaps.
+- **Sky Raiders:** waves of raiders march down; A / D to move, Space to fire, and clear each wave before it reaches you.
+- **Vault Runner:** an endless runner. Jump with Space or W (twice for a double jump) over crates, and duck drones with S.
+- **Memory Vault:** flip cards to find the pairs, using your own game covers when you have enough of them. Fewer moves is better.
 
 Every game has Pause and Quit buttons on screen and a pause menu, plus controller support. The action games count down 3, 2, 1 before play, and all games have sparks, screen shake on big moments, banners for combos, levels and big wins, and numbers that pop when they change.
 
@@ -181,6 +193,14 @@ The player at the bottom of the sidebar reads what is playing from Windows media
 ## Memory
 
 Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpers restart themselves every few hours, song artwork and achievement caches are capped, cards for removed games are dropped, and the music player only sends updates when something changes. The Discord tab and the Remote Play stream are the heavy parts; Close tab and End stream free them.
+
+## What's new in 0.16
+
+- **Six new arcade games:** Gem Merge, Vault Sweeper, Ember Flight, Sky Raiders, Vault Runner and Memory Vault.
+- **Settings is a page:** a section list on the left, a search box, and a save bar with Undo changes. Leaving the page saves.
+- **Better covers for apps and games without art:** Crimson Vault pulls the big Windows icon from the app or its shortcut and builds a cover in that icon's color; anything without an icon gets a clean name card.
+- **Friends page and profiles:** see Friends above.
+- **Xbox console play tracking:** see above.
 
 ## What's new in 0.15
 

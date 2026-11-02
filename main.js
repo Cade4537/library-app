@@ -22,6 +22,7 @@ const { Friends } = require('./src/main/friends');
 const { detectSteamId } = require('./src/main/owned/steam');
 const auth = require('./src/main/auth');
 const { XboxLive } = require('./src/main/xboxlive');
+const { ConsolePlay } = require('./src/main/consoleplay');
 const { EpicClient } = require('./src/main/epicClient');
 const { getLaunchers, openLauncher } = require('./src/main/launchers');
 const { getDrives, SizeTracker, uninstall } = require('./src/main/storage');
@@ -45,6 +46,7 @@ let media = null;
 let steamInfo = null;
 let playtime = null;
 let friends = null;
+let consolePlay = null;
 let xbox = null;
 let epic = null;
 let sizes = null;
@@ -198,6 +200,7 @@ function snapshot() {
     ...it,
     coverUrl: fileUrl(it.cover),
     iconUrl: fileUrl(it.icon),
+    iconXlUrl: fileUrl(it.iconXl),
     minutes: minutesPlayed(it),
     running: running.has(it.id),
   }));
@@ -736,6 +739,8 @@ function registerIpc() {
   });
   ipcMain.handle('friends:get', () => friends.state);
   ipcMain.handle('storage:drives', () => getDrives().catch(() => []));
+  ipcMain.handle('console:state', () => (consolePlay ? consolePlay.state() : null));
+  ipcMain.handle('console:check', async () => { if (!consolePlay || !consolePlay.enabled()) return consolePlay ? consolePlay.state() : null; try { await consolePlay.check(); consolePlay.error = ''; } catch (e) { consolePlay.error = e.message; } return consolePlay.state(); });
   ipcMain.handle('qol:downloads', () => (qol ? qol.downloads().catch(() => []) : []));
   ipcMain.handle('qol:battery', () => (qol ? qol.battery().catch(() => null) : null));
   ipcMain.handle('qol:screenshots', async (_e, id) => (qol ? (await qol.screenshots(item(id)).catch(() => [])).map((f) => ({ url: fileUrl(f.path), t: f.t, path: f.path })) : []));
@@ -821,6 +826,7 @@ if (!app.requestSingleInstanceLock()) {
     xbox = new XboxLive(store);
     epic = new EpicClient(store);
     ubisoft = new UbisoftActivity(store);
+    consolePlay = new ConsolePlay({ store, xbox, notify: (n) => qol.notify(n), sendTo: (ch, v) => sendTo(ch, v) });
     friends = new Friends(store, (s) => sendTo('friends:state', s), getSteamId, xbox, epic);
     diag.log('start', { version: app.getVersion(), hidden: startHidden });
     app.on('child-process-gone', (_e, d) => { diag.log('process-gone', d); if (d && d.type === 'GPU') leaveFullScreen(); });
@@ -836,6 +842,7 @@ if (!app.requestSingleInstanceLock()) {
     setInterval(() => deals(true).catch(() => {}), services.SIX_HOURS);
     playtime.start();
     qol.start();
+    consolePlay.start();
     streamView = new StreamView(() => win, (st) => sendTo('stream:state', st));
     win.on('resize', () => { if (streamView.full) streamView.layout(); });
     discordView = new DiscordView(() => win, (list) => new Promise((resolve) => {

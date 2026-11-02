@@ -11,6 +11,12 @@ const ARCADE = [
   { id: 'breaker', name: 'Block Breaker', sub: 'Bounce the ball and smash every brick', best: () => prefs.get('breakerBest', 0), bestLabel: 'Best score' },
   { id: 'snake', name: 'Snake', sub: 'Eat, grow and don\'t hit yourself', best: () => prefs.get('snakeBest', 0), bestLabel: 'Best score' },
   { id: 'duel', name: 'Paddle Duel', sub: 'Classic paddle tennis, against the computer or a friend', best: () => prefs.get('duelWins', 0), bestLabel: 'Wins' },
+  { id: 'merge', name: 'Gem Merge', sub: 'Slide matching gems together to grow them', best: () => prefs.get('mergeBest', 0), bestLabel: 'Best score' },
+  { id: 'sweep', name: 'Vault Sweeper', sub: 'Clear the grid without opening a trap', best: () => prefs.get('sweepWins', 0), bestLabel: 'Wins' },
+  { id: 'flight', name: 'Ember Flight', sub: 'Tap to fly through the gaps', best: () => prefs.get('flightBest', 0), bestLabel: 'Best' },
+  { id: 'raiders', name: 'Sky Raiders', sub: 'Hold the line against waves of raiders', best: () => prefs.get('raidersBest', 0), bestLabel: 'Best score' },
+  { id: 'runner', name: 'Vault Runner', sub: 'Jump and duck through an endless run', best: () => prefs.get('runnerBest', 0), bestLabel: 'Best distance' },
+  { id: 'memory', name: 'Memory Vault', sub: 'Flip cards and match your own game covers', best: () => prefs.get('memoryBest', 0) || 0, bestLabel: 'Fewest moves' },
 ];
 
 function renderArcade() {
@@ -77,6 +83,7 @@ function openGame(id) {
   else if (id === 'breaker') blockBreaker();
   else if (id === 'snake') snakeGame();
   else if (id === 'duel') paddleDuel();
+  else if (GAMES3[id]) GAMES3[id]();
 }
 
 // ---------- Vault Blocks ----------
