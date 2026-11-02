@@ -1761,3 +1761,20 @@ body.app-idle .set-bar { backdrop-filter: none; }
 .cvh-ach > span { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 3px 8px; border-radius: 6px; background: rgba(255,200,60,.1); color: #ffd36b; font-size: 11.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cvh-ach .ic { width: 12px; height: 12px; flex: none; }
 .cvh-ach i { font-style: normal; opacity: .7; }
+
+/* ---------- 0.16.1: friend polish ---------- */
+.f-made { display: grid; place-items: center; color: #fff; font-weight: 800; letter-spacing: .02em; text-shadow: 0 1px 2px rgba(0,0,0,.35); background: linear-gradient(135deg, hsl(var(--h, 350) 60% 42%), hsl(var(--h2, 20) 55% 26%)); }
+.f-av.f-made { font-size: 18px; }
+.fp-av.f-made { font-size: 32px; }
+.gd-friend .f-av.f-made, .hf-row .f-av.f-made { font-size: 14px; }
+.fcard .fc-flags { position: absolute; top: 8px; right: 10px; display: flex; gap: 4px; color: var(--muted); }
+.fcard .fc-flags .ic { width: 13px; height: 13px; }
+.fcard.fav .fc-flags span:first-child { color: #ffd36b; }
+.fcard.fav { border-color: rgba(255,211,107,.28); }
+.fcard.has-game .fc-flags { right: 74px; }
+.fc-for { flex: none; margin-left: 2px; padding: 1px 6px; border-radius: 5px; background: rgba(61,220,132,.12); font-size: 11px; font-weight: 700; }
+.fp-seen { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hf-row { cursor: pointer; border-radius: 8px; transition: background .12s; }
+.hf-row:hover { background: rgba(255,255,255,.05); }
+.toast.bump { animation: toastBump .25s ease; }
+@keyframes toastBump { 50% { transform: scale(1.04); } }

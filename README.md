@@ -117,7 +117,9 @@ Hours come from Steam, Epic, GOG Galaxy, Xbox and Ubisoft when connected. For ev
 
 Steam, Xbox and Epic friends, sorted into Playing, Online, Away and Offline, with counts at the top, a search box (names, accounts or games) and filters by status and platform. Long names and long game titles are cut off neatly with the full text on hover. A friend playing a game you own shows its cover and a Join (or Install) button. Epic only shares when someone was last online. The same person on more than one platform is matched by name automatically.
 
-Click a friend for their profile: status, what they are playing, every linked account with an Open profile button, and the games Crimson Vault has seen them play. Right click or More to link, unlink or remove.
+Click a friend for their profile: status, what they are playing and for how long, when they were last seen playing, every linked account with an Open profile button, and the games Crimson Vault has seen them play. Favorite a friend to pin them to the top, or mute their alerts, from the profile or the right click menu (which also has link, unlink, copy name and remove). Friends without a profile picture get one made from their initials. On the page, / or Ctrl+F jumps to the search and Esc clears it.
+
+Friend alerts only fire when a friend starts a different game, so changing modes or rich presence text inside the same game does not count. The same friend and game never alert twice within 3 hours, friends who start the same game together share one alert, and you can choose alerts for games you own or any game in Settings.
 
 ## Xbox console play
 
@@ -193,6 +195,17 @@ The player at the bottom of the sidebar reads what is playing from Windows media
 ## Memory
 
 Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpers restart themselves every few hours, song artwork and achievement caches are capped, cards for removed games are dropped, and the music player only sends updates when something changes. The Discord tab and the Remote Play stream are the heavy parts; Close tab and End stream free them.
+
+## What's new in 0.16.1
+
+- **Friend alerts fixed:** only when a friend changes games, never repeats for the same game within 3 hours, and one alert for friends who start together.
+- **Made up profile pictures** for friends without one, or when theirs fails to load.
+- **Friends:** favorites pinned to the top, mute alerts per friend, "playing for" times, last seen playing, friends in the same game grouped together, copy name, search shortcuts, and the page only redraws when something changes.
+- **Alert setting:** games you own or any game.
+- **Home and guide:** clicking a friend opens their profile; so does clicking a friend pop up.
+- **Covers:** a cover link that stops working falls back to the made up cover.
+- **Xbox play:** the session in progress is saved when Crimson Vault closes, and console time counts toward a game's hours.
+- **Smaller things:** Ctrl+S saves Settings, repeated toasts merge into one, and the same alert is not saved twice within 30 minutes.
 
 ## What's new in 0.16
 

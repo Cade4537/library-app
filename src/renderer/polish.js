@@ -9,7 +9,8 @@ const ALERT_ICONS = { friend: 'users', session: 'clock', deal: 'tag', download: 
 function alertList() { return prefs.get('alerts', []); }
 function pushAlert(a) {
   const list = alertList();
-  if (list[0] && list[0].title === a.title && Date.now() - list[0].at < 60000) return;
+  // The same alert again within 30 minutes is not saved twice.
+  if (list.slice(0, 15).some((x) => x.title === a.title && Date.now() - x.at < 30 * 60000)) return;
   list.unshift({ title: String(a.title || ''), body: String(a.body || ''), at: a.at || Date.now(), kind: a.kind || 'info', id: a.id || null });
   prefs.set('alerts', list.slice(0, 60));
   if (S.guideOpen) renderGuide();

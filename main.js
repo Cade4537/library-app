@@ -865,6 +865,7 @@ if (!app.requestSingleInstanceLock()) {
     globalShortcut.unregisterAll();
     if (remote) remote.stop();
     if (playtime) playtime.flushSessions();
+    if (consolePlay) { consolePlay.stop(); consolePlay.flush(); }
     rpc.set(null); rpc.close();
     if (store) store.saveNow();
     if (media) { media.enabled = false; media.stop(); }

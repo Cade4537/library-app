@@ -67,8 +67,8 @@ const fromGuide = (fn) => () => { closeGuide(); setTimeout(fn, 10); };
 
 function guideFriendRow(p, i) {
   const act = (() => { const a = (p.accounts || []).find((x) => x.activity); return a ? a.activity : p.status === 'ingame' ? 'In a game' : p.status === 'away' ? 'Away' : p.status === 'offline' ? 'Offline' : 'Online'; })();
-  const av = p.avatar ? h('img', { class: 'f-av', src: p.avatar, alt: '', loading: 'lazy' }) : h('div', { class: 'f-av f-init' }, (p.name[0] || '?').toUpperCase());
-  return h('button', { class: `gd-friend st-${p.status}`, 'data-k': `fr:${p.name}`, style: `--d:${Math.min(i, 10)}`, onclick: fromGuide(() => setView({ type: 'friends' })) },
+  const av = avatarFor(p);
+  return h('button', { class: `gd-friend st-${p.status}`, 'data-k': `fr:${p.name}`, title: `${p.name} · ${act}`, style: `--d:${Math.min(i, 10)}`, onclick: fromGuide(() => openFriendProfile(p)) },
     h('div', { class: 'f-avwrap' }, av, h('span', { class: `f-badge st-${p.status}` })), h('div', { class: 'hf-text' }, h('b', {}, p.name), h('span', {}, act)));
 }
 

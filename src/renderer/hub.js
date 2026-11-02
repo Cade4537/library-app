@@ -171,12 +171,12 @@ function heroNext(it) {
 
 function hubSide(online, playing) {
   const people = [...playing, ...online.filter((p) => !playing.includes(p))].slice(0, 5);
-  const av = (p) => (p.avatar ? h('img', { class: 'f-av', src: p.avatar, alt: '' }) : h('div', { class: 'f-av f-init' }, (p.name[0] || '?').toUpperCase()));
+  const av = (p) => avatarFor(p);
   const act = (p) => { const a = (p.accounts || []).find((x) => x.activity); return a ? a.activity : p.status === 'ingame' ? 'In a game' : 'Online'; };
   return h('div', { class: 'hub-side' },
     h('button', { class: 'hub-card hub-friends', 'data-k': 'side:friends', onclick: () => setView({ type: 'friends' }) },
       h('div', { class: 'hc-head' }, icon('users'), h('span', {}, 'Friends'), h('span', { class: 'count' }, online.length ? `${online.length} online` : '')),
-      people.length ? h('div', { class: 'hf-list' }, people.map((p) => h('div', { class: `hf-row st-${p.status}` }, h('div', { class: 'f-avwrap' }, av(p), h('span', { class: `f-badge st-${p.status}` })),
+      people.length ? h('div', { class: 'hf-list' }, people.map((p) => h('div', { class: `hf-row st-${p.status}`, title: `${p.name} · ${act(p)}`, onclick: (e) => { e.stopPropagation(); openFriendProfile(p); } }, h('div', { class: 'f-avwrap' }, av(p), h('span', { class: `f-badge st-${p.status}` })),
         h('div', { class: 'hf-text' }, h('b', {}, p.name), h('span', {}, act(p))))))
         : h('div', { class: 'help' }, S.friends.configured ? 'Nobody is online right now.' : 'Connect Steam, Xbox or Epic in Settings to see friends.')),
     h('div', { class: 'hub-card hub-music', id: 'hubMusic' }));

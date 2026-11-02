@@ -96,17 +96,7 @@ class ConsolePlay {
     let got = [];
     const after = c.before ? await this.unlocked(c.titleId) : null;
     if (after && c.before) { const had = new Set(c.before.map((a) => a.name)); got = after.filter((a) => !had.has(a.name)); }
-    const it = this.itemFor(c.titleId, c.name);
-    const rec = { titleId: c.titleId, name: c.name, device: c.device, s: c.s, e: end, id: it ? it.id : null, ach: got };
-    this.list.push(rec);
-    if (this.list.length > 500) this.list.splice(0, this.list.length - 500);
-    if (it) {
-      it.lastPlayed = Math.max(it.lastPlayed || 0, end);
-      const sessions = this.d.store.data.sessions || (this.d.store.data.sessions = []);
-      sessions.push({ id: it.id, s: c.s, e: end, console: true });
-      if (sessions.length > 1500) sessions.splice(0, sessions.length - 1500);
-    }
-    this.d.store.changed();
+    this.record(c, end, got);
     const time = mins >= 60 ? `${Math.floor(mins / 60)} h ${mins % 60} min` : `${mins} min`;
     const gs = got.reduce((n, a) => n + a.gs, 0);
     const body = got.length
@@ -114,6 +104,30 @@ class ConsolePlay {
       : `${time} on Xbox.`;
     this.d.notify({ kind: 'xbox', title: `Xbox session: ${c.name}`, body });
     this.push();
+  }
+
+  // Saves the session in progress when Crimson Vault closes (no achievement check, it has to be quick).
+  flush() {
+    const c = this.current;
+    this.current = null;
+    if (!c || c.last - c.s < 2 * 60000) return;
+    this.record(c, c.last, []);
+  }
+
+  record(c, end, got) {
+    const it = this.itemFor(c.titleId, c.name);
+    this.list.push({ titleId: c.titleId, name: c.name, device: c.device, s: c.s, e: end, id: it ? it.id : null, ach: got });
+    if (this.list.length > 500) this.list.splice(0, this.list.length - 500);
+    if (it) {
+      it.lastPlayed = Math.max(it.lastPlayed || 0, end);
+      // Console time counts toward the game's hours (the higher of this and Xbox's own count is shown).
+      it.meta = it.meta || {};
+      it.meta.trackedMinutes = (it.meta.trackedMinutes || 0) + (end - c.s) / 60000;
+      const sessions = this.d.store.data.sessions || (this.d.store.data.sessions = []);
+      sessions.push({ id: it.id, s: c.s, e: end, console: true });
+      if (sessions.length > 1500) sessions.splice(0, sessions.length - 1500);
+    }
+    this.d.store.changed();
   }
 
   state() {

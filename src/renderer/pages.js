@@ -61,3 +61,10 @@ function showSettingsPage({ body, actions }) {
   content.addEventListener('scroll', spy, { passive: true });
   spy();
 }
+
+// Ctrl+S saves on the Settings page.
+document.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 's' || !S.view || S.view.type !== 'settings') return;
+  e.preventDefault();
+  if (S.settingsSave) S.settingsSave().then(() => { const bar = document.querySelector('.set-bar'); if (bar) { bar.classList.remove('dirty'); const st = bar.querySelector('.set-status'); if (st) st.textContent = 'All changes saved'; } });
+}, true);

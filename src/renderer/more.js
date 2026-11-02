@@ -398,22 +398,65 @@ function applyDealFilter() {
 }
 
 // ---------- friend alerts ----------
-let prevPlaying = null;
+// 0.16.1: friend alerts follow each person's current game, so an alert only fires when someone
+// actually starts a different game. Presence text that wobbles ("Forza Horizon 5 - Exploring" then
+// "Forza Horizon 5 - Racing"), a friend dropping out of one check, or a platform failing to answer
+// no longer counts as starting again.
+const friendNow = new Map(); // friend -> { game, since, missed }
+const gameBase = (t) => norm(String(t || '').split(/\s+[-|•·]\s+/)[0]);
+function friendGameKey(p) {
+  const raw = p.status === 'ingame' ? gameName(actOf(p)) : '';
+  if (!raw) return null;
+  const it = gameFromActivity(raw);
+  return { key: it ? `id:${it.id}` : `n:${gameBase(raw)}`, it, label: it ? displayName(it) : raw.split(/\s+[-|•·]\s+/)[0] };
+}
+// When a friend started their current game, if Crimson Vault saw it happen.
+function friendSince(p) { const f = friendNow.get(friendKey(p)); return f && f.since ? f.since : 0; }
 function friendAlerts(st) {
-  const now = new Map();
-  for (const p of (st && st.people) || []) for (const a of p.accounts || []) if (a.status === 'ingame' && a.activity) now.set(`${a.key}`, { who: p.name, what: String(a.activity).replace(/^playing\s+/i, ''), avatar: p.avatar });
-  if (prevPlaying && prefs.get('friendAlerts', true)) {
-    for (const [k, v] of now) {
-      if (prevPlaying.has(k) && prevPlaying.get(k).what === v.what) continue;
-      const mine = S.lib.items.find((it) => it.kind === 'game' && (it.installed || it.owned) && norm(displayName(it)).length > 2 && norm(v.what).startsWith(norm(displayName(it))));
-      if (!mine) continue;
-      pushAlert({ kind: 'friend', title: `${v.who} started ${displayName(mine)}`, body: 'You own this game', id: mine.id });
-      if (holdAlert(`${v.who} started ${displayName(mine)}`)) continue;
-      showToast(`${v.who} started playing ${displayName(mine)}`);
-      if (!document.hasFocus() && 'Notification' in window) { try { new Notification(`${v.who} is playing ${displayName(mine)}`, { body: 'You own this game. Jump in?', silent: false, icon: v.avatar || undefined }); } catch {} }
+  const first = !friendAlerts.ready;
+  friendAlerts.ready = true;
+  const mode = prefs.get('friendAlerts', true) ? prefs.get('friendAlertMode', 'owned') : 'off';
+  const muted = new Set(prefs.get('mutedFriends', []));
+  const sent = prefs.get('friendAlertSent', {});
+  const groups = new Map();
+  for (const p of (st && st.people) || []) {
+    const k = friendKey(p);
+    const g = friendGameKey(p);
+    const prev = friendNow.get(k);
+    if (!g) {
+      // Give it three checks before deciding they really stopped.
+      if (prev && ++prev.missed >= 3) friendNow.delete(k);
+      continue;
+    }
+    if (prev && prev.game === g.key) { prev.missed = 0; continue; }
+    friendNow.set(k, { game: g.key, since: first ? 0 : Date.now(), missed: 0 });
+    if (first || mode === 'off' || muted.has(k)) continue;
+    if (mode === 'owned' && !g.it) continue;
+    // The same friend and game never alerts twice within 3 hours.
+    const sk = `${k}|${g.key}`;
+    if (Date.now() - (sent[sk] || 0) < 3 * 3600e3) continue;
+    sent[sk] = Date.now();
+    const grp = groups.get(g.key) || { g, people: [] };
+    grp.people.push(p);
+    groups.set(g.key, grp);
+  }
+  for (const k of Object.keys(sent)) if (Date.now() - sent[k] > 86400e3) delete sent[k];
+  prefs.set('friendAlertSent', sent);
+  // Friends who start the same game together get one alert.
+  for (const { g, people } of groups.values()) {
+    const who = people.length === 1 ? people[0].name : people.length === 2 ? `${people[0].name} and ${people[1].name}` : `${people[0].name} and ${people.length - 1} others`;
+    const text = `${who} started ${g.label}`;
+    const body = g.it ? (notInstalled(g.it) ? 'You own it, not installed' : 'You have this game') : 'Not in your library';
+    pushAlert({ kind: 'friend', title: text, body, id: g.it ? g.it.id : null });
+    if (holdAlert(text)) continue;
+    showToast(text);
+    if (!document.hasFocus() && 'Notification' in window) {
+      try {
+        const n = new Notification(text, { body: g.it ? `${body}. Jump in?` : body, silent: false, icon: people[0].avatar || undefined });
+        n.onclick = () => { window.focus(); openFriendProfile(people[0]); };
+      } catch {}
     }
   }
-  prevPlaying = now;
 }
 
 // ---------- settings: app, alerts, phone remote ----------
@@ -463,7 +506,8 @@ function moreSettingsSections(s, state) {
     h('div', { class: 'field' }, h('label', {}, 'Show / hide shortcut'), hk, h('div', { class: 'help' }, 'Works from anywhere, even in other apps. Click the box and press keys; Backspace turns it off.')),
     h('div', { class: 'field' }, h('label', {}, 'Open store pages in'), storeSeg()),
     h('div', { class: 'section-label' }, 'Alerts'),
-    h('div', { class: 'field' }, toggleRow('Friend alerts', 'A pop up when a friend starts playing a game you own', prefs.get('friendAlerts', true), (v) => prefs.set('friendAlerts', v))),
+    h('div', { class: 'field' }, toggleRow('Friend alerts', 'A pop up when a friend starts a different game. The same friend and game never alert twice within 3 hours.', prefs.get('friendAlerts', true), (v) => prefs.set('friendAlerts', v))),
+    (() => { const seg = h('div', { class: 'seg' }); const draw = () => fillEl(seg, ...[['owned', 'Games I own'], ['any', 'Any game']].map(([k, n]) => h('button', { class: prefs.get('friendAlertMode', 'owned') === k ? 'on' : '', onclick: () => { prefs.set('friendAlertMode', k); draw(); } }, n))); draw(); return h('div', { class: 'field' }, h('label', {}, 'Alert me for'), seg, h('div', { class: 'help' }, 'Mute one friend from their profile or right click menu.')); })(),
     h('div', { class: 'field' }, toggleRow('Deal alerts', 'A pop up when a wishlist game drops in price or Epic has new free games', state.dealAlerts, (v) => { state.dealAlerts = v; })),
     h('div', { class: 'field' }, toggleRow('News on Home', 'The latest Steam news from your 3 most played games', prefs.get('showNews', true), (v) => { prefs.set('showNews', v); newsKey = ''; })),
     h('div', { class: 'section-label' }, 'Phone remote'),

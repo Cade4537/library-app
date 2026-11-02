@@ -321,8 +321,9 @@ function artFor(it) {
     const img = h('img', { class: 'cover', src: it.coverUrl, alt: '', draggable: 'false', loading: 'lazy', decoding: 'async' });
     const done = () => art.classList.remove('loading');
     img.addEventListener('load', done);
-    img.addEventListener('error', done);
-    if (img.complete) done();
+    // A cover link that no longer works falls back to the made up cover.
+    img.addEventListener('error', () => { done(); const fb = artFor({ ...it, coverUrl: null }); if (art.parentNode) art.replaceWith(fb); else { art.className = fb.className; art.style.cssText = fb.style.cssText; art.replaceChildren(...fb.childNodes); } }, { once: true });
+    if (img.complete && img.naturalWidth) done();
     art.append(img);
   } else if (it.iconXlUrl || it.iconUrl) {
     // No cover anywhere: a made up cover from the program's own big icon and its colors.
@@ -1207,6 +1208,9 @@ function renderFriends() { renderFriendsPage(); }
 function friendMenu(p, pos) {
   openMenu([
     { label: 'View profile', run: () => openFriendProfile(p) },
+    { label: favFriends().has(friendKey(p)) ? 'Remove from favorites' : 'Add to favorites', run: () => toggleFavFriend(p) },
+    { label: mutedFriends().has(friendKey(p)) ? 'Unmute alerts' : 'Mute alerts', run: () => toggleMuteFriend(p) },
+    { label: 'Copy name', run: () => { navigator.clipboard.writeText(p.name).then(() => showToast(`Copied ${p.name}`)).catch(() => {}); } },
     ...p.accounts.map((a) => ({ label: `Open ${PLAT[a.platform] || a.platform} profile`, run: () => api.openExternal(a.profile) })),
     '-',
     { label: 'Link with another friend', run: () => pickFriendToLink(p) },
@@ -1936,11 +1940,15 @@ function setUpdateState(u) {
 
 // ---------- toasts ----------
 function showToast(text, kind = 'info') {
+  // The same message twice in a row just restarts the first one's timer.
+  const last = $('#toasts').lastElementChild;
+  if (last && !last.classList.contains('out') && last.dataset.text === text) { clearTimeout(last._t); last.classList.remove('bump'); void last.offsetWidth; last.classList.add('bump'); last._t = setTimeout(() => { last.classList.add('out'); setTimeout(() => last.remove(), 300); }, kind === 'error' ? 6000 : 3200); return; }
   const t = h('div', { class: 'toast' + (kind === 'error' ? ' error' : '') }, h('span', { class: 'toast-ic' }, icon(kind === 'error' ? 'close' : 'check')), h('span', {}, text));
   const box = $('#toasts');
+  t.dataset.text = text;
   box.append(t);
   while (box.children.length > 4) box.firstChild.remove();
-  setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 300); }, kind === 'error' ? 6000 : 3200);
+  t._t = setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 300); }, kind === 'error' ? 6000 : 3200);
 }
 window.showToast = showToast;
 
