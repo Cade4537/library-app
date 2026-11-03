@@ -16,6 +16,7 @@ const ARCADE = [
   { id: 'flight', name: 'Ember Flight', sub: 'Tap to fly through the gaps', best: () => prefs.get('flightBest', 0), bestLabel: 'Best' },
   { id: 'raiders', name: 'Sky Raiders', sub: 'Hold the line against waves of raiders', best: () => prefs.get('raidersBest', 0), bestLabel: 'Best score' },
   { id: 'runner', name: 'Vault Runner', sub: 'Jump and duck through an endless run', best: () => prefs.get('runnerBest', 0), bestLabel: 'Best distance' },
+  { id: 'words', name: 'Vault Words', sub: 'Guess the five letter word in six tries, with a new daily word', best: () => (prefs.get('wordsStats', {}).streak || 0), bestLabel: 'Streak' },
   { id: 'memory', name: 'Memory Vault', sub: 'Flip cards and match your own game covers', best: () => prefs.get('memoryBest', 0) || 0, bestLabel: 'Fewest moves' },
 ];
 

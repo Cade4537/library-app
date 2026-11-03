@@ -1778,3 +1778,9 @@ body.app-idle .set-bar { backdrop-filter: none; }
 .hf-row:hover { background: rgba(255,255,255,.05); }
 .toast.bump { animation: toastBump .25s ease; }
 @keyframes toastBump { 50% { transform: scale(1.04); } }
+
+/* ---------- 0.16.2: Vault Words ---------- */
+.wd-dist { display: grid; gap: 4px; }
+.wd-bar { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.wd-bar span { width: 10px; color: var(--muted); }
+.wd-bar i { font-style: normal; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: #34343c; text-align: right; min-width: 20px; }

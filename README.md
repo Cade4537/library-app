@@ -141,6 +141,7 @@ Two mini games in the Arcade tab, for mouse, keyboard or controller:
 - **Ember Flight:** tap Space or click to keep the ember flying through the gaps.
 - **Sky Raiders:** waves of raiders march down; A / D to move, Space to fire, and clear each wave before it reaches you.
 - **Vault Runner:** an endless runner. Jump with Space or W (twice for a double jump) over crates, and duck drones with S.
+- **Vault Words:** guess the five letter word in six tries. Green means the right letter in the right spot, gold means it is in the word somewhere else, grey means it is not in the word. A new daily word every day (once per day, it stays solved), plus unlimited free play. Tracks your streak and wins by number of guesses. Type, or click the keys on screen; on a controller the stick picks a key, A presses it, B deletes and X guesses.
 - **Memory Vault:** flip cards to find the pairs, using your own game covers when you have enough of them. Fewer moves is better.
 
 Every game has Pause and Quit buttons on screen and a pause menu, plus controller support. The action games count down 3, 2, 1 before play, and all games have sparks, screen shake on big moments, banners for combos, levels and big wins, and numbers that pop when they change.
@@ -195,6 +196,10 @@ The player at the bottom of the sidebar reads what is playing from Windows media
 ## Memory
 
 Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpers restart themselves every few hours, song artwork and achievement caches are capped, cards for removed games are dropped, and the music player only sends updates when something changes. The Discord tab and the Remote Play stream are the heavy parts; Close tab and End stream free them.
+
+## What's new in 0.16.2
+
+- **Vault Words:** a daily five letter word game in the Arcade, with free play and streaks.
 
 ## What's new in 0.16.1
 

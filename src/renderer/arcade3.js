@@ -562,6 +562,8 @@ function drawPreview3(c, x, acc) {
     x.fillStyle = '#e8e8ee'; x.beginPath(); x.roundRect(90, 110, 24, 40, 6); x.fill();
     x.fillStyle = '#3a1218'; x.fillRect(200, 140, 28, 30); x.strokeStyle = acc; x.strokeRect(202, 142, 24, 26);
     x.fillStyle = '#ffb02e'; x.beginPath(); x.roundRect(290, 120, 36, 16, 6); x.fill();
+  } else if (g === 'words') {
+    drawPreviewWords(x, acc);
   } else if (g === 'memory') {
     for (let yy = 0; yy < 2; yy++) for (let xx = 0; xx < 5; xx++) {
       const up = (xx + yy) % 3 === 0;
