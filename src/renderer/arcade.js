@@ -17,6 +17,10 @@ const ARCADE = [
   { id: 'raiders', name: 'Sky Raiders', sub: 'Hold the line against waves of raiders', best: () => prefs.get('raidersBest', 0), bestLabel: 'Best score' },
   { id: 'runner', name: 'Vault Runner', sub: 'Jump and duck through an endless run', best: () => prefs.get('runnerBest', 0), bestLabel: 'Best distance' },
   { id: 'words', name: 'Vault Words', sub: 'Guess the five letter word in six tries, with a new daily word', best: () => (prefs.get('wordsStats', {}).streak || 0), bestLabel: 'Streak' },
+  { id: 'crossword', name: 'Vault Crossword', sub: 'A fresh crossword every time, with clues to solve', best: () => prefs.get('crossWins', 0), bestLabel: 'Solved' },
+  { id: 'sudoku', name: 'Vault Sudoku', sub: 'Fill the grid so every row, column and box has 1 to 9', best: () => prefs.get('sudokuWins', 0), bestLabel: 'Solved' },
+  { id: 'wordsearch', name: 'Vault Word Search', sub: 'Find the hidden words, eight themes', best: () => { const b = prefs.get('wsBest_easy', 0); return b ? `${Math.floor(b / 60000)}:${String(Math.floor(b / 1000) % 60).padStart(2, '0')}` : '-'; }, bestLabel: 'Best time' },
+  { id: 'maze', name: 'Vault Maze', sub: 'Find the exit, every level a bigger maze', best: () => prefs.get('mazeBest', 0), bestLabel: 'Best level' },
   { id: 'memory', name: 'Memory Vault', sub: 'Flip cards and match your own game covers', best: () => prefs.get('memoryBest', 0) || 0, bestLabel: 'Fewest moves' },
 ];
 
@@ -26,7 +30,7 @@ function renderArcade() {
     h('div', { class: 'arc-grid' }, ARCADE.map((g) => h('button', { class: `arc-tile arc-${g.id}`, onclick: () => openGame(g.id) },
       h('canvas', { class: 'arc-preview', width: 360, height: 220, 'data-game': g.id }),
       h('div', { class: 'arc-info' }, h('div', { class: 'arc-name' }, g.name), h('div', { class: 'arc-sub' }, g.sub),
-        h('div', { class: 'arc-best' }, `${g.bestLabel}: ${fmtBig(Number(g.best()) || 0)}`)),
+        h('div', { class: 'arc-best' }, `${g.bestLabel}: ${((v) => (typeof v === 'string' ? v : fmtBig(Number(v) || 0)))(g.best())}`)),
       h('span', { class: 'arc-play' }, icon('play'), 'Play')))),
     h('div', { class: 'help', style: { marginTop: '14px' } }, 'Works with mouse, keyboard or controller. Peg Drop and Blackjack use pretend points that only live in this app.'));
   box.querySelectorAll('.arc-preview').forEach(drawPreview);

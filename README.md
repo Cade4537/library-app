@@ -142,6 +142,10 @@ Two mini games in the Arcade tab, for mouse, keyboard or controller:
 - **Sky Raiders:** waves of raiders march down; A / D to move, Space to fire, and clear each wave before it reaches you.
 - **Vault Runner:** an endless runner. Jump with Space or W (twice for a double jump) over crates, and duck drones with S.
 - **Vault Words:** guess the five letter word in six tries. Green means the right letter in the right spot, gold means it is in the word somewhere else, grey means it is not in the word. A new daily word every day (once per day, it stays solved), plus unlimited free play. Tracks your streak and wins by number of guesses. Type, or click the keys on screen; on a controller the stick picks a key, A presses it, B deletes and X guesses.
+- **Vault Crossword:** a new crossword built every game from a few hundred words and clues. Type to fill in, arrows to move, Space switches across and down, Tab jumps to the next word, and the clue list in the side panel is clickable. Check marks wrong letters, and Reveal letter or Reveal word help when you are stuck. Controller: stick moves, LB / RB change the letter, A switches direction, Y checks.
+- **Vault Sudoku:** Easy, Medium or Hard puzzles, always with exactly one answer. Number keys place, N switches to notes (which clear themselves when you place a number), U undoes, H gives a hint, and wrong numbers show in red. Matching numbers and the row, column and box light up, and the number bar shows how many of each are left. Best times per difficulty. Controller: LB / RB pick the number, A places, Y notes, X undoes.
+- **Vault Word Search:** find the hidden words by dragging across them. Eight themes (Gaming, Animals, Space, Food, Sports, Nature, Music, Photography) or Random. Easy uses across, down and diagonal; Hard is a bigger grid with every direction and backwards words. Keyboard and controller: move, then Space or A at each end.
+- **Vault Maze:** walk to the flag; each level is a bigger maze, with gems to pick up on the way. Fog mode only shows what is near you. Arrows or W A S D, hold to keep going, or click beside the dot.
 - **Memory Vault:** flip cards to find the pairs, using your own game covers when you have enough of them. Fewer moves is better.
 
 Every game has Pause and Quit buttons on screen and a pause menu, plus controller support. The action games count down 3, 2, 1 before play, and all games have sparks, screen shake on big moments, banners for combos, levels and big wins, and numbers that pop when they change.
@@ -196,6 +200,10 @@ The player at the bottom of the sidebar reads what is playing from Windows media
 ## Memory
 
 Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpers restart themselves every few hours, song artwork and achievement caches are capped, cards for removed games are dropped, and the music player only sends updates when something changes. The Discord tab and the Remote Play stream are the heavy parts; Close tab and End stream free them.
+
+## What's new in 0.16.3
+
+- **Four puzzle games in the Arcade:** Vault Crossword, Vault Sudoku, Vault Word Search and Vault Maze.
 
 ## What's new in 0.16.2
 

@@ -538,6 +538,7 @@ const GAMES3 = { merge: gemMerge, sweep: vaultSweeper, flight: emberFlight, raid
 // Small pictures for the Arcade tiles.
 function drawPreview3(c, x, acc) {
   const g = c.dataset.game;
+  if (typeof drawPreview5 === 'function' && ['crossword', 'sudoku', 'wordsearch', 'maze'].includes(g)) { drawPreview5(g, x, acc); return; }
   if (g === 'merge') {
     const vals = [[2, 4, 8, 0], [16, 32, 64, 2], [128, 256, 0, 4], [512, 1024, 2048, 8]];
     const col = { 2: '#2a2a30', 4: '#34343c', 8: '#7a1d2b', 16: '#9a1f30', 32: '#b81e33', 64: '#d81f36', 128: '#f0452a', 256: '#ff6b3d', 512: '#ffb02e', 1024: '#ffd257', 2048: '#fff1a8' };
