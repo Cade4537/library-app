@@ -1799,3 +1799,6 @@ body.app-idle .set-bar { backdrop-filter: none; }
 .pz-wlist { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
 .pz-wlist span { padding: 3px 8px; border-radius: 6px; background: rgba(255,255,255,.07); font-size: 12px; font-weight: 700; letter-spacing: .04em; }
 .pz-wlist span.found { background: color-mix(in srgb, var(--c) 30%, transparent); color: var(--c); text-decoration: line-through; }
+
+/* ---------- 0.16.4: background mode ---------- */
+body.cv-asleep *, body.cv-asleep *::before, body.cv-asleep *::after { animation-play-state: paused !important; }

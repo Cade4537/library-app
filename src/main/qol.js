@@ -31,9 +31,14 @@ class Qol {
 
   // ---------- notifications ----------
   // Shows a Windows notification. With "hold" set, it waits while a game is running (do not disturb).
-  notify({ title, body, hold, click, kind }) {
+  notify({ title, body, hold, click, kind, id }) {
     // Every alert also goes to the guide's Alerts tab, so a missed pop up can be read later.
-    if (kind !== 'summary-batch') this.d.sendTo('qol:alert', { title, body, at: Date.now(), kind: kind || 'info' });
+    // While the window is closed in the tray, alerts wait here until it opens again.
+    if (kind !== 'summary-batch') {
+      const a = { title, body, at: Date.now(), kind: kind || 'info', id: id || null };
+      if (this.d.hasWindow && !this.d.hasWindow()) { (this.pending || (this.pending = [])).push(a); if (this.pending.length > 60) this.pending.shift(); }
+      else this.d.sendTo('qol:alert', a);
+    }
     if (hold && this.s.dndWhilePlaying !== false && this.gameRunning()) { this.queue.push({ title, body }); return; }
     if (!Notification.isSupported()) return;
     try {

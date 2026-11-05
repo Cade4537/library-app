@@ -23,6 +23,15 @@ const { detectSteamId } = require('./src/main/owned/steam');
 const auth = require('./src/main/auth');
 const { XboxLive } = require('./src/main/xboxlive');
 const { ConsolePlay } = require('./src/main/consoleplay');
+const { Power } = require('./src/main/power');
+const { TrayAlerts } = require('./src/main/trayalerts');
+
+// Turning off the graphics card for this app (Settings, Health) has to happen before the app starts.
+try {
+  const fs0 = require('fs');
+  const saved = JSON.parse(fs0.readFileSync(path.join(app.getPath('userData'), 'library.json'), 'utf8'));
+  if (saved && saved.settings && saved.settings.gpuAcceleration === false) app.disableHardwareAcceleration();
+} catch {}
 const { EpicClient } = require('./src/main/epicClient');
 const { getLaunchers, openLauncher } = require('./src/main/launchers');
 const { getDrives, SizeTracker, uninstall } = require('./src/main/storage');
@@ -47,6 +56,9 @@ let steamInfo = null;
 let playtime = null;
 let friends = null;
 let consolePlay = null;
+let power = null;
+let trayAlerts = null;
+let windowCount = 0;
 let xbox = null;
 let epic = null;
 let sizes = null;
@@ -309,7 +321,13 @@ function createWindow() {
     if (/^https:\/\//.test(url)) shell.openExternal(url);
     return { action: 'deny' };
   });
-  if (startHidden && store.data.settings.closeToTray !== false) win.once('ready-to-show', () => hideWindow());
+  windowCount++;
+  if (startHidden && windowCount === 1 && store.data.settings.closeToTray !== false) win.once('ready-to-show', () => hideWindow());
+  // Background mode follows every change in the window's state.
+  for (const ev of ['show', 'hide', 'minimize', 'restore', 'focus', 'blur']) win.on(ev, () => { if (power) power.update(); });
+  win.on('closed', () => { win = null; if (power) power.update(); });
+  win.on('resize', () => { if (streamView && streamView.full) streamView.layout(); });
+  win.webContents.on('did-finish-load', () => { if (power) sendTo('app:background', power.background); });
   // Closing the window keeps Crimson Vault running in the tray (unless turned off in Settings).
   win.on('close', (e) => {
     if (!quitting && store.data.settings.closeToTray !== false && tray) { e.preventDefault(); hideWindow(); }
@@ -341,7 +359,8 @@ function hideWindow() {
 }
 
 function showWindow() {
-  if (!win || win.isDestroyed()) return;
+  // The window is closed after a while in the tray to free memory; open a new one.
+  if (!win || win.isDestroyed()) { createWindow(); return; }
   if (win.isMinimized()) win.restore();
   win.show(); win.focus();
 }
@@ -739,6 +758,10 @@ function registerIpc() {
   });
   ipcMain.handle('friends:get', () => friends.state);
   ipcMain.handle('storage:drives', () => getDrives().catch(() => []));
+  ipcMain.handle('alerts:sync', (_e, p) => { store.data.settings.friendAlertPrefs = { on: p && p.on !== false, mode: (p && p.mode) || 'owned', muted: (p && Array.isArray(p.muted) ? p.muted : []).slice(0, 500) }; store.changed(); });
+  ipcMain.handle('qol:pending', () => { const l = (qol && qol.pending) || []; if (qol) qol.pending = []; return l; });
+  ipcMain.handle('power:state', () => (power ? power.state() : null));
+  ipcMain.handle('power:check', async () => { if (power) await power.health().catch(() => {}); return power ? power.state() : null; });
   ipcMain.handle('console:state', () => (consolePlay ? consolePlay.state() : null));
   ipcMain.handle('console:check', async () => { if (!consolePlay || !consolePlay.enabled()) return consolePlay ? consolePlay.state() : null; try { await consolePlay.check(); consolePlay.error = ''; } catch (e) { consolePlay.error = e.message; } return consolePlay.state(); });
   ipcMain.handle('qol:downloads', () => (qol ? qol.downloads().catch(() => []) : []));
@@ -821,13 +844,15 @@ if (!app.requestSingleInstanceLock()) {
       achievements: async (it, force) => getAchievements(store, it, await getSteamId(), xbox, epic, force),
       sendTo: (ch, v) => sendTo(ch, v),
       showWindow: () => showWindow(),
+      hasWindow: () => !!(win && !win.isDestroyed()),
     });
+    trayAlerts = new TrayAlerts({ store, notify: (n) => qol.notify(n), prefs: () => store.data.settings.friendAlertPrefs || {} });
     sizes = new SizeTracker(store, () => store.changed());
     xbox = new XboxLive(store);
     epic = new EpicClient(store);
     ubisoft = new UbisoftActivity(store);
     consolePlay = new ConsolePlay({ store, xbox, notify: (n) => qol.notify(n), sendTo: (ch, v) => sendTo(ch, v) });
-    friends = new Friends(store, (s) => sendTo('friends:state', s), getSteamId, xbox, epic);
+    friends = new Friends(store, (s) => { sendTo('friends:state', s); if (win && !win.isDestroyed()) trayAlerts.reset(); else trayAlerts.check(s); }, getSteamId, xbox, epic);
     diag.log('start', { version: app.getVersion(), hidden: startHidden });
     app.on('child-process-gone', (_e, d) => { diag.log('process-gone', d); if (d && d.type === 'GPU') leaveFullScreen(); });
     // Memory every 30 minutes, so a slow leak shows up in the log.
@@ -844,13 +869,28 @@ if (!app.requestSingleInstanceLock()) {
     qol.start();
     consolePlay.start();
     streamView = new StreamView(() => win, (st) => sendTo('stream:state', st));
-    win.on('resize', () => { if (streamView.full) streamView.layout(); });
     discordView = new DiscordView(() => win, (list) => new Promise((resolve) => {
       const id = Math.random().toString(36).slice(2);
       pendingSource.set(id, resolve);
       sendTo('discord:pickSource', { id, list });
       setTimeout(() => { if (pendingSource.has(id)) { pendingSource.delete(id); resolve(null); } }, 120000);
     }));
+    power = new Power({
+      store, diag,
+      getWin: () => win,
+      destroyWin: () => { leaveFullScreen(); try { if (discordView) discordView.unload(); } catch {} if (win && !win.isDestroyed()) win.destroy(); win = null; },
+      // Not while a game, a console session, a stream, a scan or (for the window) the Discord tab is going.
+      isBusy: (o) => {
+        const gameOn = playtime && [...playtime.running].some((id) => { const it = store.data.items[id]; return it && it.kind === 'game'; });
+        return !!(gameOn || (consolePlay && consolePlay.current) || (streamView && streamView.open) || scanning || (discordView && discordView.view) || (o.restart && updater && updater.state && updater.state.status === 'downloading'));
+      },
+      helperPids: () => [playtime && playtime.proc && playtime.proc.pid, media && media.proc && media.proc.pid].filter(Boolean),
+      onBackground: (bg) => sendTo('app:background', bg),
+      discordLoaded: () => !!(discordView && discordView.view),
+      unloadDiscord: () => { if (discordView) discordView.unload(); sendTo('discord:unloaded', true); },
+    });
+    power.start();
+    power.update();
     updatePresence();
     setTimeout(() => friends.start(), 4000);
     updater.start();

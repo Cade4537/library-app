@@ -6,16 +6,26 @@ const { fsp, runPowerShellJson, asArray } = require('./util');
 const { launchItem } = require('./launch');
 
 let drivesCache = null;
+let driveList = null;
 
+// 0.16.4: the list of drives (and their names) comes from Windows once an hour; free space is read
+// directly from the disk each time, which needs no PowerShell at all.
 async function getDrives() {
   if (drivesCache && Date.now() - drivesCache.t < 30000) return drivesCache.v;
-  const r = await runPowerShellJson(
-    "ConvertTo-Json -InputObject @(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' | Select-Object DeviceID,VolumeName,Size,FreeSpace) -Compress",
-    20000
-  );
-  const v = asArray(r)
-    .filter((d) => d && d.DeviceID && d.Size)
-    .map((d) => ({ id: d.DeviceID, label: d.VolumeName || '', size: Number(d.Size) || 0, free: Number(d.FreeSpace) || 0 }));
+  if (!driveList || Date.now() - driveList.t > 3600 * 1000) {
+    const r = await runPowerShellJson(
+      "ConvertTo-Json -InputObject @(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' | Select-Object DeviceID,VolumeName,Size,FreeSpace) -Compress",
+      20000
+    );
+    const list = asArray(r).filter((d) => d && d.DeviceID && d.Size).map((d) => ({ id: d.DeviceID, label: d.VolumeName || '', size: Number(d.Size) || 0, free: Number(d.FreeSpace) || 0 }));
+    if (list.length || !driveList) driveList = { t: Date.now(), v: list };
+  }
+  const v = await Promise.all(driveList.v.map(async (d) => {
+    try {
+      const st = await fsp.statfs(`${d.id}\\`);
+      return { ...d, size: Number(st.blocks) * Number(st.bsize) || d.size, free: Number(st.bavail) * Number(st.bsize) };
+    } catch { return d; }
+  }));
   drivesCache = { t: Date.now(), v };
   return v;
 }

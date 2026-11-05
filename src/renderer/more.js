@@ -523,6 +523,8 @@ function healthSection() {
   const draw = async () => {
     let d;
     try { d = await api.diag(); } catch { d = null; }
+    let pw = null;
+    try { pw = api.powerState ? await api.powerState() : null; } catch {}
     if (!d) { fillEl(box, h('div', { class: 'help' }, 'Not available.')); return; }
     const types = Object.entries(d.byTypeMB || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v} MB`).join(' · ');
     const bad = (d.log || []).filter((l) => /crashed|unresponsive|process-gone|load-failed/.test(l));
@@ -535,13 +537,22 @@ function healthSection() {
       h('div', { class: 'help' }, types),
       h('div', { class: 'help' }, `Music helper ${d.helpers && d.helpers.music ? 'on' : 'off'} · Hours tracker ${d.helpers && d.helpers.playtime ? 'on' : 'off'} · Discord tab ${d.discordOpen ? 'loaded' : 'closed'} · Xbox stream ${d.streamOpen ? 'open' : 'closed'}`),
       bad.length ? h('div', { class: 'note err', style: { margin: 0 } }, `${bad.length} recent problem${bad.length === 1 ? '' : 's'}: `, bad.slice(-3).map((l) => h('div', {}, l))) : h('div', { class: 'help' }, 'No crashes or hangs logged recently.'),
+      pw && pw.health ? h('div', { class: 'help' }, `Windows handles ${pw.health.handles != null ? pw.health.handles.toLocaleString() : '?'} · GDI ${pw.health.gdi != null ? pw.health.gdi : '?'} · USER ${pw.health.user != null ? pw.health.user : '?'} · GPU ${pw.health.gpuMB} MB${pw.restartWanted ? ' · a quiet restart is due' : ''}`) : null,
       h('div', { class: 'row', style: { gap: '8px' } },
-        h('button', { class: 'btn', onclick: () => draw() }, icon('refresh'), 'Refresh'),
+        h('button', { class: 'btn', onclick: async () => { if (api.powerCheck) await api.powerCheck(); draw(); } }, icon('refresh'), 'Refresh'),
         h('button', { class: 'btn', onclick: async () => { await api.copyText(JSON.stringify({ ...d, log: d.log }, null, 1)); showToast('Health report copied'); } }, 'Copy report'),
         h('button', { class: 'btn', onclick: () => api.openDataFolder() }, 'Open log folder')));
   };
   draw();
-  return [h('div', { class: 'section-label' }, 'Health'), h('div', { class: 'field' }, box)];
+  const s = S.lib.settings || {};
+  const tg = (label, sub, key, def = true, restart = false) => h('div', { class: 'field' }, toggleRow(label, sub, s[key] === undefined ? def : s[key] !== false, (v) => { api.updateSettings({ [key]: v }); if (restart) showToast('Restart Crimson Vault for this to take effect'); }));
+  return [h('div', { class: 'section-label' }, 'Health'), h('div', { class: 'field' }, box),
+    h('div', { class: 'help', style: { margin: '4px 0 8px' } }, 'Background mode keeps Crimson Vault light when you are not using it, so it can stay open for days.'),
+    tg('Lower priority in the background', 'When minimized or in the tray, every part of Crimson Vault runs at below normal priority, so games and Windows come first', 'lowPriorityInBackground'),
+    tg('Free memory in the tray', 'After 3 minutes in the tray the window closes to free memory and graphics resources. Alerts, hours tracking, music and the phone remote keep working, and the window opens again from the tray icon.', 'freeWindowInTray'),
+    tg('Close the Discord tab after an hour in the tray', 'The Discord tab is a full web app and grows over time', 'closeDiscordInTray'),
+    tg('Quiet restart once a day', 'After 24 hours, or if Windows resources start to build up, Crimson Vault restarts itself in the tray when nothing is going on (never during a game, stream or download)', 'dailyRefresh'),
+    tg('Use the graphics card for this app', 'Turn off if your screen, wallpaper or taskbar acts up while Crimson Vault is open. Animations get a bit less smooth. Needs a restart.', 'gpuAcceleration', true, true)];
 }
 
 function wireMore() {

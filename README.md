@@ -201,6 +201,16 @@ The player at the bottom of the sidebar reads what is playing from Windows media
 
 Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpers restart themselves every few hours, song artwork and achievement caches are capped, cards for removed games are dropped, and the music player only sends updates when something changes. The Discord tab and the Remote Play stream are the heavy parts; Close tab and End stream free them.
 
+## What's new in 0.16.4
+
+- **Background mode, for leaving Crimson Vault open for days:**
+  - Minimized or in the tray, every part of the app runs at below normal priority, and the page stops its timers and animations.
+  - After 3 minutes in the tray the window closes to free memory and graphics resources. Alerts, hours tracking, Xbox play, music and the phone remote keep working, and the window opens again from the tray icon. Alerts that came in meanwhile show up in the Alerts tab.
+  - The Discord tab closes after an hour in the tray.
+  - Once a day, or if Windows handles or memory start to build up, Crimson Vault restarts itself quietly in the tray when nothing is going on (never during a game, a console session, a stream or a download).
+  - Drive space is read straight from the disk instead of starting PowerShell every few minutes.
+  - Settings, Health shows Windows handle and graphics counts, logs them every 30 minutes, and has a switch to stop using the graphics card if the screen, wallpaper or taskbar act up.
+
 ## What's new in 0.16.3
 
 - **Four puzzle games in the Arcade:** Vault Crossword, Vault Sudoku, Vault Word Search and Vault Maze.
