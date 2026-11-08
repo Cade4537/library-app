@@ -121,6 +121,18 @@ Click a friend for their profile: status, what they are playing and for how long
 
 Friend alerts only fire when a friend starts a different game, so changing modes or rich presence text inside the same game does not count. The same friend and game never alert twice within 3 hours, friends who start the same game together share one alert, and you can choose alerts for games you own or any game in Settings.
 
+## Anime (AniList)
+
+Your anime list from AniList, on its own page (Home, the guide, or the Anime tile).
+
+- **Tabs:** Watching, Planned, Completed, Paused, Dropped and All, with search (titles and genres) and sorting (recently updated, title, your score, AniList score, progress, next episode, newest).
+- **Surprise me:** choose to pick from Planned, Watching, Completed or All, optionally only shows of 13 episodes or less and one genre, and it spins through your covers and lands on one, with how long it takes to watch and a Watch on button for its streaming site.
+- **Next episodes:** shows you are watching that are still airing, with a countdown, plus a pop up when a new episode comes out (Settings, Connections, AniList).
+- **Details:** banner, cover, synopsis, genres, studio, AniList score and where to watch.
+- **Editing (signed in):** +1 episode straight from a card, change status, episodes and score in the details, move shows between lists from the right click menu, and Add anime to search AniList and add a show.
+
+To set it up, type your AniList user name on the Anime page. That is enough to read a public list. To edit from Crimson Vault (or see a private list), sign in once: Settings, Connections, AniList has the steps (AniList asks every app to use its own free API client).
+
 ## Xbox console play
 
 Crimson Vault reads your own Xbox presence (Microsoft sign in or OpenXBL key) every minute or two, so it knows when you play on an Xbox console, through Xbox Remote Play or cloud gaming. Each session is saved with the game, the console, how long you played and the achievements you unlocked during it, and a pop up sums it up when you stop. You see it at the top of the Friends page, on the Home Xbox tile, on the Remote Play page and in each game's play history ("on Xbox"). It only works while Crimson Vault is running (the tray is fine), and sessions under 2 minutes are skipped. Turn it off in Settings, Quality of life.
@@ -200,6 +212,10 @@ The player at the bottom of the sidebar reads what is playing from Windows media
 ## Memory
 
 Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpers restart themselves every few hours, song artwork and achievement caches are capped, cards for removed games are dropped, and the music player only sends updates when something changes. The Discord tab and the Remote Play stream are the heavy parts; Close tab and End stream free them.
+
+## What's new in 0.16.5
+
+- **Anime page with AniList:** Watching, Planned, Completed, Paused, Dropped and All, a Surprise me picker, next episode countdowns and alerts, and editing when signed in. See Anime above.
 
 ## What's new in 0.16.4
 

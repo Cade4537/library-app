@@ -94,7 +94,7 @@ function renderHub() {
   const sale = ((HUB.deals && HUB.deals.wish && HUB.deals.wish.items) || []).filter((w) => w.discount > 0).length;
   const freeSpace = S.drives ? S.drives.reduce((a, d) => a + d.free, 0) : null;
   const news = prefs.get('showNews', true) ? (HUB.news || []).slice(0, 3) : [];
-  const sig = JSON.stringify([last && [last.id, last.running, last.minutes, last.coverUrl], online.map((p) => p.name + p.status), installed, free.map((f) => f.title), sale, freeSpace, news.map((n) => n.url), S.stream.open, S.console && S.console.current && [S.console.current.name, Math.floor((Date.now() - S.console.current.s) / 60000)], !!S.tv, new Date().getHours()]);
+  const sig = JSON.stringify([last && [last.id, last.running, last.minutes, last.coverUrl], online.map((p) => p.name + p.status), installed, free.map((f) => f.title), sale, freeSpace, news.map((n) => n.url), S.stream.open, S.console && S.console.current && [S.console.current.name, Math.floor((Date.now() - S.console.current.s) / 60000)], !!S.tv, new Date().getHours(), typeof animeTileText === 'function' ? animeTileText() : '']);
   if (box.dataset.sig !== sig) {
     box.dataset.sig = sig;
     keepFocus(box, () => fillEl(box,
@@ -108,6 +108,7 @@ function renderHub() {
         tile('t:social', 'users', 'Social', online.length ? `${online.length} online${playing.length ? ` · ${playing.length} playing` : ''}` : 'Friends and Discord', () => setView({ type: 'friends' })),
         tile('t:stats', 'chart', 'Statistics', `${fmtHours(games.reduce((a, it) => a + (it.minutes || 0), 0)) || '0 hrs'} played`, () => setView({ type: 'stats' })),
         tile('t:surprise', 'dice', 'Surprise me', 'Let fate pick a game', () => setView({ type: 'surprise' }), 'accent'),
+        tile('t:anime', 'tv', 'Anime', animeTileText(), () => setView({ type: 'anime' })),
         tile('t:xbox', 'gamepad', 'Xbox Remote Play', S.console && S.console.current ? `On Xbox: ${S.console.current.name} · ${consoleTime(consoleMins(S.console.current))}` : S.stream.open ? 'Streaming now' : 'Play your console here', () => setView({ type: 'remoteplay' }), S.console && S.console.current ? 'live' : '')),
       free.length ? h('section', { class: 'hub-sec' },
         h('div', { class: 'sec-head' }, h('h3', { class: 'section-title' }, 'Free to keep'), h('button', { class: 'link-btn', onclick: () => setView({ type: 'deals' }) }, 'All deals')),

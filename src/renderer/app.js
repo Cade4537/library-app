@@ -263,6 +263,7 @@ function viewTitle(view = S.view) {
     case 'hub': return 'Home';
     case 'library': case 'libcollections': case 'libcategories': case 'liblaunchers': case 'libmanage': return 'Library';
     case 'surprise': return 'Surprise me';
+    case 'anime': return 'Anime';
     case 'settings': return 'Settings';
     case 'home': return 'Everything';
     case 'games': return 'Games';
@@ -489,6 +490,8 @@ function render() {
   const lb = ['library', 'libcollections', 'libcategories', 'liblaunchers', 'libmanage'].includes(S.view.type);
   const sp = S.view.type === 'surprise';
   const st = S.view.type === 'settings';
+  const an = S.view.type === 'anime';
+  $('#animeView').hidden = !an;
   $('#surpriseView').hidden = !sp;
   $('#settingsView').hidden = !st;
   // Leaving Settings with changes saves them.
@@ -500,7 +503,7 @@ function render() {
   $('#libraryView').hidden = !lb;
   $('#news').hidden = true;
   document.body.classList.toggle('hub-on', hb);
-  if (tv2 || av || dl || hb || lb || sp || st) {
+  if (tv2 || av || dl || hb || lb || sp || st || an) {
     for (const id of ['#friendsView', '#launchersView', '#storageView', '#grid', '#filters', '#jump', '#collections', '#news', '#empty', '#discordView', '#streamView']) $(id).hidden = true;
     document.body.classList.remove('discord-on');
     renderSidebar();
@@ -508,6 +511,7 @@ function render() {
     if (hb) renderHub();
     else if (lb) renderLibraryHub();
     else if (sp) renderSurprisePage();
+    else if (an) renderAnimePage(render.shownView !== 'anime');
     else if (st) { if (render.shownView !== 'settings') buildSettingsPage(); }
     else if (dl) { if (render.shownView !== 'deals') renderDeals(); }
     else if (av) { if (render.shownView !== 'arcade') renderArcade(); }
@@ -715,9 +719,9 @@ function renderHeader() {
       ])));
     }
   }
-  const noCount = ['discord', 'remoteplay', 'stats', 'arcade', 'deals', 'hub', 'library', 'libcollections', 'libcategories', 'liblaunchers', 'libmanage', 'surprise', 'launchers', 'storage'].includes(S.view.type);
+  const noCount = ['discord', 'remoteplay', 'stats', 'arcade', 'deals', 'hub', 'library', 'libcollections', 'libcategories', 'liblaunchers', 'libmanage', 'surprise', 'launchers', 'storage', 'anime'].includes(S.view.type);
   const total = S.view.type === 'friends' ? (S.friends.people || []).length : noCount ? 0 : viewItems().length;
-  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : S.view.type === 'storage' ? (S.drives ? `${fmtBytes(S.drives.reduce((a, d) => a + d.free, 0))} free` : '') : ['discord', 'remoteplay', 'stats', 'arcade', 'deals', 'hub', 'library', 'libcollections', 'libcategories', 'liblaunchers', 'libmanage', 'surprise', 'settings'].includes(S.view.type) ? '' : `${total} ${total === 1 ? 'item' : 'items'}`)));
+  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : S.view.type === 'storage' ? (S.drives ? `${fmtBytes(S.drives.reduce((a, d) => a + d.free, 0))} free` : '') : ['discord', 'remoteplay', 'stats', 'arcade', 'deals', 'hub', 'library', 'libcollections', 'libcategories', 'liblaunchers', 'libmanage', 'surprise', 'settings', 'anime'].includes(S.view.type) ? '' : `${total} ${total === 1 ? 'item' : 'items'}`)));
   if (S.view.type === 'friends' || S.view.type === 'discord') kids.push(socialTabs());
   if (isLibraryView(S.view.type)) kids.unshift(libTabs());
   if (S.view.type === 'discord') {
@@ -1661,6 +1665,7 @@ function buildSettingsPage() {
       connBlock('SteamGridDB', !!s.steamGridDbKey, null, 'sgdb',
         h('div', { class: 'field' }, h('label', {}, 'SteamGridDB API key'), sgdb.row,
           h('div', { class: 'help' }, 'Cover art for games from other launchers and for apps.'))),
+      anilistConnBlock(s, connBlock),
       h('div', { class: 'section-label' }, 'Library'),
       h('div', { class: 'field' }, toggleRow('Sort games by genre', 'Uses Steam store info, like Action, RPG or Racing. Demos and playtests always go to Demos.', genreSort, (v) => { genreSort = v; })),
       h('div', { class: 'field' }, toggleRow('Include Windows apps', 'Start Menu, Desktop and Microsoft Store apps', includeApps, (v) => { includeApps = v; })),
@@ -1766,6 +1771,13 @@ function openConnectionsHelp(focus) {
       ['Go to your API page. ', linkBtn('Open SteamGridDB API page', 'https://www.steamgriddb.com/profile/preferences/api')],
       'Click Generate API Key and copy it.',
       'In this app, open Settings, paste it into SteamGridDB API key, and click Save. Covers start filling in right away.',
+    ]),
+    helpSection('anilist', 'AniList: your anime list', 'Reading your list only needs your AniList user name (Settings, Connections, AniList, or the Anime page). Signing in lets you change episodes, status and scores from Crimson Vault and shows a private list. AniList asks every app to use its own free API client, so this takes a minute once.', [
+      ['Open AniList\'s developer settings and sign in. ', linkBtn('Open AniList developer page', 'https://anilist.co/settings/developer')],
+      'Click Create New Client. Name it Crimson Vault.',
+      ['For Redirect URL, paste this:', copyRow('https://anilist.co/api/v2/oauth/pin')],
+      'Click Save, then copy the number shown as the client ID.',
+      'In Crimson Vault, open Settings, Connections, AniList, paste the ID next to Sign in and click Sign in. Sign in on AniList\'s own page and click Authorize. The window closes by itself.',
     ]),
     helpSection('gog', 'GOG', null, [
       'Nothing to set up. If GOG Galaxy is installed and signed in on this PC, your GOG games show up automatically.',

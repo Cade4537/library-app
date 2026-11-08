@@ -21,7 +21,7 @@ function guideAlerts() {
   prefs.set('alertsSeen', Date.now());
   if (!list.length) return [h('div', { class: 'gd-empty' }, icon('bell'), h('span', {}, 'No alerts yet. Friend activity, session summaries, deals and downloads show up here.'))];
   return [
-    h('div', { class: 'gd-flist' }, list.slice(0, 40).map((a, i) => h('button', { class: `gd-alert k-${a.kind}`, 'data-k': `al:${a.at}`, style: `--d:${Math.min(i, 10)}`, onclick: () => { if (a.id && S.byId.has(a.id)) { S.guideOpen = false; document.body.classList.remove('guide-open'); openDetails(a.id); } else if (a.kind === 'deal') setView({ type: 'deals' }); else if (a.kind === 'storage') setView({ type: 'storage' }); else if (a.kind === 'xbox' && typeof openConsoleHistory === 'function') openConsoleHistory(); } },
+    h('div', { class: 'gd-flist' }, list.slice(0, 40).map((a, i) => h('button', { class: `gd-alert k-${a.kind}`, 'data-k': `al:${a.at}`, style: `--d:${Math.min(i, 10)}`, onclick: () => { if (a.id && S.byId.has(a.id)) { S.guideOpen = false; document.body.classList.remove('guide-open'); openDetails(a.id); } else if (a.kind === 'deal') setView({ type: 'deals' }); else if (a.kind === 'storage') setView({ type: 'storage' }); else if (a.kind === 'xbox' && typeof openConsoleHistory === 'function') openConsoleHistory(); else if (a.kind === 'anime') { S.guideOpen = false; document.body.classList.remove('guide-open'); setView({ type: 'anime' }); } } },
       h('span', { class: 'gd-aic' }, icon(ALERT_ICONS[a.kind] || 'bell')),
       h('div', { class: 'hf-text' }, h('b', {}, a.title), a.body ? h('span', {}, a.body) : null),
       h('span', { class: 'gd-atime' }, timeAgo(a.at))))),

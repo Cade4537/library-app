@@ -25,6 +25,7 @@ const { XboxLive } = require('./src/main/xboxlive');
 const { ConsolePlay } = require('./src/main/consoleplay');
 const { Power } = require('./src/main/power');
 const { TrayAlerts } = require('./src/main/trayalerts');
+const { AniList } = require('./src/main/anilist');
 
 // Turning off the graphics card for this app (Settings, Health) has to happen before the app starts.
 try {
@@ -58,6 +59,7 @@ let friends = null;
 let consolePlay = null;
 let power = null;
 let trayAlerts = null;
+let anilist = null;
 let windowCount = 0;
 let xbox = null;
 let epic = null;
@@ -126,6 +128,9 @@ function publicSettings() {
   s.xboxConnected = !!(s.xboxLive && s.xboxLive.refreshToken);
   s.xboxGamertag = (s.xboxLive && s.xboxLive.gamertag) || '';
   delete s.xboxLive;
+  s.anilistConnected = !!(s.anilistAuth && s.anilistAuth.token);
+  s.anilistName = (s.anilistAuth && s.anilistAuth.name) || '';
+  delete s.anilistAuth;
   return s;
 }
 
@@ -622,7 +627,10 @@ function registerIpc() {
 
   ipcMain.handle('settings:update', (_e, patch) => {
     const before = store.data.settings;
+    patch = { ...patch };
+    delete patch.anilistAuth;
     store.data.settings = { ...before, ...patch };
+    if ('anilistUser' in patch && patch.anilistUser !== before.anilistUser && anilist) anilist.cache = null;
     if (['discordClientId', 'discordPresence', 'discordBrowsing'].some((k) => k in patch)) updatePresence();
     const keyChanged = 'steamGridDbKey' in patch && patch.steamGridDbKey !== before.steamGridDbKey;
     store.changed();
@@ -758,6 +766,12 @@ function registerIpc() {
   });
   ipcMain.handle('friends:get', () => friends.state);
   ipcMain.handle('storage:drives', () => getDrives().catch(() => []));
+  // AniList (the Anime page)
+  ipcMain.handle('anime:list', async (_e, force) => { try { return await anilist.list(!!force); } catch (e) { return { configured: anilist.configured, error: e.message, entries: (anilist.cache && anilist.cache.entries) || [] }; } });
+  ipcMain.handle('anime:save', async (_e, mediaId, patch) => { try { return { ok: true, entry: await anilist.save(mediaId, patch || {}) }; } catch (e) { return { ok: false, error: e.message }; } });
+  ipcMain.handle('anime:search', async (_e, q) => { try { return { ok: true, results: await anilist.search(q) }; } catch (e) { return { ok: false, error: e.message, results: [] }; } });
+  ipcMain.handle('anime:signIn', async (_e, clientId) => anilist.signIn(win, clientId));
+  ipcMain.handle('anime:signOut', async () => { await anilist.signOut(); return true; });
   ipcMain.handle('alerts:sync', (_e, p) => { store.data.settings.friendAlertPrefs = { on: p && p.on !== false, mode: (p && p.mode) || 'owned', muted: (p && Array.isArray(p.muted) ? p.muted : []).slice(0, 500) }; store.changed(); });
   ipcMain.handle('qol:pending', () => { const l = (qol && qol.pending) || []; if (qol) qol.pending = []; return l; });
   ipcMain.handle('power:state', () => (power ? power.state() : null));
@@ -846,6 +860,29 @@ if (!app.requestSingleInstanceLock()) {
       showWindow: () => showWindow(),
       hasWindow: () => !!(win && !win.isDestroyed()),
     });
+    anilist = new AniList(store);
+    // New episode alerts for shows you are watching (works in the tray too).
+    const animeAlerts = async () => {
+      if (!anilist.configured || store.data.settings.animeAlerts === false) return;
+      let l;
+      try { l = await anilist.list(false); } catch { return; }
+      const seen = store.data.settings.anilistNext || (store.data.settings.anilistNext = {});
+      const sent = store.data.settings.anilistSent || (store.data.settings.anilistSent = {});
+      const now = Date.now();
+      for (const e of l.entries || []) {
+        if (!['CURRENT', 'REPEATING'].includes(e.status)) continue;
+        const prev = seen[e.mediaId];
+        // The episode we were waiting for has aired (and you have not watched it yet).
+        if (prev && prev.at <= now && prev.episode > e.progress && sent[e.mediaId] !== prev.episode && now - prev.at < 2 * 86400e3) {
+          sent[e.mediaId] = prev.episode;
+          qol.notify({ kind: 'anime', title: `${e.title}: episode ${prev.episode} is out`, body: e.streams && e.streams[0] ? `Watch it on ${e.streams[0].site}` : 'New episode' });
+        }
+        if (e.next) seen[e.mediaId] = { episode: e.next.episode, at: e.next.at };
+      }
+      store.changed();
+    };
+    setTimeout(animeAlerts, 60 * 1000);
+    setInterval(animeAlerts, 15 * 60 * 1000);
     trayAlerts = new TrayAlerts({ store, notify: (n) => qol.notify(n), prefs: () => store.data.settings.friendAlertPrefs || {} });
     sizes = new SizeTracker(store, () => store.changed());
     xbox = new XboxLive(store);

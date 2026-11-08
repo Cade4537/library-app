@@ -14,6 +14,7 @@ const MAIN_PAGES = [
   ['friends', 'Social', 'users'],
   ['stats', 'Statistics', 'chart'],
   ['surprise', 'Surprise me', 'dice'],
+  ['anime', 'Anime', 'tv'],
   ['remoteplay', 'Xbox Remote Play', 'gamepad'],
 ];
 const LIB_TYPES = new Set(['library', 'games', 'apps', 'favorites', 'recent', 'backlog', 'added', 'home', 'arcade', 'category', 'smart', 'launcher', 'uncategorized', 'hidden', 'libcollections', 'libcategories', 'liblaunchers', 'libmanage']);
