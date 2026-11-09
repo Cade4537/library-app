@@ -126,7 +126,7 @@ Friend alerts only fire when a friend starts a different game, so changing modes
 Your anime list from AniList, on its own page (Home, the guide, or the Anime tile).
 
 - **Tabs:** Watching, Planned, Completed, Paused, Dropped and All, with search (titles and genres) and sorting (recently updated, title, your score, AniList score, progress, next episode, newest).
-- **Surprise me:** choose to pick from Planned, Watching, Completed or All, optionally only shows of 13 episodes or less and one genre, and it spins through your covers and lands on one, with how long it takes to watch and a Watch on button for its streaming site.
+- **Surprise me:** choose to pick from Planned, Watching, Completed or All, optionally only shows of 13 episodes or less and one genre. It opens the same full screen reel as the games' Surprise me (spinning covers with motion blur, ticking sound, the backdrop changing as it slows, sparks and a chord when it lands, then the show's banner) and shows how long it takes to watch, with Watch on, Spin again and Details. Space or X spins again, Esc or B closes.
 - **Next episodes:** shows you are watching that are still airing, with a countdown, plus a pop up when a new episode comes out (Settings, Connections, AniList).
 - **Details:** banner, cover, synopsis, genres, studio, AniList score and where to watch.
 - **Editing (signed in):** +1 episode straight from a card, change status, episodes and score in the details, move shows between lists from the right click menu, and Add anime to search AniList and add a show.
@@ -212,6 +212,10 @@ The player at the bottom of the sidebar reads what is playing from Windows media
 ## Memory
 
 Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpers restart themselves every few hours, song artwork and achievement caches are capped, cards for removed games are dropped, and the music player only sends updates when something changes. The Discord tab and the Remote Play stream are the heavy parts; Close tab and End stream free them.
+
+## What's new in 0.16.6
+
+- **Anime Surprise me uses the full games reel:** spinning covers, sound, sparks and the show's banner when it lands.
 
 ## What's new in 0.16.5
 

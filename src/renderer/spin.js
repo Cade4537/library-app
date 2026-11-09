@@ -77,7 +77,9 @@ function burst(canvas, x, y, color) {
 }
 
 // ---------- the reel ----------
-function spinOverlay(pool, from) {
+// ad (optional) lets other things use the same reel, like the Anime page:
+// { art(it), bg(it) -> { url, color }, show(it, parts), primaryLabel }
+function spinOverlay(pool, from, ad) {
   const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#e11d2e';
   const ITEM = 176, GAP = 18, STEP = ITEM + GAP, WIN_AT = 42, COUNT = 50;
@@ -105,7 +107,7 @@ function spinOverlay(pool, from) {
   soundBtn.addEventListener('click', () => { prefs.set('spinSound', !Sfx.on()); setSoundIcon(); });
   const closeBtn = h('button', { class: 'icon-btn spin-close', title: 'Close (Esc)' }, icon('close'));
   const hints = h('div', { class: 'spin-hints' },
-    h('span', {}, h('b', { class: 'pb a' }, 'A'), 'Play'), h('span', {}, h('b', { class: 'pb x' }, 'X'), 'Spin again'), h('span', {}, h('b', { class: 'pb b' }, 'B'), 'Close'));
+    h('span', {}, h('b', { class: 'pb a' }, 'A'), ad && ad.primaryLabel ? ad.primaryLabel : 'Play'), h('span', {}, h('b', { class: 'pb x' }, 'X'), 'Spin again'), h('span', {}, h('b', { class: 'pb b' }, 'B'), 'Close'));
   const root = h('div', { class: 'spin' + (reduce ? ' reduce' : '') }, bg, bg2,
     h('div', { class: 'spin-vignette' }),
     h('div', { class: 'spin-top' }, h('div', { class: 'spin-title' }, icon('dice'), 'Surprise me'), h('span', { class: 'spacer' }), soundBtn, closeBtn),
@@ -116,6 +118,14 @@ function spinOverlay(pool, from) {
   const setBg = (it) => {
     const next = bgFlip ? bg : bg2; const prev = bgFlip ? bg2 : bg; bgFlip = !bgFlip;
     next.classList.remove('real');
+    if (ad) {
+      const b = ad.bg(it) || {};
+      next.style.backgroundImage = b.url ? `url("${String(b.url).replace(/"/g, '')}")` : 'none';
+      next.style.backgroundColor = b.url ? '' : b.color || '#15151a';
+      next.classList.add('on'); prev.classList.remove('on');
+      if (b.real) next.classList.add('real');
+      return;
+    }
     next.style.backgroundImage = it.coverUrl ? `url("${it.coverUrl}")` : 'none';
     next.style.backgroundColor = it.coverUrl ? '' : `hsl(${hashHue(it.name) % 360} 45% 14%)`;
     next.classList.add('on'); prev.classList.remove('on');
@@ -147,11 +157,12 @@ function spinOverlay(pool, from) {
   const fill = (winner) => {
     const items = [];
     for (let i = 0; i < COUNT; i++) items.push(i === WIN_AT ? winner : pool[Math.floor(Math.random() * pool.length)]);
-    strip.replaceChildren(...items.map((it, i) => h('div', { class: 'spin-item', 'data-i': i }, artFor(it))));
+    strip.replaceChildren(...items.map((it, i) => h('div', { class: 'spin-item', 'data-i': i }, ad ? ad.art(it) : artFor(it))));
     return items;
   };
 
   const showResult = (it) => {
+    if (ad) { ad.show(it, { name, meta, playBtn, detBtn, close }); return; }
     const ach = it.meta && it.meta.achievements && it.meta.achievements.total ? it.meta.achievements : null;
     const cat = it.categoryId ? catPath(it.categoryId).map((c) => c.name).slice(-1)[0] : null;
     name.textContent = displayName(it);
@@ -177,7 +188,7 @@ function spinOverlay(pool, from) {
     const winner = pickWinner();
     last = winner;
     currentItems = fill(winner);
-    heroUrlFor(winner); // start loading the winner's art while the reel spins
+    if (!ad) heroUrlFor(winner); // start loading the winner's art while the reel spins
     const reelW = reel.clientWidth;
     const center = reelW / 2 - ITEM / 2;
     const start = -(4 * STEP) + center;
@@ -222,7 +233,7 @@ function spinOverlay(pool, from) {
     if (el) el.classList.add('win');
     setBg(winner);
     showResult(winner);
-    if (typeof onSurpriseLanded === 'function') onSurpriseLanded(winner);
+    if (!ad && typeof onSurpriseLanded === 'function') onSurpriseLanded(winner);
     Sfx.land();
     const r = reel.getBoundingClientRect();
     ring.classList.remove('pulse'); void ring.offsetWidth; ring.classList.add('pulse');

@@ -1898,3 +1898,10 @@ body.cv-asleep *, body.cv-asleep *::before, body.cv-asleep *::after { animation-
 .an-setup .text-input { max-width: 280px; }
 @media (max-width: 1100px) { .an-surprise { grid-template-columns: 1fr; } }
 .an-air-art .an-fallback, .an-res-art .an-fallback { display: none; }
+/* Anime on the Surprise me reel */
+.an-spin-art { background: color-mix(in srgb, var(--c) 55%, #15151a); }
+.an-spin-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.an-spin-art .an-fallback { font-size: 15px; }
+.an-spin-art img + .an-fallback { display: none; }
+.spin-meta .an-src { --src: #02a9ff; }
+.spin-meta span .ic { width: 13px; height: 13px; margin-right: 4px; vertical-align: -2px; }

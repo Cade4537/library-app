@@ -1,4 +1,4 @@
-/* global Sfx, toggleRow, openMenu, renderHub, api, S, $, h, icon, prefs, fillEl, keepFocus, openModal, showToast, setView, timeAgo, norm, openSettings, openConnectionsHelp, confirmBox */
+/* global spinOverlay, Sfx, toggleRow, openMenu, renderHub, api, S, $, h, icon, prefs, fillEl, keepFocus, openModal, showToast, setView, timeAgo, norm, openSettings, openConnectionsHelp, confirmBox */
 // 0.16.5: the Anime page. Your AniList list (Watching, Planned, Completed, Paused, Dropped, All),
 // with a Surprise me picker that chooses from the lists you pick, show details, and (signed in)
 // episode, status and score updates.
@@ -245,7 +245,7 @@ function animeSurprisePanel() {
         h('button', { class: 'chip' + (short ? ' on' : ''), onclick: () => { prefs.set('animeShort', !short); S.animePick = null; renderAnimePage(true); } }, '13 episodes or less'),
         h('select', { class: 'text-input an-genre', onchange: (ev) => { prefs.set('animeGenre', ev.target.value); S.animePick = null; renderAnimePage(true); } },
           h('option', { value: '' }, 'Any genre'), genres.map((g) => h('option', { value: g, selected: g === genre }, g)))),
-      h('button', { class: 'btn primary an-sp-go', disabled: !n, onclick: () => animeSpin(stage) }, icon('dice'), S.animePick ? 'Pick again' : 'Pick an anime')),
+      h('button', { class: 'btn primary an-sp-go', disabled: !n, onclick: () => animeSpin() }, icon('dice'), S.animePick ? 'Pick again' : 'Pick an anime')),
     stage);
 }
 function animeSurprisePool() {
@@ -253,37 +253,41 @@ function animeSurprisePool() {
   const genre = prefs.get('animeGenre', '');
   return animeIn(prefs.get('animePool', 'planned')).filter((e) => (!short || (e.episodes && e.episodes <= 13)) && (!genre || e.genres.includes(genre)));
 }
-function animeSpin(stage) {
-  let pool = animeSurprisePool();
+function animeSpin() {
+  const pool = animeSurprisePool();
   if (!pool.length) return;
-  // Avoid picking the same show twice in a row when there is a choice.
-  if (pool.length > 1 && S.animePick) pool = pool.filter((e) => e.mediaId !== S.animePick.mediaId);
-  const pick = pool[Math.floor(Math.random() * pool.length)];
-  S.animeSpinning = true;
-  const reel = h('div', { class: 'an-reel' });
-  stage.replaceChildren(reel);
-  const btn = document.querySelector('.an-sp-go');
-  if (btn) btn.disabled = true;
-  let delay = 50, t = 0;
-  const show = (e) => reel.replaceChildren(animeArt(e, 'an-reel-art'));
-  const step = () => {
-    t += delay;
-    if (t > 1700) {
-      S.animePick = pick;
-      S.animeSpinning = false;
-      S.animeFresh = true;
-      renderAnimePage(true);
-      S.animeFresh = false;
-      Sfx && Sfx.land && Sfx.land();
-      return;
-    }
-    show(pool[Math.floor(Math.random() * pool.length)]);
-    try { Sfx.tick(1.2); } catch {}
-    delay *= 1.13;
-    setTimeout(step, delay);
-  };
-  step();
+  const poolName = (A_POOLS.find((x) => x[0] === prefs.get('animePool', 'planned')) || [0, 'All'])[1];
+  const extras = [prefs.get('animeShort', false) ? 'short' : '', prefs.get('animeGenre', '')].filter(Boolean).join(', ');
+  // The same full screen reel as the games' Surprise me: spinning covers, sound, sparks and the show's banner.
+  S.spin = spinOverlay(pool, `your ${poolName.toLowerCase()} anime${extras ? ` (${extras})` : ''}`, {
+    primaryLabel: 'Watch',
+    art: (e) => animeArt(e, 'art an-spin-art'),
+    bg: (e) => (e.banner ? { url: e.banner, real: true } : e.cover ? { url: e.cover } : { color: e.color || '#15151a' }),
+    show: (e, { name, meta, playBtn, detBtn, close }) => {
+      S.animePick = e;
+      const left = e.episodes ? Math.max(0, e.episodes - e.progress) : 0;
+      const mins = (left || e.episodes) * (e.duration || 24);
+      name.textContent = e.title;
+      meta.replaceChildren(...[
+        h('span', { class: 'chip-src an-src' }, A_STATUS[e.status] || 'AniList'),
+        e.format ? h('span', {}, fmtFormat(e.format)) : null,
+        e.episodes ? h('span', {}, e.progress && left ? `${left} of ${e.episodes} episodes left` : `${e.episodes} episodes`) : null,
+        mins ? h('span', {}, icon('clock'), mins >= 60 ? `about ${Math.round(mins / 60)} h` : `${mins} min`) : null,
+        e.season ? h('span', {}, e.season) : null,
+        e.avg ? h('span', {}, icon('star'), `${e.avg}%`) : null,
+        e.score ? h('span', {}, `Your score ${e.score}`) : null,
+        e.genres.length ? h('span', {}, e.genres.slice(0, 3).join(', ')) : null,
+      ].filter(Boolean));
+      const s0 = e.streams[0];
+      playBtn.replaceChildren(icon('play'), s0 ? `Watch on ${s0.site}` : 'Open on AniList');
+      playBtn.onclick = () => { close(); api.openExternal(s0 ? s0.url : e.url); };
+      detBtn.onclick = () => { close(); setTimeout(() => openAnimeDetails(e), 280); };
+      // The panel on the page shows the pick too, for when the reel is closed.
+      if (S.view.type === 'anime') renderAnimePage(true);
+    },
+  });
 }
+
 function animePickCard(e, fresh) {
   const left = e.episodes ? Math.max(0, e.episodes - e.progress) : 0;
   const mins = left * (e.duration || 24);
@@ -364,7 +368,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(() => {
     const box = $('#animeView');
     if (S.view.type !== 'anime' || !S.anime || !S.anime.configured || !box) return;
-    if (box.querySelector('.an-reel') || (document.activeElement && box.contains(document.activeElement) && /input|select/i.test(document.activeElement.tagName))) return;
+    if (document.querySelector('.spin') || (document.activeElement && box.contains(document.activeElement) && /input|select/i.test(document.activeElement.tagName))) return;
     renderAnimePage(true);
   }, 60000);
   setInterval(() => { if (S.anime && S.anime.configured) loadAnime(false); }, 11 * 60000);
