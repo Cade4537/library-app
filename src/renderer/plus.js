@@ -114,8 +114,14 @@ document.addEventListener('DOMContentLoaded', () => {
       };
       new MutationObserver((_, ob) => { if (achBox.querySelector('.ach-list')) { addFilter(); ob.disconnect(); } }).observe(achBox, { childList: true });
     }
-    // Hint for the next and previous keys.
+    // How play time is counted for this game (some games leave programs running in the background).
     const top = panel.querySelector('.det-info');
+    if (top && it.kind === 'game' && it.installed) {
+      const cur = (it.meta && it.meta.countMode) || 'auto';
+      const seg = h('div', { class: 'seg det-count' }, [['auto', 'Automatic'], ['window', 'Only with its window open'], ['any', 'Any of its programs']].map(([k, n]) => h('button', { class: cur === k ? 'on' : '', onclick: (ev) => { api.updateItem(id, { countMode: k }); seg.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === ev.currentTarget)); showToast(k === 'any' ? 'Counts whenever any of its programs runs' : k === 'window' ? 'Counts only while its window is open' : 'Automatic: counts while its window is open'); } }, n)));
+      top.append(h('div', { class: 'det-countrow' }, h('span', { class: 'help' }, 'Counts as playing:'), seg));
+    }
+    // Hint for the next and previous keys.
     if (top) top.append(h('div', { class: 'det-keys help' }, '[ and ] for the previous and next game · Enter to play'));
   };
   // [ and ] move to the previous and next game in the grid; Enter plays.

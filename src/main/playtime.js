@@ -1,5 +1,7 @@
 // Tracks hours played by checking every 30 seconds which programs are running
 // and matching them to each game's install folder.
+// 0.17.2: a game only counts while one of its programs has a window open. Some games (Roblox above all)
+// leave a process running in the background after you close them, which used to count as playing.
 const { spawn } = require('child_process');
 const path = require('path');
 
@@ -8,7 +10,7 @@ const SCRIPT = `
 [Console]::OutputEncoding=[Text.Encoding]::UTF8
 $ErrorActionPreference='SilentlyContinue'
 while ($true) {
-  $p = @(Get-Process | Where-Object { $_.Path } | Select-Object -ExpandProperty Path -Unique)
+  $p = @(Get-Process | Where-Object { $_.Path } | ForEach-Object { [pscustomobject]@{ p = $_.Path; w = [int]([int64]$_.MainWindowHandle -ne 0) } })
   [Console]::Out.WriteLine((ConvertTo-Json -InputObject $p -Compress))
   [Console]::Out.Flush()
   Start-Sleep -Seconds ${INTERVAL}
@@ -84,13 +86,36 @@ class PlaytimeTracker {
     return out.sort((a, b) => b[0].length - a[0].length);
   }
 
+  // Whether a game needs a window to count as playing. Automatic: yes, except Microsoft Store and
+  // Xbox app games, whose windows belong to a Windows helper and cannot be seen from here.
+  static needsWindow(it) {
+    const mode = it.meta && it.meta.countMode;
+    if (mode === 'window') return true;
+    if (mode === 'any') return false;
+    const dir = String(it.installDir || '').toLowerCase();
+    return !(it.source === 'xbox' || dir.includes('\\windowsapps\\') || dir.includes('/windowsapps/'));
+  }
+
   tick(paths) {
     const dirs = this.dirs();
-    const now = new Set();
-    for (const p of paths || []) {
+    const seen = new Map(); // game id -> has a window
+    for (const entry of paths || []) {
+      const p = typeof entry === 'string' ? entry : entry && entry.p;
+      if (!p) continue;
       const low = String(p).toLowerCase();
       const hit = dirs.find(([d]) => low.startsWith(d));
-      if (hit) now.add(hit[1].id);
+      if (!hit) continue;
+      const w = typeof entry === 'string' ? true : !!entry.w;
+      seen.set(hit[1].id, seen.get(hit[1].id) || w);
+    }
+    const now = new Set();
+    this.background = new Set();
+    for (const [id, w] of seen) {
+      const it = this.store.data.items[id];
+      if (!it) continue;
+      // Running with no window anywhere: a leftover background process, not play.
+      if (!w && PlaytimeTracker.needsWindow(it)) { this.background.add(id); continue; }
+      now.add(id);
     }
     const t = Date.now();
     for (const id of now) {

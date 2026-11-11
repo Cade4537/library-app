@@ -329,6 +329,8 @@ class Store {
       if (k in patch) it[k] = patch[k];
     }
     if ('categoryId' in patch) it.catAuto = false;
+    // How play time is counted: 'window' (only with a window open), 'any' (any of its programs), or automatic.
+    if ('countMode' in patch) { it.meta = it.meta || {}; if (patch.countMode === 'window' || patch.countMode === 'any') it.meta.countMode = patch.countMode; else delete it.meta.countMode; }
     if (patch.suiteMain) this.applyPromotions();
     if ('categoryId' in patch && !('kind' in patch)) it.kind = this.kindForCategory(patch.categoryId, it.kind);
     if (it.customName !== null && !String(it.customName || '').trim()) it.customName = null;

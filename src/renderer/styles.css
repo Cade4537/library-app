@@ -1962,3 +1962,5 @@ kbd { display: inline-block; padding: 1px 7px; border-radius: 6px; border: 1px s
 .whats-new { margin: 0; padding-left: 20px; display: grid; gap: 8px; line-height: 1.45; }
 .hub-today { color: var(--muted); }
 .news-unread { margin-left: 10px; padding: 2px 8px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 11px; letter-spacing: 0; vertical-align: 2px; }
+.det-countrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.det-count button { font-size: 12px; padding: 4px 10px; }
