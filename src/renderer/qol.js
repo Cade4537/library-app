@@ -81,6 +81,7 @@ const PAL_ACTIONS = () => [
   ...[['games', 'Games', 'gamepad'], ['apps', 'Apps', 'grid'], ['favorites', 'Favorites', 'star'], ['backlog', 'Backlog', 'list'], ['arcade', 'Arcade', 'joystick'], ['storage', 'Storage', 'drive'], ['launchers', 'Launchers', 'rocket'], ['hidden', 'Hidden', 'eyeOff'], ['libcategories', 'Categories', 'folder'], ['libcollections', 'Collections', 'sparkle']]
     .map(([type, label, ic]) => ({ label, hint: 'Library', ic, run: () => setView({ type }) })),
   { label: 'Open the guide', hint: 'G', ic: 'menu', run: () => openGuide() },
+  ...(typeof plusPalActions === 'function' ? plusPalActions() : []),
   { label: 'Settings', hint: 'Action', ic: 'gear', run: () => openSettings() },
   { label: S.tv ? 'Leave controller mode' : 'Controller mode', hint: 'Action', ic: 'tv', run: () => setTV(!S.tv) },
   { label: 'Surprise me: spin now', hint: 'Action', ic: 'dice', run: () => { setView({ type: 'surprise' }); setTimeout(() => window.surprise && surprise(), 300); } },

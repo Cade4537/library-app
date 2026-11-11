@@ -26,8 +26,12 @@ const ARCADE = [
 
 function renderArcade() {
   const box = $('#arcadeView');
+  const lastMap = prefs.get('arcadeLast', {});
+  const newest = Object.entries(lastMap).sort((a, b) => b[1] - a[1])[0];
   box.replaceChildren(
+    h('div', { class: 'arc-head' }, h('span', {}, `${ARCADE.length} games`), prefs.get('arcadePlays', 0) ? h('span', {}, `${prefs.get('arcadePlays', 0).toLocaleString()} played`) : null, newest && ARCADE.find((g) => g.id === newest[0]) ? h('button', { class: 'chip', onclick: () => openGame(newest[0]) }, icon('play'), `Continue ${ARCADE.find((g) => g.id === newest[0]).name}`) : null),
     h('div', { class: 'arc-grid' }, ARCADE.map((g) => h('button', { class: `arc-tile arc-${g.id}`, onclick: () => openGame(g.id) },
+      lastMap[g.id] ? h('span', { class: 'arc-last' }, `Played ${timeAgo(lastMap[g.id]).toLowerCase()}`) : null,
       h('canvas', { class: 'arc-preview', width: 360, height: 220, 'data-game': g.id }),
       h('div', { class: 'arc-info' }, h('div', { class: 'arc-name' }, g.name), h('div', { class: 'arc-sub' }, g.sub),
         h('div', { class: 'arc-best' }, `${g.bestLabel}: ${((v) => (typeof v === 'string' ? v : fmtBig(Number(v) || 0)))(g.best())}`)),
@@ -82,6 +86,9 @@ function gameShell(title, onClose) {
 
 function openGame(id) {
   if (document.querySelector('.game')) return;
+  // Remember when each game was last played, and how many games you have started in total.
+  const lastMap = prefs.get('arcadeLast', {}); lastMap[id] = Date.now(); prefs.set('arcadeLast', lastMap);
+  prefs.set('arcadePlays', prefs.get('arcadePlays', 0) + 1);
   if (id === 'blocks') vaultBlocks();
   else if (id === 'pegs') pegDrop();
   else if (id === 'bj') blackjack();

@@ -213,6 +213,75 @@ The player at the bottom of the sidebar reads what is playing from Windows media
 
 Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpers restart themselves every few hours, song artwork and achievement caches are capped, cards for removed games are dropped, and the music player only sends updates when something changes. The Discord tab and the Remote Play stream are the heavy parts; Close tab and End stream free them.
 
+## What's new in 0.17.0: a hundred improvements
+
+**Anime (21)**
+1. Watch sites: your own list of sites, in order (Settings, Connections, AniList).
+2. Exact pages when AniList links the show on that site.
+3. Built in searches for Crunchyroll, HIDIVE, Netflix, Hulu, Prime Video, Disney+, Max, YouTube, Tubi and RetroCrush.
+4. Any other site works through a web search limited to that site that opens the first result.
+5. Your own search link per site, with {title}.
+6. Search by the English or the Japanese title.
+7. Watch on button with a menu of every other site.
+8. Where to watch shows which links are exact pages and which are searches.
+9. Undo after +1 episode.
+10. + and - keys change episodes on the focused card.
+11. W opens your first watch site for the focused card.
+12. Genres in the details are clickable and filter your list.
+13. Stats strip: completed, episodes, days watched, mean score, top genre.
+14. Next episodes say Today, Tomorrow or the weekday, with the time.
+15. Sort by shortest left.
+16. Rewatching badge with how many times.
+17. Copy title in the right click menu.
+18. / or Ctrl+F jumps to the anime search.
+19. The header says when the list was last updated.
+20. Your list is kept on disk, so the page opens instantly and works offline.
+21. When AniList is busy, Crimson Vault waits and tries again.
+
+**Library and details (17)**
+22. Copy name. 23. Copy folder path. 24. Reset a renamed game. 25. Find guides online. 26. Steam store page (all in the right click menu).
+27. Play something random from a category.
+28. Details say where the game ranks among your most played.
+29. Sessions, 30. longest session, 31. this week and 32. time on Xbox in the details.
+33. Achievement filter: all, unlocked, locked. 34. Newest unlocks first.
+35. [ and ] move to the previous and next game. 36. Enter plays.
+37. Hover a card for hours and when you last played. 38. Middle click a card to play.
+
+**Keyboard and window (12)**
+39. F2 renames. 40. Delete hides (with undo). 41. Ctrl+D favorites. 42. Ctrl+1 to 9 for the main pages. 43. Ctrl+, opens Settings. 44. Alt+Left goes back. 45. The mouse back button goes back.
+46. Ctrl and + / - / 0 zoom. 47. Zoom is remembered and has a setting.
+48. ? shows every shortcut. 49. The window title follows the page. 50. The window reopens at the size and place you left it, maximized too.
+
+**Toasts, Home, guide and search (10)**
+51. Hovering a toast keeps it. 52. Toasts can be clicked.
+53. Home shows what you played today. 54. Click the clock for 24 hour time. 55. Favorite friends first on Home. 56. How many more friends are online.
+57. The guide shows your next anime episode.
+58. Ctrl+K finds Settings sections, 59. your anime and 60. the shortcut list.
+
+**Deals and news (5)**
+61. Read news posts dim. 62. Mark a free game as claimed to hide it. 63. Copy a free game's link. 64. Right click a wishlist deal to search its price history. 65. News shows how many posts are new.
+
+**Statistics (5)**
+66. Play streak and your best streak. 67. Longest session. 68. Hours on Xbox. 69. Anime hours. 70. Export your play history to a spreadsheet.
+
+**Friends (5)**
+71. Sort by who just started playing. 72. Offline friends fold away. 73. Offline cards say what they last played. 74. Message on Steam. 75. Games you both have, with covers.
+
+**Arcade (12)**
+76. Games pause when you switch windows. 77. A setting for that. 78. Each tile says when you last played it. 79. Total games played. 80. Continue your last game.
+81. Vault Words: Copy result (without the word). 82. Vault Words hard mode.
+83. Word Search hint. 84. Maze: show the way. 85. Crossword jumps to the next unfinished word. 86. Crossword Reveal all. 87. Sudoku: right click clears a square.
+
+**Settings and reliability (13)**
+88. Back up your settings to a file. 89. Restore a backup (passwords, keys and sign ins are never included).
+90. Settings search highlights what matches. 91. Settings reopens at the section you were reading.
+92. Reduce animations. 93. A short What's new after each update.
+94. Health: Restart now. 95. Health shows how long the app has been running.
+96. Tray menu: Anime. 97. Clicking a new episode alert opens that show.
+98. Search waits a moment while you type in big libraries.
+99. A running game's right click menu says Back to game.
+100. Arcade previews and pages keep the last game you played one click away.
+
 ## What's new in 0.16.6
 
 - **Anime Surprise me uses the full games reel:** spinning covers, sound, sparks and the show's banner when it lands.

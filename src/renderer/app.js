@@ -2047,13 +2047,16 @@ function wire() {
   let scrolled = false;
   content.addEventListener('scroll', () => { const on = content.scrollTop > 8; if (on !== scrolled) { scrolled = on; document.body.classList.toggle('scrolled', on); } }, { passive: true });
   const search = $('#search');
-  search.addEventListener('input', () => {
+  // A short pause before searching, so big libraries stay smooth while you type.
+  let searchT = null;
+  search.addEventListener('input', () => { clearTimeout(searchT); searchT = setTimeout(runSearch, S.lib && S.lib.items.length > 400 ? 90 : 0); });
+  const runSearch = () => {
     S.search = search.value.trim();
     if (S.view.type === 'friends') { renderFriends(); return; }
     // Pages without a grid (Home, Library, Deals, Stats...) switch to Everything to show results.
     if (S.search && ['hub', 'library', 'deals', 'stats', 'arcade', 'discord', 'remoteplay', 'launchers', 'storage'].includes(S.view.type)) { setView({ type: 'home' }); return; }
     renderHeader(); renderJump(); renderGrid();
-  });
+  };
   search.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); spatial.focusDefault(); } });
   $('#surpriseBtn').addEventListener('click', surprise);
   $('#surpriseMode').addEventListener('click', surpriseModeMenu);

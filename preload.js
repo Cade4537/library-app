@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webFrame } = require('electron');
 
 const call = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
 
@@ -83,6 +83,10 @@ contextBridge.exposeInMainWorld('library', {
   syncAlerts: call('alerts:sync'),
   pendingAlerts: call('qol:pending'),
   powerState: call('power:state'),
+  powerRestart: call('power:restart'),
+  backupSettings: call('settings:backup'),
+  restoreSettings: call('settings:restore'),
+  setZoom: (z) => { const n = Number(z); if (n >= 0.5 && n <= 2) webFrame.setZoomFactor(n); },
   powerCheck: call('power:check'),
   onBackground: (cb) => ipcRenderer.on('app:background', (_e, v) => cb(v)),
   onDiscordUnloaded: (cb) => ipcRenderer.on('discord:unloaded', () => cb()),

@@ -110,7 +110,15 @@ function vaultCrossword() {
   const setLetter = (ch) => {
     if (solved) return;
     ent[cur.r][cur.c] = ch; wrong.delete(`${cur.r},${cur.c}`); Sfx.tick(1.3);
+    const w = curWord();
+    const atEnd = w && (() => { const cs = cellsOf(w); const l = cs[cs.length - 1]; return l.r === cur.r && l.c === cur.c; })();
     nextInWord(1);
+    // Finished the word: jump to the next word that still has empty squares.
+    if (w && atEnd && cellsOf(w).every(({ r, c }) => ent[r][c])) {
+      const i = pz.words.indexOf(w);
+      const next = [...pz.words.slice(i + 1), ...pz.words.slice(0, i)].find((x) => cellsOf(x).some(({ r, c }) => !ent[r][c]));
+      if (next) { const e0 = cellsOf(next).find(({ r, c }) => !ent[r][c]); cur = { r: e0.r, c: e0.c }; across = next.across; drawList(); }
+    }
     checkDone();
   };
   const checkDone = () => {
@@ -141,7 +149,7 @@ function vaultCrossword() {
     side: (g) => [
       statBox([['Time', timeEl], ['Letters left', leftEl], ['Solved', winsEl]]),
       h('div', { class: 'gs-box' }, h('div', { class: 'row', style: { gap: '6px', flexWrap: 'wrap' } },
-        sideBtn('Check', () => check()), sideBtn('Reveal letter', () => reveal([cur])), sideBtn('Reveal word', () => { const w = curWord(); if (w) reveal(cellsOf(w)); }), sideBtn('New puzzle', () => g.restart()))),
+        sideBtn('Check', () => check()), sideBtn('Reveal letter', () => reveal([cur])), sideBtn('Reveal word', () => { const w = curWord(); if (w) reveal(cellsOf(w)); }), sideBtn('Reveal all', () => reveal(pz.words.flatMap(cellsOf))), sideBtn('New puzzle', () => g.restart()))),
       listBox,
       keyList(['Type', 'fill in'], ['Arrows', 'move'], ['Space', 'across or down'], ['Tab / Enter', 'next word'], ['Backspace', 'delete'], [null, 'Controller: stick to move, LB / RB change the letter, A switches across and down, Y checks, B deletes.']),
     ],
@@ -355,7 +363,12 @@ function vaultSudoku() {
     },
     onPointer: (g, e) => {
       const p = g.point(e);
-      if (p.y >= GY && p.y < GY + S9 * 9 && p.x >= GX && p.x < GX + S9 * 9) { cur = { r: Math.floor((p.y - GY) / S9), c: Math.floor((p.x - GX) / S9) }; return; }
+      if (p.y >= GY && p.y < GY + S9 * 9 && p.x >= GX && p.x < GX + S9 * 9) {
+        cur = { r: Math.floor((p.y - GY) / S9), c: Math.floor((p.x - GX) / S9) };
+        // Right click clears the square.
+        if (e.button === 2) { const i = cur.r * 9 + cur.c; if (!given[i] && (val[i] || notes[i])) { undo.push({ i, v: val[i], n: notes[i] }); val[i] = 0; notes[i] = 0; } }
+        return;
+      }
       if (p.y >= PY && p.y < PY + PH) {
         const b = picker().find((o) => p.x >= o.x && p.x < o.x + PW);
         if (!b) return;
@@ -433,6 +446,7 @@ const WS_THEMES = {
   Photography: ['CAMERA', 'LENS', 'SHUTTER', 'FOCUS', 'TRIPOD', 'FLASH', 'PORTRAIT', 'STUDIO', 'APERTURE', 'EXPOSURE', 'ZOOM', 'FRAME', 'LIGHTING', 'SNAPSHOT', 'GALLERY'],
 };
 function vaultWordSearch() {
+  let wsHint = null;
   const W = 700, H = 700;
   let N, grid, words, found, sel, drag, cursorRC, elapsed, done, theme, colors;
   const timeEl = h('div', { class: 'gs-v' }), leftEl = h('div', { class: 'gs-v' }), bestEl = h('div', { class: 'gs-v' });
@@ -533,6 +547,7 @@ function vaultWordSearch() {
       choiceBox('Difficulty', [['easy', 'Easy'], ['hard', 'Hard']], 'wsLevel', 'easy', g),
       choiceBox('Theme', [['Random', 'Random'], ...Object.keys(WS_THEMES).map((k) => [k, k])], 'wsTheme', 'Random', g),
       statBox([['Time', timeEl], ['Words left', leftEl], ['Best time', bestEl]]),
+      h('div', { class: 'gs-box' }, h('div', { class: 'row', style: { gap: '6px' } }, sideBtn('Hint (+15 s)', () => { if (done) return; const left = words.filter((x) => !found.some((f) => f.w === x.w)); if (!left.length) return; const w = left[Math.floor(Math.random() * left.length)]; wsHint = { r: w.r, c: w.c, t: performance.now() }; elapsed += 15000; Sfx.tick(1.6); }), sideBtn('New puzzle', () => g.restart()))),
       listBox,
       keyList(['Drag', 'over a word'], ['Arrows / W A S D', 'move'], ['Space', 'start, then end a word'], [null, 'Easy: across, down and diagonal. Hard: every direction, backwards too. Controller: stick to move, A to start and end.']),
     ],
@@ -559,7 +574,7 @@ function vaultWordSearch() {
     },
     pausedSub: () => `${words.length - found.length} words left · ${fmtClock(elapsed)}`,
     reset(g) {
-      G = g; build(); found = []; sel = null; drag = null; cursorRC = { r: 0, c: 0 }; elapsed = 0; done = false;
+      G = g; build(); found = []; wsHint = null; sel = null; drag = null; cursorRC = { r: 0, c: 0 }; elapsed = 0; done = false;
       colors = null;
       const b = prefs.get(`wsBest_${level()}`, 0); bestEl.textContent = b ? fmtClock(b) : '-'; timeEl.textContent = '0:00';
       showList();
@@ -586,6 +601,8 @@ function vaultWordSearch() {
       for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) { ctx.fillStyle = '#ececf1'; ctx.fillText(grid[r][c], o.x + c * s + s / 2, o.y + r * s + s / 2 + 1); }
       const padOn = !!(navigator.getGamepads && [...navigator.getGamepads()].some(Boolean));
       if (padOn || sel) { ctx.strokeStyle = ACC(); ctx.lineWidth = 3; rr(ctx, o.x + cursorRC.c * s + 2, o.y + cursorRC.r * s + 2, s - 4, s - 4, 8); ctx.stroke(); }
+      // A hint: a pulsing ring on the first letter of a word you have not found.
+      if (wsHint && now - wsHint.t < 3000) { const u = (now - wsHint.t) / 3000; ctx.save(); ctx.globalAlpha = 1 - u; ctx.strokeStyle = '#ffd257'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(o.x + wsHint.c * s + s / 2, o.y + wsHint.r * s + s / 2, s * (0.45 + 0.25 * Math.sin(u * Math.PI * 6)), 0, Math.PI * 2); ctx.stroke(); ctx.restore(); }
     },
   });
 }
@@ -594,6 +611,22 @@ function vaultWordSearch() {
 // Vault Maze
 // =====================================================================
 function vaultMaze() {
+  let mazeHint = null;
+  // The shortest way from where you are to the flag.
+  const mazePath = () => {
+    const D = [[-1, 0, 1], [0, 1, 2], [1, 0, 4], [0, -1, 8]];
+    const key = (r, c) => r * 1000 + c;
+    const prev = new Map([[key(player.r, player.c), null]]);
+    const q = [[player.r, player.c]];
+    while (q.length) {
+      const [r, c] = q.shift();
+      if (r === rows - 1 && c === cols - 1) break;
+      for (const [dr, dc, bit] of D) { if (walls[r][c] & bit) continue; const k = key(r + dr, c + dc); if (!prev.has(k)) { prev.set(k, [r, c]); q.push([r + dr, c + dc]); } }
+    }
+    const out = []; let at = [rows - 1, cols - 1];
+    while (at) { out.unshift(at); at = prev.get(key(at[0], at[1])); }
+    return out;
+  };
   const W = 760, H = 760;
   let cols, rows, walls, player, trail, elapsed, level, done, gems, got, moves, glow;
   const levelEl = h('div', { class: 'gs-v' }), timeEl = h('div', { class: 'gs-v' }), gemEl = h('div', { class: 'gs-v' }), bestEl = h('div', { class: 'gs-v' });
@@ -655,7 +688,7 @@ function vaultMaze() {
     side: (g) => [
       choiceBox('Fog', [[false, 'Off'], [true, 'On']], 'mazeFog', false, g, () => {}),
       statBox([['Level', levelEl], ['Time', timeEl], ['Gems', gemEl], ['Best', bestEl]]),
-      h('div', { class: 'gs-box' }, h('div', { class: 'row', style: { gap: '6px' } }, sideBtn('New maze', () => build()), sideBtn('Back to level 1', () => g.restart()))),
+      h('div', { class: 'gs-box' }, h('div', { class: 'row', style: { gap: '6px', flexWrap: 'wrap' } }, sideBtn('Show the way (+10 s)', () => { if (done) return; mazeHint = { path: mazePath(), t: performance.now() }; elapsed += 10000; Sfx.tick(1.6); }), sideBtn('New maze', () => build()), sideBtn('Back to level 1', () => g.restart()))),
       keyList(['Arrows / W A S D', 'move'], ['Hold', 'to keep going'], ['Esc / P', 'pause'], [null, 'Reach the flag in the bottom corner. Each level gets bigger. Fog only shows what is near you. Controller: stick or D-pad.']),
     ],
     keys: { ...DIR_KEYS },
@@ -669,7 +702,7 @@ function vaultMaze() {
     },
     pausedSub: () => `Level ${level} · ${fmtClock(elapsed)}`,
     reset(g) {
-      G = g; level = 1; got = 0; elapsed = 0; done = false; glow = 0;
+      G = g; level = 1; got = 0; elapsed = 0; done = false; glow = 0; mazeHint = null;
       build();
       levelEl.textContent = '1'; gemEl.textContent = '0'; timeEl.textContent = '0:00';
       const b = prefs.get('mazeBest', 0); bestEl.textContent = b ? `Level ${b}` : '-';
@@ -705,6 +738,11 @@ function vaultMaze() {
         if (c === cols - 1 && (w & 2)) { ctx.moveTo(x + s, y); ctx.lineTo(x + s, y + s); }
       }
       ctx.stroke();
+      // The way out, for three seconds after asking.
+      if (mazeHint && now - mazeHint.t < 3000) {
+        ctx.save(); ctx.globalAlpha = 1 - (now - mazeHint.t) / 3000; ctx.strokeStyle = '#ffd257'; ctx.lineWidth = Math.max(3, s * 0.18); ctx.lineJoin = 'round'; ctx.setLineDash([s * 0.3, s * 0.25]);
+        ctx.beginPath(); mazeHint.path.forEach(([r, c], i) => { const x = o.x + c * s + s / 2, y = o.y + r * s + s / 2; if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }); ctx.stroke(); ctx.restore();
+      }
       const px = o.x + player.x * s + s / 2, py = o.y + player.y * s + s / 2;
       if (fog()) {
         const rad = s * 3.2;

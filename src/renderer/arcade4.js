@@ -80,6 +80,14 @@ function vaultWords() {
     if (done || reveal) return;
     if (cur.length < 5) { shake = performance.now(); say('Not enough letters'); Sfx.tick(0.6); return; }
     if (!WORDS_V.has(cur)) { shake = performance.now(); say('Not in the word list'); Sfx.tick(0.6); return; }
+    // Hard mode: every green letter stays put and every gold letter is used again.
+    if (prefs.get('wordsHard', false)) {
+      for (let r = 0; r < guesses.length; r++) for (let i = 0; i < 5; i++) {
+        const m = marks[r][i], ch = guesses[r][i];
+        if (m === 'hit' && cur[i] !== ch) { shake = performance.now(); say(`Letter ${i + 1} must be ${ch.toUpperCase()}`); Sfx.tick(0.6); return; }
+        if (m === 'near' && !cur.includes(ch)) { shake = performance.now(); say(`Use ${ch.toUpperCase()} in your guess`); Sfx.tick(0.6); return; }
+      }
+    }
     guesses.push(cur); marks.push(score(cur, answer));
     reveal = { row: guesses.length - 1, t: performance.now() };
     cur = '';
@@ -133,6 +141,9 @@ function vaultWords() {
           h('button', { class: 'btn', style: { flex: 1 }, onclick: (e) => { e.currentTarget.blur(); startMode(g, 'free'); } }, 'Free play'))),
       statBox([['Streak', streakEl], ['Wins', winEl], ['Played', playedEl]]),
       distBox,
+      h('div', { class: 'gs-box' }, h('div', { class: 'row', style: { gap: '6px', flexWrap: 'wrap' } },
+        h('button', { class: 'btn', style: { flex: 1 }, onclick: (e) => { e.currentTarget.blur(); if (!done) { showToast('Finish the word first'); return; } const grid = marks.map((r) => r.map((m) => ({ hit: '🟩', near: '🟨', miss: '⬛' }[m])).join('')).join('\n'); navigator.clipboard.writeText(`Vault Words ${mode === 'free' && !prefs.get('wordsDaily', {}).done ? '' : `#${dayNo() + 1} `}${won ? guesses.length : 'X'}/6${prefs.get('wordsHard', false) ? '*' : ''}\n${grid}`).then(() => showToast('Result copied, without the word')); } }, icon('copy'), 'Copy result'),
+        h('button', { class: 'chip' + (prefs.get('wordsHard', false) ? ' on' : ''), title: 'Green letters must stay in place and gold letters must be used', onclick: (e) => { e.currentTarget.blur(); prefs.set('wordsHard', !prefs.get('wordsHard', false)); e.currentTarget.classList.toggle('on'); showToast(prefs.get('wordsHard', false) ? 'Hard mode on' : 'Hard mode off'); } }, 'Hard mode'))),
       keyList(['Type', 'letters'], ['Enter', 'guess'], ['Backspace', 'delete'], ['Esc', 'pause'], [null, 'Green: right spot. Gold: in the word, wrong spot. Grey: not in the word. Controller: stick picks a key, A presses it, B deletes, X guesses.']),
     ],
     keys,

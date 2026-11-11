@@ -303,10 +303,32 @@ async function rescan(silent = false) {
   }
 }
 
+// 0.17.0: the window opens where you left it, at the size you left it (if that screen is still there).
+function savedBounds() {
+  const b = store.data.windowState;
+  if (!b || !b.width || !b.height) return { width: 1440, height: 900 };
+  const { screen } = require('electron');
+  const onScreen = screen.getAllDisplays().some((d) => { const a = d.workArea; return b.x < a.x + a.width - 80 && b.x + b.width > a.x + 80 && b.y < a.y + a.height - 40 && b.y + 40 > a.y; });
+  return onScreen ? { x: b.x, y: b.y, width: Math.max(900, b.width), height: Math.max(600, b.height) } : { width: Math.max(900, b.width), height: Math.max(600, b.height) };
+}
+function trackBounds(w) {
+  let t = null;
+  const save = () => {
+    clearTimeout(t);
+    t = setTimeout(() => {
+      if (!w || w.isDestroyed() || w.isMinimized() || w.isFullScreen()) return;
+      const max = w.isMaximized();
+      const b = max ? (store.data.windowState || {}) : w.getBounds();
+      store.data.windowState = { ...b, maximized: max };
+      store.saveSoon();
+    }, 600);
+  };
+  for (const ev of ['resize', 'move', 'maximize', 'unmaximize']) w.on(ev, save);
+}
+
 function createWindow() {
   win = new BrowserWindow({
-    width: 1440,
-    height: 900,
+    ...savedBounds(),
     minWidth: 900,
     minHeight: 600,
     backgroundColor: '#0a0a0b',
@@ -321,6 +343,8 @@ function createWindow() {
       nodeIntegration: false,
     },
   });
+  if (store.data.windowState && store.data.windowState.maximized) win.maximize();
+  trackBounds(win);
   win.loadFile(path.join(__dirname, 'src', 'renderer', 'index.html'));
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https:\/\//.test(url)) shell.openExternal(url);
@@ -379,6 +403,7 @@ function setupTray() {
     { label: 'Open Crimson Vault', click: showWindow },
     { label: 'Surprise me', click: () => { showWindow(); sendTo('app:command', 'surprise'); } },
     { label: 'Controller mode', click: () => { showWindow(); sendTo('app:command', 'tv'); } },
+    { label: 'Anime', click: () => { showWindow(); setTimeout(() => sendTo('app:command', 'anime'), 400); } },
     { type: 'separator' },
     { label: 'Quit', click: () => { quitting = true; app.quit(); } },
   ]);
@@ -774,6 +799,17 @@ function registerIpc() {
   ipcMain.handle('anime:signOut', async () => { await anilist.signOut(); return true; });
   ipcMain.handle('alerts:sync', (_e, p) => { store.data.settings.friendAlertPrefs = { on: p && p.on !== false, mode: (p && p.mode) || 'owned', muted: (p && Array.isArray(p.muted) ? p.muted : []).slice(0, 500) }; store.changed(); });
   ipcMain.handle('qol:pending', () => { const l = (qol && qol.pending) || []; if (qol) qol.pending = []; return l; });
+  // Settings backup: everything except keys, tokens and sign ins.
+  const SECRET = /key|token|auth|secret|password|cookie|xboxlive|epic|ubisoft|refresh|session|ticket/i;
+  ipcMain.handle('settings:backup', () => Object.fromEntries(Object.entries(store.data.settings).filter(([k]) => !SECRET.test(k))));
+  ipcMain.handle('settings:restore', (_e, s) => {
+    if (!s || typeof s !== 'object') return false;
+    for (const [k, v] of Object.entries(s)) if (!SECRET.test(k) && k.length < 60) store.data.settings[k] = v;
+    store.changed();
+    applyStartup();
+    return true;
+  });
+  ipcMain.handle('power:restart', () => { if (power) power.restart(); });
   ipcMain.handle('power:state', () => (power ? power.state() : null));
   ipcMain.handle('power:check', async () => { if (power) await power.health().catch(() => {}); return power ? power.state() : null; });
   ipcMain.handle('console:state', () => (consolePlay ? consolePlay.state() : null));
@@ -875,7 +911,7 @@ if (!app.requestSingleInstanceLock()) {
         // The episode we were waiting for has aired (and you have not watched it yet).
         if (prev && prev.at <= now && prev.episode > e.progress && sent[e.mediaId] !== prev.episode && now - prev.at < 2 * 86400e3) {
           sent[e.mediaId] = prev.episode;
-          qol.notify({ kind: 'anime', title: `${e.title}: episode ${prev.episode} is out`, body: e.streams && e.streams[0] ? `Watch it on ${e.streams[0].site}` : 'New episode' });
+          qol.notify({ kind: 'anime', id: `anime:${e.mediaId}`, title: `${e.title}: episode ${prev.episode} is out`, body: e.streams && e.streams[0] ? `Watch it on ${e.streams[0].site}` : 'New episode' });
         }
         if (e.next) seen[e.mediaId] = { episode: e.next.episode, at: e.next.at };
       }

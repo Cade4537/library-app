@@ -289,7 +289,9 @@ function renderNews() {
   api.news(ids).then((list) => {
     if (!list || !list.length) { sec.hidden = true; return; }
     sec.hidden = false;
-    fillEl(sec, h('div', { class: 'sec-head' }, h('h3', { class: 'section-title' }, 'News for your games'), h('button', { class: 'link-btn', onclick: () => { prefs.set('showNews', false); sec.hidden = true; } }, 'Hide')),
+    const readSet = new Set(prefs.get('newsRead', []));
+    const unread = list.slice(0, 6).filter((n) => !readSet.has(n.url)).length;
+    fillEl(sec, h('div', { class: 'sec-head' }, h('h3', { class: 'section-title' }, 'News for your games', unread ? h('span', { class: 'news-unread' }, `${unread} new`) : null), h('button', { class: 'link-btn', onclick: () => { prefs.set('showNews', false); sec.hidden = true; } }, 'Hide')),
       h('div', { class: 'news-list' }, list.slice(0, 6).map(newsCard)));
   }).catch(() => { sec.hidden = true; });
 }
@@ -513,6 +515,7 @@ function moreSettingsSections(s, state) {
     h('div', { class: 'section-label' }, 'Phone remote'),
     h('div', { class: 'field' }, remoteToggle, qr),
     ...qolSettings(s),
+    ...(typeof plusSettings === 'function' ? plusSettings() : []),
     ...healthSection(),
   ];
 }
@@ -537,9 +540,11 @@ function healthSection() {
       h('div', { class: 'help' }, types),
       h('div', { class: 'help' }, `Music helper ${d.helpers && d.helpers.music ? 'on' : 'off'} · Hours tracker ${d.helpers && d.helpers.playtime ? 'on' : 'off'} · Discord tab ${d.discordOpen ? 'loaded' : 'closed'} · Xbox stream ${d.streamOpen ? 'open' : 'closed'}`),
       bad.length ? h('div', { class: 'note err', style: { margin: 0 } }, `${bad.length} recent problem${bad.length === 1 ? '' : 's'}: `, bad.slice(-3).map((l) => h('div', {}, l))) : h('div', { class: 'help' }, 'No crashes or hangs logged recently.'),
+      pw ? h('div', { class: 'help' }, `Running for ${pw.uptimeHours} hours${pw.background ? ' · in the background now' : ''}`) : null,
       pw && pw.health ? h('div', { class: 'help' }, `Windows handles ${pw.health.handles != null ? pw.health.handles.toLocaleString() : '?'} · GDI ${pw.health.gdi != null ? pw.health.gdi : '?'} · USER ${pw.health.user != null ? pw.health.user : '?'} · GPU ${pw.health.gpuMB} MB${pw.restartWanted ? ' · a quiet restart is due' : ''}`) : null,
       h('div', { class: 'row', style: { gap: '8px' } },
         h('button', { class: 'btn', onclick: async () => { if (api.powerCheck) await api.powerCheck(); draw(); } }, icon('refresh'), 'Refresh'),
+        api.powerRestart ? h('button', { class: 'btn', title: 'Restart Crimson Vault now (it reopens by itself)', onclick: async () => { if (await confirmBox('Restart Crimson Vault?', 'It closes and opens again in a few seconds. Games you are playing keep running.', 'Restart')) api.powerRestart(); } }, icon('power'), 'Restart now') : null,
         h('button', { class: 'btn', onclick: async () => { await api.copyText(JSON.stringify({ ...d, log: d.log }, null, 1)); showToast('Health report copied'); } }, 'Copy report'),
         h('button', { class: 'btn', onclick: () => api.openDataFolder() }, 'Open log folder')));
   };

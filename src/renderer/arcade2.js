@@ -85,7 +85,10 @@ function actionGame({ title, W, H, side, keys, onButton, reset, update, draw, pa
   let raf, last = performance.now(), paused = false, over = false;
   const held = heldInput();
   let unKeys = () => {};
-  const shell = gameShell(title, () => { cancelAnimationFrame(raf); held.off(); unKeys(); window.removeEventListener('resize', fit); if (S.view.type === 'arcade') renderArcade(); });
+  // Switching to another window pauses the game, so the clock and the action wait for you.
+  const onBlur = () => { if (!paused && !over && api.ready && prefs.get('arcadeAutoPause', true)) api.pause(true); };
+  window.addEventListener('blur', onBlur);
+  const shell = gameShell(title, () => { cancelAnimationFrame(raf); held.off(); unKeys(); window.removeEventListener('blur', onBlur); window.removeEventListener('resize', fit); if (S.view.type === 'arcade') renderArcade(); });
   const { canvas, side: sideEl, root } = shell;
   const stage = root.querySelector('.game-stage');
   const ctx = canvas.getContext('2d');

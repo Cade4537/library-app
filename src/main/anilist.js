@@ -53,7 +53,13 @@ class AniList {
   async gql(query, variables, auth) {
     const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
     if (auth && this.token) headers.Authorization = `Bearer ${this.token}`;
-    const res = await fetch(API, { method: 'POST', headers, body: JSON.stringify({ query, variables }), signal: AbortSignal.timeout(20000) });
+    let res = await fetch(API, { method: 'POST', headers, body: JSON.stringify({ query, variables }), signal: AbortSignal.timeout(20000) });
+    // Too many requests: wait what AniList asks (up to 20 s) and try once more.
+    if (res.status === 429) {
+      const wait = Math.min(20, Number(res.headers.get('retry-after')) || 5) * 1000;
+      await new Promise((r) => setTimeout(r, wait));
+      res = await fetch(API, { method: 'POST', headers, body: JSON.stringify({ query, variables }), signal: AbortSignal.timeout(20000) });
+    }
     let j = null;
     try { j = await res.json(); } catch {}
     if (res.status === 429) throw new Error('AniList is busy right now (too many requests). Try again in a minute.');
@@ -70,6 +76,8 @@ class AniList {
   // The whole anime list, flattened to one entry per show.
   async list(force) {
     if (!this.configured) return { configured: false, entries: [] };
+    // The last list is kept on disk, so the page opens instantly and still works offline.
+    if (!this.cache && this.store.data.animeCache && this.store.data.animeCache.forUser === (this.user || '').toLowerCase()) { this.cache = this.store.data.animeCache.data; this.last = this.store.data.animeCache.at || 0; }
     if (!force && this.cache && Date.now() - this.last < 10 * 60 * 1000) return this.cache;
     // Signed in: use the account's own id, which also shows a private list.
     const vars = this.token && this.s.anilistAuth.userId ? { id: this.s.anilistAuth.userId } : { name: this.user };
@@ -86,6 +94,8 @@ class AniList {
     }
     this.cache = { configured: true, user: col.user ? { name: col.user.name, avatar: col.user.avatar && col.user.avatar.large, url: col.user.siteUrl } : { name: this.user }, canEdit: !!this.token, entries, updated: Date.now() };
     this.last = Date.now();
+    this.store.data.animeCache = { forUser: (this.user || '').toLowerCase(), at: this.last, data: this.cache };
+    this.store.saveSoon();
     return this.cache;
   }
 

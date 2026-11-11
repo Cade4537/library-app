@@ -1,4 +1,4 @@
-/* global spinOverlay, Sfx, toggleRow, openMenu, renderHub, api, S, $, h, icon, prefs, fillEl, keepFocus, openModal, showToast, setView, timeAgo, norm, openSettings, openConnectionsHelp, confirmBox */
+/* global watchTargets, watchLabel, watchOpen, watchMenu, watchButton, watchRow, showUndo, spinOverlay, Sfx, toggleRow, openMenu, renderHub, api, S, $, h, icon, prefs, fillEl, keepFocus, openModal, showToast, setView, timeAgo, norm, openSettings, openConnectionsHelp, confirmBox */
 // 0.16.5: the Anime page. Your AniList list (Watching, Planned, Completed, Paused, Dropped, All),
 // with a Surprise me picker that chooses from the lists you pick, show details, and (signed in)
 // episode, status and score updates.
@@ -13,7 +13,7 @@ const A_TABS = [
 ];
 const A_STATUS = { CURRENT: 'Watching', REPEATING: 'Rewatching', PLANNING: 'Planned', COMPLETED: 'Completed', PAUSED: 'Paused', DROPPED: 'Dropped' };
 const A_POOLS = [['planned', 'Planned'], ['watching', 'Watching'], ['completed', 'Completed'], ['all', 'All']];
-const A_SORTS = [['updated', 'Recently updated'], ['title', 'Title'], ['score', 'Your score'], ['avg', 'AniList score'], ['progress', 'Progress'], ['airing', 'Next episode'], ['year', 'Newest']];
+const A_SORTS = [['updated', 'Recently updated'], ['title', 'Title'], ['score', 'Your score'], ['avg', 'AniList score'], ['progress', 'Progress'], ['airing', 'Next episode'], ['year', 'Newest'], ['short', 'Shortest left']];
 
 let animeQuery = '';
 let animeBusy = false;
@@ -64,6 +64,7 @@ function renderAnimePage(force) {
     progress: (x, y) => (y.episodes ? y.progress / y.episodes : 0) - (x.episodes ? x.progress / x.episodes : 0),
     airing: (x, y) => (x.next ? x.next.at : 9e15) - (y.next ? y.next.at : 9e15),
     year: (x, y) => y.year - x.year,
+    short: (x, y) => animeLeftMins(x) - animeLeftMins(y),
   }[sort] || (() => 0);
   list = list.slice().sort(by);
   const sig = JSON.stringify([tab, sort, q, a.updated, a.error, a.canEdit, animeBusy, list.length, list.slice(0, 60).map((e) => [e.mediaId, e.progress, e.status, e.score])]);
@@ -80,18 +81,19 @@ function renderAnimePage(force) {
   keepFocus(box, () => fillEl(box,
     h('div', { class: 'an-head' },
       a.user && a.user.avatar ? h('img', { class: 'an-avatar', src: a.user.avatar, alt: '', referrerpolicy: 'no-referrer' }) : h('div', { class: 'an-avatar an-avatar-blank' }, icon('tv')),
-      h('div', { class: 'an-who' }, h('b', {}, a.user ? a.user.name : 'AniList'), h('span', {}, `${(a.entries || []).length} shows · ${Math.round(watchedMins / 60).toLocaleString()} hours watched${a.canEdit ? '' : ' · read only'}`)),
+      h('div', { class: 'an-who' }, h('b', {}, a.user ? a.user.name : 'AniList'), h('span', {}, `${(a.entries || []).length} shows · ${Math.round(watchedMins / 60).toLocaleString()} hours watched${a.canEdit ? '' : ' · read only'}${a.updated ? ` · updated ${timeAgo(a.updated).toLowerCase()}` : ''}`)),
       h('div', { class: 'an-head-btns' },
         a.canEdit ? h('button', { class: 'btn', onclick: animeAddSearch }, icon('plus'), 'Add anime') : h('button', { class: 'btn', title: 'Sign in to change episodes, status and scores from here', onclick: () => openConnectionsHelp('anilist') }, 'Sign in to edit'),
         h('button', { class: 'btn', disabled: animeBusy, onclick: () => loadAnime(true) }, icon('refresh'), animeBusy ? 'Updating' : 'Refresh'),
         h('button', { class: 'btn', onclick: () => api.openExternal(a.user && a.user.url ? a.user.url : 'https://anilist.co/home') }, 'Open AniList'))),
     a.error ? h('div', { class: 'note err' }, a.error) : null,
+    animeStatsStrip(a),
     animeSurprisePanel(),
     airingSoon.length ? h('section', { class: 'an-sec' },
       h('h3', { class: 'section-title' }, 'Next episodes'),
       h('div', { class: 'an-airing' }, airingSoon.map((e) => h('button', { class: 'an-air', onclick: () => openAnimeDetails(e) },
         animeArt(e, 'an-air-art'),
-        h('div', { class: 'an-air-text' }, h('b', { title: e.title }, e.title), h('span', {}, `Episode ${e.next.episode}`), h('span', { class: 'an-when' }, e.next.at <= Date.now() ? 'Out now' : `in ${untilText(e.next.at)}`)))))) : null,
+        h('div', { class: 'an-air-text' }, h('b', { title: e.title }, e.title), h('span', {}, `Episode ${e.next.episode}`), h('span', { class: 'an-when', title: new Date(e.next.at).toLocaleString() }, e.next.at <= Date.now() ? 'Out now' : `${dayLabel(e.next.at)} · in ${untilText(e.next.at)}`)))))) : null,
     h('div', { class: 'an-tools' },
       h('div', { class: 'seg' }, A_TABS.map(([k, n]) => h('button', { class: tab === k ? 'on' : '', onclick: () => { prefs.set('animeTab', k); renderAnimePage(true); } }, n, h('span', { class: 'seg-count' }, String(counts[k] || 0))))),
       h('div', { class: 'search-mini an-search' }, icon('search'), search),
@@ -106,7 +108,7 @@ function animeCard(e) {
   const card = h('button', { class: `an-card st-${(e.status || '').toLowerCase()}`, title: e.title, 'data-k': `an:${e.mediaId}`, onclick: () => openAnimeDetails(e) },
     animeArt(e),
     e.score ? h('span', { class: 'an-score' }, icon('star'), String(Math.round(e.score * 10) / 10)) : null,
-    prefs.get('animeTab', 'watching') === 'all' && e.status ? h('span', { class: 'an-status' }, A_STATUS[e.status] || e.status) : null,
+    prefs.get('animeTab', 'watching') === 'all' && e.status ? h('span', { class: 'an-status' }, A_STATUS[e.status] || e.status) : e.status === 'REPEATING' || e.repeat ? h('span', { class: 'an-status' }, e.status === 'REPEATING' ? `Rewatching${e.repeat ? ` · ${e.repeat + 1}x` : ''}` : `Watched ${e.repeat + 1}x`) : null,
     e.next && ['CURRENT', 'REPEATING'].includes(e.status) ? h('span', { class: 'an-next' }, `Ep ${e.next.episode} ${e.next.at <= Date.now() ? 'out' : `in ${untilText(e.next.at)}`}`) : null,
     h('div', { class: 'an-info' },
       h('div', { class: 'an-title' }, e.title),
@@ -116,6 +118,13 @@ function animeCard(e) {
     card.append(h('span', { class: 'an-plus', role: 'button', title: 'Watched one more episode', onclick: (ev) => { ev.stopPropagation(); animePlusOne(e); } }, icon('plus'), '1'));
   }
   card.addEventListener('contextmenu', (ev) => { ev.preventDefault(); animeMenu(e, { x: ev.clientX, y: ev.clientY }); });
+  // + and - change episodes on the focused card (signed in); W opens your first watch site.
+  card.addEventListener('keydown', (ev) => {
+    if (ev.ctrlKey || ev.altKey || ev.metaKey) return;
+    if ((ev.key === '+' || ev.key === '=') && canPlus) { ev.preventDefault(); ev.stopPropagation(); animePlusOne(e); }
+    else if ((ev.key === '-' || ev.key === '_') && S.anime && S.anime.canEdit && e.progress > 0) { ev.preventDefault(); ev.stopPropagation(); animeSave(e, { progress: e.progress - 1 }, true).then((ok) => ok && showToast(`${e.title}: episode ${e.progress}`)); }
+    else if (ev.key.toLowerCase() === 'w') { ev.preventDefault(); ev.stopPropagation(); watchOpen(watchTargets(e)[0]); }
+  });
   return card;
 }
 const fmtFormat = (f) => ({ TV: 'TV', TV_SHORT: 'TV short', MOVIE: 'Movie', SPECIAL: 'Special', OVA: 'OVA', ONA: 'ONA', MUSIC: 'Music' }[f] || f);
@@ -125,8 +134,9 @@ function animeMenu(e, pos) {
   const edit = S.anime && S.anime.canEdit;
   openMenu([
     { label: 'Details', run: () => openAnimeDetails(e) },
-    ...(e.streams.length ? [{ label: `Watch on ${e.streams[0].site}`, run: () => api.openExternal(e.streams[0].url) }] : []),
+    ...watchTargets(e).slice(0, 6).map((t) => ({ label: watchLabel(t), hint: t.exact ? '' : 'search', run: () => watchOpen(t) })),
     { label: 'Open on AniList', run: () => api.openExternal(e.url) },
+    { label: 'Copy title', run: () => navigator.clipboard.writeText(e.title).then(() => showToast(`Copied ${e.title}`)).catch(() => {}) },
     ...(edit ? ['-', ...Object.entries(A_STATUS).filter(([k]) => k !== e.status).map(([k, n]) => ({ label: `Move to ${n}`, run: () => animeSave(e, { status: k }) }))] : []),
   ], pos);
 }
@@ -146,8 +156,13 @@ async function animePlusOne(e) {
   const patch = { progress: n };
   if (e.episodes && n >= e.episodes) patch.status = 'COMPLETED';
   else if (e.status === 'PLANNING' || e.status === 'PAUSED') patch.status = 'CURRENT';
+  const before = { progress: e.progress, status: e.status };
   const ok = await animeSave(e, patch, true);
-  if (ok) showToast(patch.status === 'COMPLETED' ? `Finished ${e.title}!` : `${e.title}: episode ${n}${e.episodes ? ` of ${e.episodes}` : ''}`);
+  if (!ok) return;
+  const msg = patch.status === 'COMPLETED' ? `Finished ${e.title}!` : `${e.title}: episode ${n}${e.episodes ? ` of ${e.episodes}` : ''}`;
+  // A wrong click is one press away from being undone.
+  if (typeof showUndo === 'function') showUndo(msg, () => animeSave(e, before.status !== e.status ? before : { progress: before.progress }, true).then((r) => r && showToast(`${e.title}: back to episode ${before.progress}`)));
+  else showToast(msg);
 }
 
 // ---------- details ----------
@@ -175,7 +190,7 @@ function openAnimeDetails(e) {
         h('h2', {}, e.title),
         e.romaji && e.romaji !== e.title ? h('div', { class: 'an-d-sub' }, e.romaji) : null,
         h('div', { class: 'an-d-facts' }, [fmtFormat(e.format), e.episodes ? `${e.episodes} episodes` : e.airing === 'RELEASING' ? 'Airing' : null, e.season, e.studio, e.avg ? `${e.avg}% on AniList` : null].filter(Boolean).map((t) => h('span', {}, t))),
-        h('div', { class: 'an-genres' }, e.genres.slice(0, 6).map((g) => h('span', {}, g))),
+        h('div', { class: 'an-genres' }, e.genres.slice(0, 6).map((g) => h('button', { class: 'an-genre-btn', title: `Show my ${g} anime`, onclick: () => { close(); animeQuery = g; prefs.set('animeTab', 'all'); if (S.view.type !== 'anime') setView({ type: 'anime' }); else renderAnimePage(true); } }, g))),
         e.next ? h('div', { class: 'an-d-next' }, icon('clock'), `Episode ${e.next.episode} ${e.next.at <= Date.now() ? 'is out' : `in ${untilText(e.next.at)}`}`) : null)),
     descEl, more,
     e.status || edit ? h('div', { class: 'an-d-mine' },
@@ -186,7 +201,7 @@ function openAnimeDetails(e) {
           h('div', { class: 'field' }, h('label', {}, `Episodes${e.episodes ? ` (of ${e.episodes})` : ''}`), h('div', { class: 'an-stepper' }, h('button', { class: 'btn', onclick: () => stepProg(-1) }, '−'), progEl, h('button', { class: 'btn', onclick: () => stepProg(1) }, '+'))),
           h('div', { class: 'field', style: { flex: 1 } }, h('label', {}, 'Your score'), h('div', { class: 'an-score-row' }, scoreRange, scoreEl))))
         : h('div', { class: 'an-d-facts' }, [A_STATUS[e.status], epText(e), e.score ? `Your score ${e.score}` : null, e.completedAt ? `Finished ${new Date(e.completedAt).toLocaleDateString()}` : null].filter(Boolean).map((t) => h('span', {}, t)))) : null,
-    e.streams.length ? h('div', { class: 'an-streams' }, h('h3', { class: 'section-title' }, 'Where to watch'), h('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap' } }, e.streams.map((s) => h('button', { class: 'btn', onclick: () => api.openExternal(s.url) }, icon('play'), s.site)))) : null);
+    watchRow(e));
   openModal({
     title: '',
     cls: 'an-modal',
@@ -278,9 +293,10 @@ function animeSpin() {
         e.score ? h('span', {}, `Your score ${e.score}`) : null,
         e.genres.length ? h('span', {}, e.genres.slice(0, 3).join(', ')) : null,
       ].filter(Boolean));
-      const s0 = e.streams[0];
-      playBtn.replaceChildren(icon('play'), s0 ? `Watch on ${s0.site}` : 'Open on AniList');
-      playBtn.onclick = () => { close(); api.openExternal(s0 ? s0.url : e.url); };
+      const t0 = watchTargets(e)[0];
+      playBtn.replaceChildren(icon(t0 && !t0.exact ? 'search' : 'play'), t0 ? watchLabel(t0) : 'Open on AniList');
+      playBtn.onclick = () => { close(); if (t0) watchOpen(t0); else api.openExternal(e.url); };
+      playBtn.oncontextmenu = (ev) => { ev.preventDefault(); watchMenu(e, { x: ev.clientX, y: ev.clientY }); };
       detBtn.onclick = () => { close(); setTimeout(() => openAnimeDetails(e), 280); };
       // The panel on the page shows the pick too, for when the reel is closed.
       if (S.view.type === 'anime') renderAnimePage(true);
@@ -300,7 +316,7 @@ function animePickCard(e, fresh) {
       e.progress && left ? h('span', {}, `${left} episodes left, about ${mins >= 60 ? `${Math.round(mins / 60)} h` : `${mins} min`}`) : e.episodes && !e.progress ? h('span', {}, `About ${Math.round((e.episodes * (e.duration || 24)) / 60)} h to watch`) : null,
       h('div', { class: 'an-genres' }, e.genres.slice(0, 4).map((g) => h('span', {}, g))),
       h('div', { class: 'row', style: { gap: '8px', marginTop: '6px', flexWrap: 'wrap' } },
-        e.streams.length ? h('button', { class: 'btn primary', onclick: () => api.openExternal(e.streams[0].url) }, icon('play'), `Watch on ${e.streams[0].site}`) : null,
+        watchButton(e),
         h('button', { class: 'btn', onclick: () => openAnimeDetails(e) }, 'Details'))));
 }
 
@@ -347,6 +363,7 @@ function anilistConnBlock(s, connBlock) {
     h('div', { class: 'help' }, 'Your anime list for the Anime page. The user name is enough to read a public list. Sign in to change episodes, status and scores, or to see a private list.'),
     h('div', { class: 'field', style: { marginTop: '10px' } }, h('label', {}, 'AniList user name'), user),
     h('div', { class: 'field' }, h('label', {}, 'Sign in'), h('div', { class: 'row' }, cid, btn)),
+    watchSitesEditor(),
     toggleRow('New episode alerts', 'A pop up when a new episode of a show you are watching comes out', s.animeAlerts !== false, (v) => api.updateSettings({ animeAlerts: v })));
 }
 
@@ -373,3 +390,39 @@ document.addEventListener('DOMContentLoaded', () => {
   }, 60000);
   setInterval(() => { if (S.anime && S.anime.configured) loadAnime(false); }, 11 * 60000);
 });
+
+// ---------- 0.17.0 helpers ----------
+function animeLeftMins(e) { const left = e.episodes ? Math.max(0, e.episodes - e.progress) : 12; return left * (e.duration || 24); }
+function dayLabel(at) {
+  const d = new Date(at), t = new Date();
+  const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((day(d) - day(t)) / 86400000);
+  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  if (diff === 0) return `Today ${time}`;
+  if (diff === 1) return `Tomorrow ${time}`;
+  return `${d.toLocaleDateString(undefined, { weekday: 'short' })} ${time}`;
+}
+// Mean score, finished shows, episodes and days watched.
+function animeStatsStrip(a) {
+  const list = a.entries || [];
+  if (!list.length) return null;
+  const scored = list.filter((e) => e.score);
+  const eps = list.reduce((t, e) => t + (e.progress || 0) + (e.repeat || 0) * (e.episodes || 0), 0);
+  const mins = list.reduce((t, e) => t + ((e.progress || 0) + (e.repeat || 0) * (e.episodes || 0)) * (e.duration || 24), 0);
+  const genres = new Map();
+  for (const e of list.filter((x) => x.status === 'COMPLETED' || x.status === 'CURRENT')) for (const g of e.genres) genres.set(g, (genres.get(g) || 0) + 1);
+  const top = [...genres.entries()].sort((x, y) => y[1] - x[1])[0];
+  const box = (v, l) => h('div', { class: 'an-stat' }, h('b', {}, v), h('span', {}, l));
+  return h('div', { class: 'an-stats' },
+    box(String(animeIn('completed').length), 'completed'),
+    box(eps.toLocaleString(), 'episodes'),
+    box((mins / 1440).toFixed(1), 'days watched'),
+    box(scored.length ? (scored.reduce((t, e) => t + e.score, 0) / scored.length).toFixed(1) : '-', 'mean score'),
+    top ? box(top[0], 'top genre') : null);
+}
+// / jumps to the Anime search.
+document.addEventListener('keydown', (e) => {
+  if (!S.view || S.view.type !== 'anime' || S.modals.length || !(e.key === '/' || (e.ctrlKey && e.key.toLowerCase() === 'f')) || /input|textarea|select/i.test(document.activeElement.tagName)) return;
+  const i = document.querySelector('.an-search input');
+  if (i) { e.preventDefault(); e.stopPropagation(); i.focus(); i.select(); }
+}, true);
