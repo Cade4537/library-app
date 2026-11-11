@@ -280,7 +280,7 @@ Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpe
 96. Tray menu: Anime. 97. Clicking a new episode alert opens that show.
 98. Search waits a moment while you type in big libraries.
 99. A running game's right click menu says Back to game.
-100. Arcade previews and pages keep the last game you played one click away.
+100. News: Mark all read.
 
 ## What's new in 0.16.6
 

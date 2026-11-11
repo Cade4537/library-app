@@ -291,7 +291,8 @@ function renderNews() {
     sec.hidden = false;
     const readSet = new Set(prefs.get('newsRead', []));
     const unread = list.slice(0, 6).filter((n) => !readSet.has(n.url)).length;
-    fillEl(sec, h('div', { class: 'sec-head' }, h('h3', { class: 'section-title' }, 'News for your games', unread ? h('span', { class: 'news-unread' }, `${unread} new`) : null), h('button', { class: 'link-btn', onclick: () => { prefs.set('showNews', false); sec.hidden = true; } }, 'Hide')),
+    fillEl(sec, h('div', { class: 'sec-head' }, h('h3', { class: 'section-title' }, 'News for your games', unread ? h('span', { class: 'news-unread' }, `${unread} new`) : null),
+      unread ? h('button', { class: 'link-btn', onclick: () => { const r = new Set(prefs.get('newsRead', [])); for (const n of list) r.add(n.url); prefs.set('newsRead', [...r].slice(-400)); sec.querySelectorAll('.news-card').forEach((c) => c.classList.add('read')); const u = sec.querySelector('.news-unread'); if (u) u.remove(); } }, 'Mark all read') : null, h('button', { class: 'link-btn', onclick: () => { prefs.set('showNews', false); sec.hidden = true; } }, 'Hide')),
       h('div', { class: 'news-list' }, list.slice(0, 6).map(newsCard)));
   }).catch(() => { sec.hidden = true; });
 }
