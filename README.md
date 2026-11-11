@@ -213,6 +213,10 @@ The player at the bottom of the sidebar reads what is playing from Windows media
 
 Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpers restart themselves every few hours, song artwork and achievement caches are capped, cards for removed games are dropped, and the music player only sends updates when something changes. The Discord tab and the Remote Play stream are the heavy parts; Close tab and End stream free them.
 
+## What's new in 0.17.3
+
+- **Zoom inside Xbox Remote Play and the Discord tab:** Ctrl and + (or =) zoom in, Ctrl and - zoom out, Ctrl+0 resets. Zooming in used to need Shift there.
+
 ## What's new in 0.17.2
 
 - **Background programs no longer count as playing:** a game now only counts while one of its programs has a window open. Some games, Roblox above all, leave a process running in the background after you close them, which used to show as Playing now and add hours. Each game's details have a "Counts as playing" switch: Automatic (the default), Only with its window open, or Any of its programs. Microsoft Store and Xbox app games keep the old way automatically, because their windows belong to a Windows helper.

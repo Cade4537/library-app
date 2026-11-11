@@ -42,6 +42,12 @@ class StreamView {
     wc.on('before-input-event', (e, input) => {
       if (input.type !== 'keyDown') return;
       if (input.key === 'F11') { e.preventDefault(); this.setFull(!this.full); }
+      // Ctrl and + / = zoom in, Ctrl and - zoom out, Ctrl+0 resets (the built in shortcut needed Shift for +).
+      if (input.control && !input.alt && ['=', '+', '-', '_', '0'].includes(input.key)) {
+        e.preventDefault();
+        const z = wc.getZoomFactor();
+        wc.setZoomFactor(input.key === '0' ? 1 : Math.max(0.5, Math.min(2, Math.round((z + (input.key === '-' || input.key === '_' ? -0.1 : 0.1)) * 10) / 10)));
+      }
     });
     wc.on('render-process-gone', () => this.stop());
     wc.loadURL(CONSOLES_URL);

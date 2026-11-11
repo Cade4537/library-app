@@ -35,6 +35,14 @@ class DiscordView {
       }
     });
     const view = new WebContentsView({ webPreferences: { partition: PARTITION, contextIsolation: true, sandbox: true } });
+    // Ctrl and + / = zoom in, Ctrl and - zoom out, Ctrl+0 resets, inside the Discord tab too.
+    view.webContents.on('before-input-event', (e, input) => {
+      if (input.type !== 'keyDown' || !input.control || input.alt || !['=', '+', '-', '_', '0'].includes(input.key)) return;
+      e.preventDefault();
+      const wc2 = view.webContents;
+      const z = wc2.getZoomFactor();
+      wc2.setZoomFactor(input.key === '0' ? 1 : Math.max(0.5, Math.min(2, Math.round((z + (input.key === '-' || input.key === '_' ? -0.1 : 0.1)) * 10) / 10)));
+    });
     view.setBackgroundColor('#313338');
     const wc = view.webContents;
     // Links to other sites open in the normal browser; Discord pages stay in the tab.
