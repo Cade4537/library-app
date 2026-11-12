@@ -2077,7 +2077,7 @@ function wire() {
   $('#newCatBtn').addEventListener('click', () => newCategory(null));
   dropTarget($('#catHead'), { cat: (id) => api.moveCategory(id, null, null) });
   api.onToast((t) => showToast(t.text, t.kind));
-  api.onMedia(setMediaState);
+  api.onMedia((st) => window.setMediaState(st));
   api.onFriends(setFriends);
   api.onUpdate(setUpdateState);
   $('#updateBtn').addEventListener('click', () => api.installUpdate());
@@ -2095,7 +2095,7 @@ function wire() {
   render();
   S.version = await api.version();
   setUpdateState(await api.getUpdate());
-  setMediaState(await api.getMedia());
+  window.setMediaState(await api.getMedia());
   setFriends(await api.getFriends());
   loadDrives();
   setInterval(loadDrives, 5 * 60 * 1000);

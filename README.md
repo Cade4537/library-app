@@ -217,6 +217,10 @@ Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpe
 
 Crimson Vault is a free hobby project. No account, no analytics, no ads, nothing collected. Everything it reads, stores and sends is listed in [PRIVACY.md](PRIVACY.md), the short terms are in [TERMS.md](TERMS.md), and the code is [MIT licensed](LICENSE). It comes as is, with no warranty: if you like it, great, and if you find a problem, open an issue.
 
+## What's new in 0.18.6
+
+- **Fixed:** the full screen music view froze on the song it opened with; the sidebar kept up but the big view did not. Title, cover art, background colors and lyrics now follow every song change.
+
 ## What's new in 0.18.5: Discord presence everywhere, and your music
 
 - **Music on Discord, like Spotify.** The song you are listening to shows on your profile as "Listening to", with the album art and a progress bar, separately from (and at the same time as) the game you are playing. It uses a second Discord application made just for music, so name that one something like "Music". Choose While music plays, Only in Now Playing, or Off in Settings.
