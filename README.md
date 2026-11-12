@@ -213,6 +213,12 @@ The player at the bottom of the sidebar reads what is playing from Windows media
 
 Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpers restart themselves every few hours, song artwork and achievement caches are capped, cards for removed games are dropped, and the music player only sends updates when something changes. The Discord tab and the Remote Play stream are the heavy parts; Close tab and End stream free them.
 
+## What's new in 0.18.2: Sound tab and the guide from anywhere
+
+- **Sound tab in the guide.** Every Sonar channel (Master, Game, Chat, Media, Aux, Mic) with a slider, 5% steps and mute, plus chat mix and Classic or Streamer mode. Updates every 2 seconds while the tab is open. Big mixer opens the full one.
+- **The guide while minimized.** Press **Ctrl+Alt+G** anywhere and the guide slides in over whatever you are doing, even with Crimson Vault minimized or in the tray. Click outside it or press Escape to put it away. Picking a page or a game opens the full app; starting a game or changing music and sound stays in the overlay. Change or turn off the shortcut in Settings.
+- Games in exclusive full screen draw over everything, so use borderless or windowed to see the overlay.
+
 ## What's new in 0.18.1: SteelSeries Sonar
 
 A Sound mixer for SteelSeries Sonar (part of SteelSeries GG). Open it from Now Playing (the sliders button, or S), the Home music card, the guide's Music tab, or Ctrl+K "Sound mixer".

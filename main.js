@@ -211,6 +211,72 @@ function applyAutoCategories() {
 
 function sendTo(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
+  // The guide overlay (used while the app is minimized) gets the same live updates.
+  // Only live state: prompts (Discord pickers, app commands) belong to the main window.
+  if (overlay && !overlay.isDestroyed() && OVERLAY_CHANNELS.has(channel)) overlay.webContents.send(channel, payload);
+}
+const OVERLAY_CHANNELS = new Set(['friends:state', 'media:state', 'update:state', 'toast', 'library:changed']);
+
+// ---------- 0.18.2: the guide overlay ----------
+// A see-through window over everything (games included, unless they use exclusive full screen) that
+// shows only the guide. It opens with the guide hotkey while Crimson Vault is minimized or in the tray.
+let overlay = null;
+let overlayTimer = null;
+let pendingCommand = null;
+function createOverlay() {
+  const { screen } = require('electron');
+  const d = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+  overlay = new BrowserWindow({
+    x: d.x, y: d.y, width: d.width, height: d.height,
+    frame: false, transparent: true, backgroundColor: '#00000000', resizable: false, movable: false, minimizable: false, maximizable: false,
+    fullscreenable: false, skipTaskbar: true, show: false, hasShadow: false, title: 'Crimson Vault guide',
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false },
+  });
+  overlay.setAlwaysOnTop(true, 'screen-saver');
+  overlay.setVisibleOnAllWorkspaces(true);
+  overlay.loadFile(path.join(__dirname, 'src', 'renderer', 'index.html'), { query: { overlay: '1' } });
+  overlay.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/i.test(url)) shell.openExternal(url); return { action: 'deny' }; });
+  overlay.webContents.on('will-navigate', (e) => e.preventDefault());
+  // Clicking anywhere else (another window) puts it away, like the Xbox Game Bar.
+  overlay.on('blur', () => { if (overlay && !overlay.isDestroyed() && overlay.isVisible() && !overlay.webContents.isDevToolsOpened()) hideOverlay(); });
+  overlay.on('closed', () => { overlay = null; });
+}
+function showOverlay() {
+  clearTimeout(overlayTimer);
+  if (!overlay || overlay.isDestroyed()) {
+    createOverlay();
+    overlay.once('ready-to-show', () => { if (!overlay) return; overlay.show(); overlay.focus(); overlay.webContents.send('overlay:open', true); });
+    return;
+  }
+  // Follow the screen the mouse is on.
+  const { screen } = require('electron');
+  overlay.setBounds(screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea);
+  overlay.show();
+  overlay.focus();
+  overlay.webContents.send('overlay:open', true);
+}
+function hideOverlay() {
+  if (!overlay || overlay.isDestroyed() || !overlay.isVisible()) return;
+  overlay.webContents.send('overlay:open', false);
+  overlay.hide();
+  // Kept ready for 10 minutes so it opens instantly, then closed to free memory.
+  clearTimeout(overlayTimer);
+  overlayTimer = setTimeout(() => { if (overlay && !overlay.isDestroyed() && !overlay.isVisible()) overlay.destroy(); }, 10 * 60 * 1000);
+}
+// The guide hotkey: the guide in the app when it is in front, otherwise the overlay.
+function guideHotkey() {
+  if (win && !win.isDestroyed() && win.isVisible() && !win.isMinimized() && win.isFocused()) { win.webContents.send('app:command', 'guide'); return; }
+  if (overlay && !overlay.isDestroyed() && overlay.isVisible()) hideOverlay(); else showOverlay();
+}
+if (process.env.CV_TEST) global.__cvGuide = () => guideHotkey();
+// Something picked in the overlay that needs the full app (a page, the details of a game).
+function commandMain(cmd) {
+  hideOverlay();
+  const fresh = !win || win.isDestroyed();
+  showWindow();
+  if (win && win.isMinimized()) win.restore();
+  const send = () => { if (win && !win.isDestroyed()) win.webContents.send('app:command', cmd); };
+  if (fresh && win) { pendingCommand = cmd; win.webContents.once('did-finish-load', () => setTimeout(() => { if (pendingCommand) { send(); pendingCommand = null; } }, 600)); } else setTimeout(send, 120);
 }
 
 const fileUrl = (p) => (p ? pathToFileURL(p).href : null);
@@ -239,7 +305,10 @@ let pushTimer = null;
 function pushUpdate() {
   clearTimeout(pushTimer);
   pushTimer = setTimeout(() => {
-    if (win && !win.isDestroyed()) win.webContents.send('library:changed', snapshot());
+    const live = [win, overlay].filter((w) => w && !w.isDestroyed());
+    if (!live.length) return;
+    const snap = snapshot();
+    for (const w of live) w.webContents.send('library:changed', snap);
   }, 150);
 }
 
@@ -430,6 +499,9 @@ function applyStartup() {
       });
     } catch {}
   }
+  // The guide hotkey works everywhere, even with Crimson Vault minimized or in the tray.
+  const gk = s.guideHotkey === undefined ? 'Control+Alt+G' : s.guideHotkey;
+  if (gk) { try { globalShortcut.register(gk, guideHotkey); } catch {} }
 }
 
 // Data the phone remote can see and the things it can do.
@@ -707,6 +779,8 @@ function registerIpc() {
   // Now Playing: lyrics (LRCLIB) and artwork (iTunes, Deezer) for the current song.
   // SteelSeries Sonar: volume, mute and chat mix for each channel (all on this PC).
   const sonarSafe = (fn) => async (_e, ...a) => { try { const r = await fn(...a); return r && r.ok ? r : { ok: true, result: r }; } catch (e) { return { ok: false, error: e.message, code: e.code || '' }; } };
+  ipcMain.handle('overlay:hide', () => hideOverlay());
+  ipcMain.handle('overlay:command', (_e, cmd) => { if (cmd && (typeof cmd === 'string' || typeof cmd === 'object')) commandMain(cmd); });
   ipcMain.handle('sonar:state', sonarSafe(() => sonar.state()));
   ipcMain.handle('sonar:volume', sonarSafe((id, v, mix, mode) => sonar.setVolume(String(id), Number(v), String(mix || ''), String(mode || ''))));
   ipcMain.handle('sonar:mute', sonarSafe((id, m, mix, mode) => sonar.setMute(String(id), !!m, String(mix || ''), String(mode || ''))));

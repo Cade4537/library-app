@@ -109,3 +109,82 @@ document.addEventListener('DOMContentLoaded', () => {
   const prev = window.plusPalActions;
   window.plusPalActions = () => [...(prev ? prev() : []), { label: 'Sound mixer (SteelSeries Sonar)', hint: 'Sound', ic: 'headphones', run: () => openSoundMixer() }];
 });
+
+// ---------- the guide's Sound tab ----------
+// One container that survives the guide redrawing itself, refreshed every 2 seconds while the tab is open.
+function guideSound() {
+  if (!SM.gbox) SM.gbox = h('div', { class: 'smg' }, h('div', { class: 'gd-empty' }, h('div', { class: 'spinner' }), h('span', {}, 'Connecting to Sonar')));
+  const load = async () => {
+    if (!S.guideOpen || S.guideTab !== 'sound' || !document.body.contains(SM.gbox)) { clearInterval(SM.gtimer); SM.gtimer = 0; return; }
+    if (Date.now() - SM.busy < 1500) return;
+    const r = await api.sonarState().catch((e) => ({ ok: false, error: e.message }));
+    if (Date.now() - SM.busy < 1500) return;
+    SM.st = r;
+    smDrawGuide(SM.gbox);
+  };
+  if (!SM.gtimer) { SM.gtimer = setInterval(load, 2000); setTimeout(load, 30); }
+  return [SM.gbox];
+}
+function smDrawGuide(box) {
+  const r = SM.st;
+  if (!r || !r.ok) {
+    box.replaceChildren(h('div', { class: 'gd-empty' }, icon('headphones'), h('span', {}, (r && r.error) || 'Open SteelSeries GG and turn on Sonar.')),
+      h('button', { class: 'gd-wide', onclick: () => api.openUrl('steelseries-gg://') }, icon('external'), 'Open SteelSeries GG'));
+    return;
+  }
+  const stream = r.mode === 'stream';
+  const mixKeys = stream ? Object.keys(r.mixes || {}) : [];
+  if (stream && !mixKeys.includes(SM.mix)) SM.mix = mixKeys[0] || 'monitoring';
+  const val = (c) => (stream ? (c.mixes && c.mixes[SM.mix]) : c.classic) || { volume: 0, muted: false };
+  const row = (c) => {
+    const v = val(c);
+    let pct = Math.round(v.volume * 100);
+    const num = h('b', { class: 'smg-pct' }, String(pct));
+    const range = h('input', { type: 'range', min: 0, max: 100, step: 1, value: pct, class: 'smg-range', 'aria-label': `${c.label} volume`, style: `--c:${SM_COLORS[c.id]};--v:${pct}%` });
+    const set = (n) => {
+      pct = Math.max(0, Math.min(100, n));
+      SM.busy = Date.now();
+      range.value = pct; num.textContent = String(pct); range.style.setProperty('--v', `${pct}%`);
+      smQueue(`v:${c.id}`, () => api.sonarVolume(c.id, pct / 100, SM.mix, r.mode));
+    };
+    range.addEventListener('keydown', (e) => e.stopPropagation());
+    range.addEventListener('input', () => set(Number(range.value)));
+    const mute = h('button', { class: 'smg-mute' + (v.muted ? ' on' : ''), 'data-k': `snd:m:${c.id}`, title: v.muted ? `Unmute ${c.label}` : `Mute ${c.label}`, style: `--c:${SM_COLORS[c.id]}`, onclick: async () => {
+      SM.busy = Date.now();
+      const next = !mute.classList.contains('on');
+      mute.classList.toggle('on', next);
+      mute.replaceChildren(icon(next ? (c.id === 'mic' ? 'micOff' : 'volumeOff') : SM_ICONS[c.id]));
+      el.classList.toggle('muted', next);
+      const res = await api.sonarMute(c.id, next, SM.mix, r.mode);
+      if (!res.ok) showToast(res.error || 'Sonar did not take that', 'error');
+    } }, icon(v.muted ? (c.id === 'mic' ? 'micOff' : 'volumeOff') : SM_ICONS[c.id]));
+    const el = h('div', { class: 'smg-row' + (v.muted ? ' muted' : ''), style: `--c:${SM_COLORS[c.id]}` },
+      mute, h('span', { class: 'smg-name' }, c.label),
+      h('button', { class: 'smg-step', 'data-k': `snd:-:${c.id}`, title: `${c.label} down`, onclick: () => set(pct - 5) }, '−'),
+      range,
+      h('button', { class: 'smg-step', 'data-k': `snd:+:${c.id}`, title: `${c.label} up`, onclick: () => set(pct + 5) }, '+'),
+      num);
+    return el;
+  };
+  let cm = null;
+  if (r.chatMix) {
+    let bal = Math.round(r.chatMix.balance * 100);
+    const lab = h('span', { class: 'smg-cmv' }, smChatLabel(bal / 100));
+    const knob = h('input', { type: 'range', min: -100, max: 100, step: 1, value: bal, class: 'smg-cm', 'aria-label': 'Chat mix' });
+    const set = (n) => { bal = Math.max(-100, Math.min(100, n)); SM.busy = Date.now(); knob.value = bal; lab.textContent = smChatLabel(bal / 100); smQueue('chatmix', () => api.sonarChatMix(bal / 100)); };
+    knob.addEventListener('keydown', (e) => e.stopPropagation());
+    knob.addEventListener('input', () => set(Number(knob.value)));
+    knob.addEventListener('dblclick', () => set(0));
+    cm = h('div', { class: 'smg-cmrow' },
+      h('div', { class: 'gd-label' }, 'Chat mix'),
+      h('div', { class: 'smg-cmline' }, h('button', { class: 'smg-step', 'data-k': 'snd:cm-', title: 'More game', onclick: () => set(bal - 10) }, icon('gamepad')), knob, h('button', { class: 'smg-step', 'data-k': 'snd:cm+', title: 'More chat', onclick: () => set(bal + 10) }, icon('chat'))),
+      lab);
+  }
+  box.replaceChildren(
+    h('div', { class: 'smg-modes' },
+      h('div', { class: 'seg' }, [['classic', 'Classic'], ['stream', 'Streamer']].map(([k, n]) => h('button', { class: r.mode === k ? 'on' : '', 'data-k': `snd:mode:${k}`, onclick: async () => { if (r.mode === k) return; const res = await api.sonarMode(k); if (!res.ok) { showToast(res.error || 'Could not switch mode', 'error'); return; } SM.busy = 0; SM.st = await api.sonarState(); smDrawGuide(box); } }, n))),
+      stream && mixKeys.length > 1 ? h('div', { class: 'seg' }, mixKeys.map((k) => h('button', { class: SM.mix === k ? 'on' : '', 'data-k': `snd:mix:${k}`, onclick: () => { SM.mix = k; smDrawGuide(box); } }, (r.mixes || {})[k] || k))) : null),
+    h('div', { class: 'smg-rows' }, r.channels.map(row)),
+    cm,
+    h('button', { class: 'gd-wide', 'data-k': 'snd:big', onclick: () => { openSoundMixer(); } }, icon('sliders'), 'Big mixer'));
+}

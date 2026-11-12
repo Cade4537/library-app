@@ -474,16 +474,22 @@ function moreSettingsSections(s, state) {
   state.startWithWindows = !!s.startWithWindows;
   state.hotkey = s.hotkey === undefined ? 'Control+Alt+Space' : s.hotkey;
   state.dealAlerts = s.dealAlerts !== false;
-  const hk = h('input', { class: 'text-input', value: state.hotkey, placeholder: 'Press keys, or leave empty for none', readonly: true, title: 'Click, then press the keys you want' });
-  hk.addEventListener('keydown', (e) => {
-    e.preventDefault(); e.stopPropagation();
-    if (e.key === 'Backspace' || e.key === 'Delete') { hk.value = ''; state.hotkey = ''; return; }
-    if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return;
-    const parts = [e.ctrlKey && 'Control', e.altKey && 'Alt', e.shiftKey && 'Shift', e.metaKey && 'Super'].filter(Boolean);
-    if (!parts.length) return;
-    const key = e.key === ' ' ? 'Space' : e.key.length === 1 ? e.key.toUpperCase() : e.key;
-    hk.value = state.hotkey = [...parts, key].join('+');
-  });
+  state.guideHotkey = s.guideHotkey === undefined ? 'Control+Alt+G' : s.guideHotkey;
+  const keyBox = (field) => {
+    const box = h('input', { class: 'text-input', value: state[field], placeholder: 'Press keys, or leave empty for none', readonly: true, title: 'Click, then press the keys you want' });
+    box.addEventListener('keydown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (e.key === 'Backspace' || e.key === 'Delete') { box.value = ''; state[field] = ''; return; }
+      if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return;
+      const parts = [e.ctrlKey && 'Control', e.altKey && 'Alt', e.shiftKey && 'Shift', e.metaKey && 'Super'].filter(Boolean);
+      if (!parts.length) return;
+      const key = e.key === ' ' ? 'Space' : e.key.length === 1 ? e.key.toUpperCase() : e.key;
+      box.value = state[field] = [...parts, key].join('+');
+    });
+    return box;
+  };
+  const hk = keyBox('hotkey');
+  const gk = keyBox('guideHotkey');
   // Phone remote
   const qr = h('div', { class: 'qr-box' });
   const remoteToggle = toggleRow('Phone remote', 'Browse your library, start games, install and uninstall from your phone on the same Wi-Fi', !!s.remoteEnabled, async (v) => { drawRemote(await api.remoteSet(v)); });
@@ -507,6 +513,7 @@ function moreSettingsSections(s, state) {
     h('div', { class: 'field' }, toggleRow('Keep running in the tray', 'Closing the window keeps Crimson Vault in the tray, so tracking and alerts keep working', state.closeToTray, (v) => { state.closeToTray = v; })),
     h('div', { class: 'field' }, toggleRow('Start with Windows', 'Opens quietly in the tray when you sign in', state.startWithWindows, (v) => { state.startWithWindows = v; })),
     h('div', { class: 'field' }, h('label', {}, 'Show / hide shortcut'), hk, h('div', { class: 'help' }, 'Works from anywhere, even in other apps. Click the box and press keys; Backspace turns it off.')),
+    h('div', { class: 'field' }, h('label', {}, 'Guide shortcut'), gk, h('div', { class: 'help' }, 'Opens the guide over whatever you are doing, even with Crimson Vault minimized or in the tray. Games in exclusive full screen hide it; use borderless or windowed.')),
     h('div', { class: 'field' }, h('label', {}, 'Open store pages in'), storeSeg()),
     h('div', { class: 'section-label' }, 'Alerts'),
     h('div', { class: 'field' }, toggleRow('Friend alerts', 'A pop up when a friend starts a different game. The same friend and game never alert twice within 3 hours.', prefs.get('friendAlerts', true), (v) => prefs.set('friendAlerts', v))),

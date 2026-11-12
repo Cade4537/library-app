@@ -422,7 +422,7 @@ function plusClock() { return new Date().toLocaleTimeString([], prefs.get('clock
 // ---------- keyboard shortcut sheet ----------
 function shortcutSheet() {
   const rows = [
-    ['Everywhere', [['Ctrl+K', 'find anything'], ['Ctrl+F or /', 'search'], ['G', 'open the guide'], ['Ctrl+1 to 9', 'Home, Library, Deals, Stats, Social, Anime, Arcade, Surprise me, Remote Play'], ['Ctrl+,', 'Settings'], ['Alt+Left or mouse back', 'go back'], ['Ctrl + / - / 0', 'zoom in, out, reset'], ['F11', 'full screen'], ['F5', 'scan launchers'], ['Ctrl+Z', 'undo the last change'], ['?', 'this list']]],
+    ['Everywhere', [['Ctrl+K', 'find anything'], ['Ctrl+F or /', 'search'], ['G', 'open the guide'], ['Ctrl+Alt+G', 'the guide from anywhere, even minimized'], ['Ctrl+1 to 9', 'Home, Library, Deals, Stats, Social, Anime, Arcade, Surprise me, Remote Play'], ['Ctrl+,', 'Settings'], ['Alt+Left or mouse back', 'go back'], ['Ctrl + / - / 0', 'zoom in, out, reset'], ['F11', 'full screen'], ['F5', 'scan launchers'], ['Ctrl+Z', 'undo the last change'], ['?', 'this list']]],
     ['A game card', [['Enter', 'details'], ['Middle click', 'play'], ['F2', 'rename'], ['Ctrl+D', 'favorite'], ['Delete', 'hide (with undo)'], ['Shift or Ctrl click', 'select several']]],
     ['Game details', [['Enter', 'play'], ['[ and ]', 'previous and next game'], ['Esc', 'close']]],
     ['Anime', [['/', 'search'], ['+ and -', 'one episode more or less (signed in)'], ['W', 'watch on your first site']]],
@@ -481,6 +481,7 @@ function importBackup() {
 
 // ---------- what's new ----------
 const WHATS_NEW = {
+  '0.18.2': ['The guide has a Sound tab: every Sonar channel, mute, chat mix and Classic or Streamer mode', 'Ctrl+Alt+G opens the guide over anything, even with Crimson Vault minimized or in the tray (change it in Settings)'],
   '0.17.0': ['Watch sites for anime: your own list of sites, exact pages when AniList knows them, searches otherwise', 'Keyboard shortcuts everywhere (press ? to see them)', 'Zoom with Ctrl and + or -', 'Statistics: play streak, longest session, Xbox and anime hours, export to a spreadsheet', 'Friends: sort by who just started, Steam messages, games you both have', 'Arcade: auto pause, hints, Vault Words hard mode and Copy result', 'Back up and restore your settings', 'And dozens of smaller fixes and touches'],
 };
 function whatsNew(v) {

@@ -1703,7 +1703,7 @@ function buildSettingsPage() {
           steamGridDbKey: sgdb.input.value.trim(), curseforgeInstancesPath: cf.value.trim(), includeApps, musicEnabled, musicAnyApp,
           steamApiKey: steamKey.input.value.trim(), steamId: steamId.value.trim(), gogOwned, openXblKey: xblKey.input.value.trim(), genreSort, ubisoftOwned,
           discordTab, discordPresence, discordBrowsing, discordClientId: dcId.value.trim(), tvOnStart,
-          closeToTray: app.closeToTray, startWithWindows: app.startWithWindows, hotkey: app.hotkey, dealAlerts: app.dealAlerts,
+          closeToTray: app.closeToTray, startWithWindows: app.startWithWindows, hotkey: app.hotkey, guideHotkey: app.guideHotkey, dealAlerts: app.dealAlerts,
         });
         api.applyStartup();
         S.keyErrorShown = false;

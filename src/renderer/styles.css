@@ -2101,3 +2101,33 @@ body.calm .npx-bgart, body.calm .npx-blobs i, body.calm .npx-artistimg { animati
 .sm-chatmix { width: 100%; accent-color: #ff5000; }
 .sm-cm-v { font-size: 12px; color: var(--muted); }
 .sm-foot { text-align: center; }
+
+/* ---------- 0.18.2: guide overlay (the guide over other apps while minimized) ---------- */
+html.overlay-mode, body.overlay-mode { background: transparent !important; }
+body.overlay-mode::before, body.overlay-mode::after { display: none !important; }
+body.overlay-mode > *:not(#guide):not(#guideBack):not(#modalRoot):not(#menuRoot):not(#toasts):not(script) { display: none !important; }
+body.overlay-mode #guideBack { background: rgba(0,0,0,.38); backdrop-filter: none; }
+body.overlay-mode #guide { box-shadow: 0 30px 90px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.06); }
+
+/* ---------- 0.18.2: Sound tab in the guide ---------- */
+.smg { display: grid; gap: 12px; }
+.smg-modes { display: grid; gap: 8px; }
+.smg-modes .seg { display: flex; }
+.smg-modes .seg button { flex: 1; }
+.smg-rows { display: grid; gap: 6px; }
+.smg-row { display: grid; grid-template-columns: 34px 52px 26px 1fr 26px 30px; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 12px; background: rgba(255,255,255,.035); }
+.smg-row.muted { opacity: .55; }
+.smg-name { font-size: 12.5px; font-weight: 600; color: var(--c); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.smg-mute, .smg-step { height: 30px; border-radius: 9px; border: 0; background: rgba(255,255,255,.06); color: #fff; cursor: pointer; display: grid; place-items: center; font-size: 15px; padding: 0; }
+.smg-mute { width: 34px; color: var(--c); }
+.smg-mute.on { background: rgba(255,77,109,.18); color: #ff4d6d; }
+.smg-mute svg, .smg-step svg { width: 16px; height: 16px; }
+.smg-mute:hover, .smg-step:hover, .smg-mute:focus-visible, .smg-step:focus-visible { background: rgba(255,255,255,.14); }
+.smg-pct { font-variant-numeric: tabular-nums; text-align: right; font-size: 12.5px; }
+.smg-range, .smg-cm { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 6px; background: linear-gradient(90deg, var(--c, #fff) var(--v, 50%), rgba(255,255,255,.12) var(--v, 50%)); outline: none; margin: 0; }
+.smg-cm { --c: #fff; background: linear-gradient(90deg, #ff4d6d, rgba(255,255,255,.25) 50%, #3ddc84); }
+.smg-range::-webkit-slider-thumb, .smg-cm::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px var(--c, #fff), 0 2px 8px rgba(0,0,0,.5); cursor: pointer; }
+.smg-range:focus-visible::-webkit-slider-thumb, .smg-cm:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--c, #fff); }
+.smg-cmrow { display: grid; gap: 6px; padding: 8px; border-radius: 12px; background: rgba(255,255,255,.035); }
+.smg-cmline { display: grid; grid-template-columns: 30px 1fr 30px; gap: 8px; align-items: center; }
+.smg-cmv { text-align: center; font-size: 12px; color: var(--muted, #9a9aa3); }

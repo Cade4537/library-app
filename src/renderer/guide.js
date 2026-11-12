@@ -27,7 +27,7 @@ function pageOf(type) {
 
 function guideEl() { return document.getElementById('guide'); }
 // Guide tabs, like the Xbox guide: Home, Friends, Music and Quick settings. LB / RB switch them.
-const GUIDE_TABS = [['home', 'Home', 'home'], ['friends', 'Friends', 'users'], ['alerts', 'Alerts', 'bell'], ['music', 'Music', 'music'], ['quick', 'Quick settings', 'gear']];
+const GUIDE_TABS = [['home', 'Home', 'home'], ['friends', 'Friends', 'users'], ['alerts', 'Alerts', 'bell'], ['music', 'Music', 'music'], ['sound', 'Sound', 'sliders'], ['quick', 'Quick settings', 'gear']];
 function openGuide(tab) {
   if (tab) S.guideTab = tab;
   if (!S.guideTab) S.guideTab = 'home';
@@ -160,7 +160,7 @@ function renderGuide() {
   const st = (typeof NP !== 'undefined' && NP.state) || {};
   const me = S.lib.settings.xboxGamertag || S.lib.settings.epicName || 'Player';
   const unread = tab === 'alerts' ? 0 : unreadAlerts();
-  const body = tab === 'friends' ? guideFriends() : tab === 'alerts' ? guideAlerts() : tab === 'music' ? guideMusic() : tab === 'quick' ? guideQuick() : guideHome();
+  const body = tab === 'friends' ? guideFriends() : tab === 'alerts' ? guideAlerts() : tab === 'music' ? guideMusic() : tab === 'sound' && typeof guideSound === 'function' ? guideSound() : tab === 'quick' ? guideQuick() : guideHome();
   keepFocus(g, () => fillEl(g,
     h('div', { class: 'gd-head' },
       h('div', { class: 'gd-me' }, h('div', { class: 'gd-avatar' }, (me[0] || 'P').toUpperCase(), h('span', { class: 'f-badge st-online' })), h('div', { class: 'gd-metext' }, h('b', {}, me), h('span', {}, 'Online'))),
