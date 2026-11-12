@@ -240,7 +240,7 @@ function createOverlay() {
   overlay.setAlwaysOnTop(true, 'screen-saver');
   overlay.setVisibleOnAllWorkspaces(true);
   overlay.loadFile(path.join(__dirname, 'src', 'renderer', 'index.html'), { query: { overlay: '1' } });
-  overlay.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/i.test(url)) shell.openExternal(url); return { action: 'deny' }; });
+  overlay.webContents.setWindowOpenHandler(({ url }) => { if (/^https:\/\//i.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   overlay.webContents.on('will-navigate', (e) => e.preventDefault());
   // Clicking anywhere else (another window) puts it away, like the Xbox Game Bar.
   // Only after it really had focus: Windows can send a blur while the window is still appearing, which
@@ -443,8 +443,11 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
   });
+  // The app page never navigates anywhere else (a dropped link or file would replace the app).
+  win.webContents.on('will-navigate', (e) => e.preventDefault());
   if (store.data.windowState && store.data.windowState.maximized) win.maximize();
   trackBounds(win);
   win.loadFile(path.join(__dirname, 'src', 'renderer', 'index.html'));
@@ -659,7 +662,7 @@ function registerIpc() {
     const r = await dialog.showOpenDialog(win, { properties: ['openFile'], filters: [{ name: 'Programs', extensions: ['exe', 'bat', 'cmd', 'lnk'] }] });
     return r.canceled ? null : r.filePaths[0];
   });
-  ipcMain.handle('app:openUrl', (_e, url) => { if (/^(https:\/\/|steam:\/\/|ms-settings:|com\.epicgames\.launcher:\/\/|goggalaxy:\/\/)/.test(String(url))) shell.openExternal(url); });
+  ipcMain.handle('app:openUrl', (_e, url) => { if (/^(https:\/\/|steam:\/\/|ms-settings:|com\.epicgames\.launcher:\/\/|goggalaxy:\/\/|steelseries-gg:\/\/)/.test(String(url))) shell.openExternal(url); });
 
   ipcMain.handle('library:get', () => snapshot());
   ipcMain.handle('library:rescan', () => rescan(false));
@@ -1000,6 +1003,13 @@ if (!app.requestSingleInstanceLock()) {
   app.on('second-instance', () => showWindow());
 
   app.whenReady().then(async () => {
+    // The app's own pages may only show notifications, go full screen and copy text. Camera,
+    // microphone, location, screen capture and the rest are refused (the Discord and Xbox tabs
+    // have their own rules for calls and streaming).
+    const { session } = require('electron');
+    const OWN_PERMS = ['notifications', 'fullscreen', 'clipboard-sanitized-write'];
+    session.defaultSession.setPermissionRequestHandler((_wc, perm, cb) => cb(OWN_PERMS.includes(perm)));
+    session.defaultSession.setPermissionCheckHandler((_wc, perm) => OWN_PERMS.includes(perm));
     store = new Store(path.join(app.getPath('userData'), 'library.json'));
     store.load();
     store.onChange = pushUpdate;

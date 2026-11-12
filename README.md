@@ -213,6 +213,18 @@ The player at the bottom of the sidebar reads what is playing from Windows media
 
 Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpers restart themselves every few hours, song artwork and achievement caches are capped, cards for removed games are dropped, and the music player only sends updates when something changes. The Discord tab and the Remote Play stream are the heavy parts; Close tab and End stream free them.
 
+## Privacy, terms and license
+
+Crimson Vault is a free hobby project. No account, no analytics, no ads, nothing collected. Everything it reads, stores and sends is listed in [PRIVACY.md](PRIVACY.md), the short terms are in [TERMS.md](TERMS.md), and the code is [MIT licensed](LICENSE). It comes as is, with no warranty: if you like it, great, and if you find a problem, open an issue.
+
+## What's new in 0.18.4: privacy and trust
+
+- **Lyrics are opt in.** Off by default. The first time you press Lyrics, the app explains that they come from LRCLIB (a free community database, not Apple Music or Spotify) and asks before turning them on. There is also a toggle in Settings.
+- **Secrets encrypted.** API keys and sign ins in library.json are now encrypted with Windows' protection for your user account. Another Windows user, or a copy of the file, cannot read them. The settings backup still never includes them.
+- **Hardened exe.** The built app refuses Node.js code injection (ELECTRON_RUN_AS_NODE, NODE_OPTIONS, debugger flags), encrypts its cookies, and only loads its own packaged code. The main window now runs sandboxed, never navigates away, and camera, microphone and screen capture are blocked for the app's own pages.
+- **PRIVACY.md and TERMS.md** spell out what the app reads, stores and sends, what it never does, and that it is not affiliated with any of the services it connects to.
+- **MIT license** added to the repo.
+
 ## What's new in 0.18.3: the guide from anywhere, for real
 
 - **Controller opens the guide anywhere.** Press the Xbox button, or View + Menu together, with Crimson Vault minimized or in the tray, even on an empty desktop. Pick which in Settings. Crimson Vault reads the controller itself through XInput (built into Windows), so it works without focus, and the controller drives the overlay the same way it drives the app (B closes it).

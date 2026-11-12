@@ -20,7 +20,7 @@ function loginWindow(parent, { url, partition, title, check }) {
       title,
       autoHideMenuBar: true,
       backgroundColor: '#0a0a0b',
-      webPreferences: { partition, contextIsolation: true, nodeIntegration: false },
+      webPreferences: { partition, contextIsolation: true, nodeIntegration: false, sandbox: true },
     });
     let done = false;
     const finish = (v) => {

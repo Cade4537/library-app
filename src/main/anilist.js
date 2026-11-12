@@ -127,7 +127,7 @@ class AniList {
     const id = String(clientId || this.s.anilistClientId || '').trim();
     if (!/^\d+$/.test(id)) return Promise.resolve({ ok: false, error: 'Enter your AniList API client ID first (see How to set up).' });
     return new Promise((resolve) => {
-      const win = new BrowserWindow({ width: 520, height: 760, parent, modal: !!parent, title: 'Sign in to AniList', autoHideMenuBar: true, backgroundColor: '#0b1622', webPreferences: { partition: PARTITION } });
+      const win = new BrowserWindow({ width: 520, height: 760, parent, modal: !!parent, title: 'Sign in to AniList', autoHideMenuBar: true, backgroundColor: '#0b1622', webPreferences: { partition: PARTITION, contextIsolation: true, sandbox: true } });
       let done = false;
       const finish = async (url) => {
         if (done) return;

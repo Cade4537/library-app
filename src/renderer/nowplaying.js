@@ -13,7 +13,18 @@ function npPos() {
   const p = NP.base + (st.status === 'Playing' ? (Date.now() - NP.at) / 1000 : 0);
   return Math.max(0, st.dur ? Math.min(st.dur, p) : p);
 }
-const npLyricsOn = () => prefs.get('npLyrics', true);
+// 0.18.4: lyrics are opt in. They come from LRCLIB, a free community database, not from Apple Music or
+// Spotify, so they are off until you turn them on.
+const npLyricsOn = () => prefs.get('lyricsOptIn', false);
+function npLyricsConsent(then) {
+  openModal({
+    title: 'Turn on lyrics?',
+    body: h('div', { class: 'help', style: { fontSize: '13.5px', lineHeight: 1.5 } },
+      h('p', {}, 'Lyrics come from LRCLIB (lrclib.net), a free database where people share synced lyrics. They do not come from Apple Music or Spotify, and Crimson Vault does not have a license for them.'),
+      h('p', {}, 'When on, the name, artist, album and length of the song playing are sent to lrclib.net to find its lyrics. Nothing is saved, and you can turn them off again any time with the Lyrics button or L.')),
+    actions: [{ label: 'Not now' }, { label: 'Turn on', primary: true, run: () => { prefs.set('lyricsOptIn', true); then(); } }],
+  });
+}
 
 // ---------- new song: fetch lyrics and artwork ----------
 async function npTrackChanged() {
@@ -147,7 +158,11 @@ function closeNowPlaying() {
   NPX.els = null;
 }
 function npFull() { const r = NPX.els && NPX.els.root; if (!r) return; if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); else r.requestFullscreen().catch(() => {}); }
-function npToggleLyrics() { prefs.set('npLyrics', !npLyricsOn()); NPX.key = ''; npTrackChanged(); }
+function npToggleLyrics() {
+  const done = () => { NPX.key = ''; npTrackChanged(); };
+  if (npLyricsOn()) { prefs.set('lyricsOptIn', false); done(); return; }
+  npLyricsConsent(done);
+}
 function npSeek(sec) {
   sec = Math.max(0, sec);
   api.mediaCommand(`seek:${sec.toFixed(2)}`);

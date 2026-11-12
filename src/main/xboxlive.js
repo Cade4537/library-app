@@ -57,7 +57,7 @@ class XboxLive {
   signIn(parent) {
     return new Promise((resolve) => {
       const url = `https://login.live.com/oauth20_authorize.srf?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT)}&response_type=code&prompt=select_account&scope=${encodeURIComponent(SCOPE)}`;
-      const win = new BrowserWindow({ width: 500, height: 720, parent, modal: !!parent, title: 'Sign in with Microsoft', autoHideMenuBar: true, backgroundColor: '#ffffff', webPreferences: { partition: PARTITION } });
+      const win = new BrowserWindow({ width: 500, height: 720, parent, modal: !!parent, title: 'Sign in with Microsoft', autoHideMenuBar: true, backgroundColor: '#ffffff', webPreferences: { partition: PARTITION, contextIsolation: true, sandbox: true } });
       let done = false;
       const finish = async (redirectUrl) => {
         if (done) return;

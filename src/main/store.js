@@ -23,6 +23,34 @@ const ITEM_PATCH_FIELDS = ['customName', 'favorite', 'hidden', 'categoryId', 'ki
 
 const newId = () => crypto.randomUUID();
 
+// 0.18.4: keys, tokens and sign ins are encrypted on disk with Windows' own protection for your
+// account (Electron safeStorage, which uses DPAPI). Another Windows user, or a copy of the file on
+// another PC, cannot read them. Everything else in library.json stays plain so it is easy to back up.
+const SECRET_FIELD = /^(steamGridDbKey|steamApiKey|openXblKey|xboxLive|epicAuth|anilistAuth)$|token|password|cookie|secret/i;
+let vault = null;
+try {
+  const { safeStorage } = require('electron');
+  if (safeStorage) vault = safeStorage;
+} catch {}
+const canEncrypt = () => { try { return !!(vault && vault.isEncryptionAvailable()); } catch { return false; } };
+function sealSettings(settings) {
+  if (!canEncrypt()) return settings;
+  const out = { ...settings };
+  for (const [k, v] of Object.entries(settings)) {
+    if (!SECRET_FIELD.test(k) || v === '' || v == null || (v && v.$enc)) continue;
+    try { out[k] = { $enc: vault.encryptString(JSON.stringify(v)).toString('base64') }; } catch {}
+  }
+  return out;
+}
+function openSettings(settings) {
+  for (const [k, v] of Object.entries(settings)) {
+    if (!v || typeof v !== 'object' || typeof v.$enc !== 'string') continue;
+    // Not readable here (another PC or Windows user): sign in again rather than keep junk.
+    try { settings[k] = JSON.parse(vault.decryptString(Buffer.from(v.$enc, 'base64'))); } catch { settings[k] = DEFAULT_SETTINGS[k] !== undefined ? DEFAULT_SETTINGS[k] : null; }
+  }
+  return settings;
+}
+
 class Store {
   constructor(file) {
     this.file = file;
@@ -38,7 +66,7 @@ class Store {
     if (!d || typeof d !== 'object') d = {};
     d.version = 1;
     d.items = d.items && typeof d.items === 'object' ? d.items : {};
-    d.settings = { ...DEFAULT_SETTINGS, ...(d.settings || {}) };
+    d.settings = openSettings({ ...DEFAULT_SETTINGS, ...(d.settings || {}) });
     d.coverEpoch = d.coverEpoch || 1;
     d.ensuredPaths = Array.isArray(d.ensuredPaths) ? d.ensuredPaths : [];
     if (!d.migrations) d.migrations = {};
@@ -64,12 +92,15 @@ class Store {
     clearTimeout(this._timer);
     try {
       fs.mkdirSync(path.dirname(this.file), { recursive: true });
+      const text = JSON.stringify({ ...this.data, settings: sealSettings(this.data.settings) }, null, 1);
+      // The backup is the last good copy, written the same (encrypted) way.
       if (!this._backedUp && fs.existsSync(this.file)) {
-        fs.copyFileSync(this.file, this.file.replace(/\.json$/, '.backup.json'));
+        const prev = (() => { try { return JSON.parse(fs.readFileSync(this.file, 'utf8')); } catch { return null; } })();
+        if (prev && typeof prev === 'object') { if (prev.settings) prev.settings = sealSettings(openSettings({ ...prev.settings })); fs.writeFileSync(this.file.replace(/\.json$/, '.backup.json'), JSON.stringify(prev, null, 1)); }
         this._backedUp = true;
       }
       const tmp = this.file + '.tmp';
-      fs.writeFileSync(tmp, JSON.stringify(this.data, null, 1));
+      fs.writeFileSync(tmp, text);
       fs.renameSync(tmp, this.file);
     } catch (e) {
       console.error('Saving library failed', e);
