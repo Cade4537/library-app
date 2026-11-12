@@ -71,6 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (S.guideOpen) S.guideOpen = false;
     openGuide();
   };
+  if (api.onOverlayPad) api.onOverlayPad((name) => { if (OV.open && window.padFeed) window.padFeed(name); });
   api.onOverlay((v) => {
     if (v) show();
     else { OV.open = false; if (S.guideOpen) realClose(); }

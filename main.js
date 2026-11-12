@@ -42,6 +42,8 @@ const { getLaunchers, openLauncher } = require('./src/main/launchers');
 const { getDrives, SizeTracker, uninstall } = require('./src/main/storage');
 const { runPowerShell, psStats } = require('./src/main/util');
 const diag = require('./src/main/diag');
+const { PadWatch } = require('./src/main/padwatch');
+let padWatch = null;
 const { Qol } = require('./src/main/qol');
 
 const { openRemotePlayWindow, openXboxAppAndConnect } = require('./src/main/remoteplay');
@@ -223,6 +225,9 @@ const OVERLAY_CHANNELS = new Set(['friends:state', 'media:state', 'update:state'
 let overlay = null;
 let overlayTimer = null;
 let pendingCommand = null;
+let overlayFocused = false;
+let overlayShownAt = 0;
+let overlayReady = false;
 function createOverlay() {
   const { screen } = require('electron');
   const d = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
@@ -238,25 +243,48 @@ function createOverlay() {
   overlay.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/i.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   overlay.webContents.on('will-navigate', (e) => e.preventDefault());
   // Clicking anywhere else (another window) puts it away, like the Xbox Game Bar.
-  overlay.on('blur', () => { if (overlay && !overlay.isDestroyed() && overlay.isVisible() && !overlay.webContents.isDevToolsOpened()) hideOverlay(); });
+  // Only after it really had focus: Windows can send a blur while the window is still appearing, which
+  // used to put the overlay away the moment it opened.
+  overlay.on('focus', () => { overlayFocused = true; });
+  overlay.on('blur', () => {
+    if (!overlayFocused || Date.now() - overlayShownAt < 700) return;
+    overlayFocused = false;
+    if (overlay && !overlay.isDestroyed() && overlay.isVisible() && !overlay.webContents.isDevToolsOpened()) hideOverlay();
+  });
   overlay.on('closed', () => { overlay = null; });
 }
 function showOverlay() {
   clearTimeout(overlayTimer);
   if (!overlay || overlay.isDestroyed()) {
     createOverlay();
-    overlay.once('ready-to-show', () => { if (!overlay) return; overlay.show(); overlay.focus(); overlay.webContents.send('overlay:open', true); });
+    overlayReady = false;
+    const first = () => { if (!overlay || overlay.isDestroyed() || overlayReady) return; overlayReady = true; revealOverlay(); };
+    overlay.once('ready-to-show', first);
+    overlay.webContents.once('did-finish-load', () => setTimeout(first, 300));
+    setTimeout(first, 6000);
     return;
   }
   // Follow the screen the mouse is on.
   const { screen } = require('electron');
   overlay.setBounds(screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea);
+  revealOverlay();
+}
+function revealOverlay() {
+  overlayShownAt = Date.now();
+  overlayFocused = false;
+  overlay.setAlwaysOnTop(true, 'screen-saver');
   overlay.show();
+  overlay.moveTop();
   overlay.focus();
+  overlay.webContents.focus();
   overlay.webContents.send('overlay:open', true);
+  // Opened from the controller, Windows may refuse focus; the controller helper asks for it.
+  if (padWatch && !overlay.isFocused()) { try { const b = overlay.getNativeWindowHandle(); padWatch.front(b.length >= 8 ? b.readBigUInt64LE(0).toString() : String(b.readUInt32LE(0))); } catch {} }
+  diag.log('overlay-shown', { focused: overlay.isFocused() });
 }
 function hideOverlay() {
   if (!overlay || overlay.isDestroyed() || !overlay.isVisible()) return;
+  overlayFocused = false;
   overlay.webContents.send('overlay:open', false);
   overlay.hide();
   // Kept ready for 10 minutes so it opens instantly, then closed to free memory.
@@ -264,8 +292,9 @@ function hideOverlay() {
   overlayTimer = setTimeout(() => { if (overlay && !overlay.isDestroyed() && !overlay.isVisible()) overlay.destroy(); }, 10 * 60 * 1000);
 }
 // The guide hotkey: the guide in the app when it is in front, otherwise the overlay.
+function mainInFront() { return !!(win && !win.isDestroyed() && win.isVisible() && !win.isMinimized() && win.isFocused()); }
 function guideHotkey() {
-  if (win && !win.isDestroyed() && win.isVisible() && !win.isMinimized() && win.isFocused()) { win.webContents.send('app:command', 'guide'); return; }
+  if (mainInFront()) { win.webContents.send('app:command', 'guide'); return; }
   if (overlay && !overlay.isDestroyed() && overlay.isVisible()) hideOverlay(); else showOverlay();
 }
 if (process.env.CV_TEST) global.__cvGuide = () => guideHotkey();
@@ -474,6 +503,7 @@ function setupTray() {
   tray.setToolTip('Crimson Vault');
   const menu = () => Menu.buildFromTemplate([
     { label: 'Open Crimson Vault', click: showWindow },
+    { label: 'Open the guide', click: () => showOverlay() },
     { label: 'Surprise me', click: () => { showWindow(); sendTo('app:command', 'surprise'); } },
     { label: 'Controller mode', click: () => { showWindow(); sendTo('app:command', 'tv'); } },
     { label: 'Anime', click: () => { showWindow(); setTimeout(() => sendTo('app:command', 'anime'), 400); } },
@@ -501,7 +531,14 @@ function applyStartup() {
   }
   // The guide hotkey works everywhere, even with Crimson Vault minimized or in the tray.
   const gk = s.guideHotkey === undefined ? 'Control+Alt+G' : s.guideHotkey;
-  if (gk) { try { globalShortcut.register(gk, guideHotkey); } catch {} }
+  if (gk) {
+    let ok = false;
+    try { ok = globalShortcut.register(gk, guideHotkey); } catch {}
+    // Another app (a recorder, a GPU overlay) may already own the keys.
+    if (!ok) { diag.log('guide-hotkey-taken', { key: gk }); setTimeout(() => sendTo('toast', { text: `${gk.replace(/Control/g, 'Ctrl')} is taken by another app. Pick another guide shortcut in Settings.`, kind: 'error' }), 8000); }
+  }
+  const padMode = s.guidePad === undefined ? 'both' : s.guidePad;
+  if (padWatch && padWatch.mode !== padMode) padWatch.restart(padMode);
 }
 
 // Data the phone remote can see and the things it can do.
@@ -1021,6 +1058,13 @@ if (!app.requestSingleInstanceLock()) {
     registerIpc();
     createWindow();
     setupTray();
+    padWatch = new PadWatch({
+      log: (k, d) => diag.log(k, d),
+      // In the app, the app reads the controller itself; the Xbox button still toggles its guide.
+      onGuide: (src) => { if (mainInFront()) { if (src === 'guide') win.webContents.send('app:command', 'guide'); return; } guideHotkey(); },
+      onInput: (name, repeat) => { if (overlay && !overlay.isDestroyed() && overlay.isVisible()) overlay.webContents.send('overlay:pad', name, repeat); },
+    });
+    padWatch.start(store.data.settings.guidePad === undefined ? 'both' : store.data.settings.guidePad);
     applyStartup();
     remote = new RemoteServer(store, remoteApi());
     if (store.data.settings.remoteEnabled) remote.start();
@@ -1064,6 +1108,7 @@ if (!app.requestSingleInstanceLock()) {
     quitting = true;
     diag.log('quit');
     globalShortcut.unregisterAll();
+    if (padWatch) padWatch.stop();
     if (remote) remote.stop();
     if (playtime) playtime.flushSessions();
     if (consolePlay) { consolePlay.stop(); consolePlay.flush(); }

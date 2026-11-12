@@ -119,7 +119,20 @@
     if (now >= hold[name]) { hold[name] = now + 85; fn(); }
   }
 
+  // 0.18.3: the guide overlay gets the controller from Crimson Vault itself (it may not have focus).
+  window.padFeed = (name) => {
+    if (['up', 'down', 'left', 'right'].includes(name)) {
+      if (!document.body.classList.contains('pad')) { setPadMode(true); if (!document.activeElement || document.activeElement === document.body) { focusDefault(); return; } }
+      move(name);
+      return;
+    }
+    setPadMode(true);
+    const fn = window.padActions && window.padActions[name];
+    if (fn) fn();
+  };
+
   function poll(now) {
+    if (document.documentElement.classList.contains('overlay-mode')) { setTimeout(() => requestAnimationFrame(poll), 1000); return; }
     // While another app (like a game) has focus, check far less often: input is ignored then anyway.
     if (!document.hasFocus()) { setTimeout(() => requestAnimationFrame(poll), 400); return; }
     const pads = navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean) : [];

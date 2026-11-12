@@ -490,6 +490,10 @@ function moreSettingsSections(s, state) {
   };
   const hk = keyBox('hotkey');
   const gk = keyBox('guideHotkey');
+  state.guidePad = s.guidePad === undefined ? 'both' : s.guidePad;
+  const padSeg = h('div', { class: 'seg' });
+  const drawPad = () => fillEl(padSeg, ...[['both', 'Xbox button or View + Menu'], ['guide', 'Xbox button'], ['combo', 'View + Menu'], ['off', 'Off']].map(([k, n]) => h('button', { class: state.guidePad === k ? 'on' : '', onclick: () => { state.guidePad = k; drawPad(); } }, n)));
+  drawPad();
   // Phone remote
   const qr = h('div', { class: 'qr-box' });
   const remoteToggle = toggleRow('Phone remote', 'Browse your library, start games, install and uninstall from your phone on the same Wi-Fi', !!s.remoteEnabled, async (v) => { drawRemote(await api.remoteSet(v)); });
@@ -514,6 +518,7 @@ function moreSettingsSections(s, state) {
     h('div', { class: 'field' }, toggleRow('Start with Windows', 'Opens quietly in the tray when you sign in', state.startWithWindows, (v) => { state.startWithWindows = v; })),
     h('div', { class: 'field' }, h('label', {}, 'Show / hide shortcut'), hk, h('div', { class: 'help' }, 'Works from anywhere, even in other apps. Click the box and press keys; Backspace turns it off.')),
     h('div', { class: 'field' }, h('label', {}, 'Guide shortcut'), gk, h('div', { class: 'help' }, 'Opens the guide over whatever you are doing, even with Crimson Vault minimized or in the tray. Games in exclusive full screen hide it; use borderless or windowed.')),
+    h('div', { class: 'field' }, h('label', {}, 'Controller opens the guide'), padSeg, h('div', { class: 'help' }, 'Works with Crimson Vault minimized or in the tray. If the Xbox button also opens Xbox Game Bar, turn that off in Windows Settings, Gaming, Game Bar, or use View + Menu.')),
     h('div', { class: 'field' }, h('label', {}, 'Open store pages in'), storeSeg()),
     h('div', { class: 'section-label' }, 'Alerts'),
     h('div', { class: 'field' }, toggleRow('Friend alerts', 'A pop up when a friend starts a different game. The same friend and game never alert twice within 3 hours.', prefs.get('friendAlerts', true), (v) => prefs.set('friendAlerts', v))),

@@ -213,6 +213,14 @@ The player at the bottom of the sidebar reads what is playing from Windows media
 
 Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpers restart themselves every few hours, song artwork and achievement caches are capped, cards for removed games are dropped, and the music player only sends updates when something changes. The Discord tab and the Remote Play stream are the heavy parts; Close tab and End stream free them.
 
+## What's new in 0.18.3: the guide from anywhere, for real
+
+- **Controller opens the guide anywhere.** Press the Xbox button, or View + Menu together, with Crimson Vault minimized or in the tray, even on an empty desktop. Pick which in Settings. Crimson Vault reads the controller itself through XInput (built into Windows), so it works without focus, and the controller drives the overlay the same way it drives the app (B closes it).
+- **Fixed:** the overlay could close the instant it opened, because Windows sent a focus loss while it was still appearing.
+- **Open the guide** from the tray icon's menu.
+- If another app already uses the guide shortcut, Crimson Vault says so instead of failing quietly.
+- If the Xbox button also opens Xbox Game Bar, turn that off in Windows Settings, Gaming, Game Bar, or use View + Menu.
+
 ## What's new in 0.18.2: Sound tab and the guide from anywhere
 
 - **Sound tab in the guide.** Every Sonar channel (Master, Game, Chat, Media, Aux, Mic) with a slider, 5% steps and mute, plus chat mix and Classic or Streamer mode. Updates every 2 seconds while the tab is open. Big mixer opens the full one.

@@ -159,7 +159,7 @@ document.addEventListener('keydown', (e) => {
 let autoTv = false;
 let mouseRun = { d: 0, t: 0, x: null, y: null };
 window.addEventListener('padmode', (e) => {
-  if (!e.detail || S.tv || !prefs.get('autoTv', true) || S.modals.length) return;
+  if (!e.detail || S.tv || !prefs.get('autoTv', true) || S.modals.length || document.documentElement.classList.contains('overlay-mode')) return;
   autoTv = true;
   setTV(true);
   showToast('Controller mode on. Move the mouse to leave.');
