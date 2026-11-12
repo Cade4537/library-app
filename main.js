@@ -26,6 +26,8 @@ const { ConsolePlay } = require('./src/main/consoleplay');
 const { Power } = require('./src/main/power');
 const { TrayAlerts } = require('./src/main/trayalerts');
 const { AniList } = require('./src/main/anilist');
+const { Lyrics } = require('./src/main/lyrics');
+const lyrics = new Lyrics();
 
 // Turning off the graphics card for this app (Settings, Health) has to happen before the app starts.
 try {
@@ -700,6 +702,9 @@ function registerIpc() {
 
   ipcMain.handle('media:get', () => media.state);
   ipcMain.handle('media:command', (_e, cmd) => media.command(cmd));
+  // Now Playing: lyrics (LRCLIB) and artwork (iTunes, Deezer) for the current song.
+  ipcMain.handle('music:lyrics', async (_e, t) => { try { return await lyrics.lyrics(t || {}); } catch { return { error: 'Lyrics could not be reached right now.' }; } });
+  ipcMain.handle('music:extras', async (_e, t) => { try { return await lyrics.extras(t || {}); } catch { return {}; } });
   ipcMain.handle('media:openApp', async () => {
     const found = Object.values(store.data.items).find((i) => i.launch && i.launch.type === 'aumid' && /^AppleInc\.AppleMusic/i.test(i.launch.target));
     try {

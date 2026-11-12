@@ -123,6 +123,7 @@ function guideMusic() {
         h('button', { class: 'icon-btn', 'data-k': 'm:prev', title: 'Previous', onclick: () => { sendMedia('prev'); } }, icon('prev')),
         h('button', { class: 'icon-btn main', 'data-k': 'm:toggle', 'data-first': '', title: playing ? 'Pause' : 'Play', onclick: () => { sendMedia('toggle'); setTimeout(renderGuide, 60); } }, icon(playing ? 'pause' : 'play')),
         h('button', { class: 'icon-btn', 'data-k': 'm:next', title: 'Next', onclick: () => { sendMedia('next'); } }, icon('next')))),
+    h('button', { class: 'gd-wide', 'data-k': 'm:now', onclick: () => { if (typeof closeGuide === 'function') closeGuide(); openNowPlaying(); } }, icon('expand'), 'Now Playing with lyrics'),
     st.isApple ? h('button', { class: 'gd-wide', 'data-k': 'm:open', onclick: () => openAppleMusic() }, icon('music'), 'Open Apple Music') : null,
   ];
 }

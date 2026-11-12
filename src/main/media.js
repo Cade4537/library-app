@@ -59,6 +59,10 @@ while ($true) {
           'toggle' { Await ($s.TryTogglePlayPauseAsync()) ([bool]) | Out-Null }
           'next' { Await ($s.TrySkipNextAsync()) ([bool]) | Out-Null }
           'prev' { Await ($s.TrySkipPreviousAsync()) ([bool]) | Out-Null }
+          default {
+            # seek:<seconds> jumps to that point in the song (used by the lyrics).
+            if ($cmd -like 'seek:*') { $sec = [double]($cmd.Substring(5)); Await ($s.TryChangePlaybackPositionAsync([long]($sec * 10000000))) ([bool]) | Out-Null }
+          }
         }
       } catch {}
     }
@@ -81,6 +85,8 @@ while ($true) {
         status = $pb.PlaybackStatus.ToString()
         pos = [math]::Round($tl.Position.TotalSeconds)
         dur = [math]::Round($tl.EndTime.TotalSeconds)
+        # The exact position right now: players only update it now and then, so add the time since.
+        posExact = [math]::Round($(if ($pb.PlaybackStatus.ToString() -eq 'Playing') { $tl.Position.TotalSeconds + ([DateTimeOffset]::Now - $tl.LastUpdatedTime).TotalSeconds } else { $tl.Position.TotalSeconds }), 2)
       }
       $key = "$($s.SourceAppUserModelId)|$($p.Title)|$($p.Artist)"
       if ($key -ne $lastKey) { $lastKey = $key; $artTries = 0; $lastArt = ''; $o.art = '' }
@@ -228,7 +234,8 @@ class MediaBridge {
   }
 
   command(cmd) {
-    if (!['toggle', 'next', 'prev'].includes(cmd)) return;
+    const seek = /^seek:\d{1,5}(\.\d{1,2})?$/.test(String(cmd));
+    if (!seek && !['toggle', 'next', 'prev'].includes(cmd)) return;
     try { fs.writeFileSync(this.cmdFile, cmd); } catch {}
   }
 }

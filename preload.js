@@ -75,6 +75,8 @@ contextBridge.exposeInMainWorld('library', {
   power: call('app:power'),
   diag: call('diag:get'),
   consoleState: call('console:state'),
+  musicLyrics: call('music:lyrics'),
+  musicExtras: call('music:extras'),
   animeList: call('anime:list'),
   animeSave: call('anime:save'),
   animeSearch: call('anime:search'),

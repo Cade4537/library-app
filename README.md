@@ -213,6 +213,18 @@ The player at the bottom of the sidebar reads what is playing from Windows media
 
 Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpers restart themselves every few hours, song artwork and achievement caches are capped, cards for removed games are dropped, and the music player only sends updates when something changes. The Discord tab and the Remote Play stream are the heavy parts; Close tab and End stream free them.
 
+## What's new in 0.18.0: Now Playing
+
+A full screen view of what is playing in Apple Music, Spotify or any player Windows knows about. Open it with **M**, the expand button on the music cards, a click on the cover, or Now Playing in the guide's Music tab.
+
+- **Lyrics that follow the song:** timed lyrics from LRCLIB (a free public lyrics database), looked up while the song plays. The current line is large and bright and fills in word by word as it is sung, the next line waits below, and the view scrolls by itself. Click any line to jump to it. If the words run early or late, nudge them by half a second (remembered per song). Untimed lyrics scroll gently with the song, and instrumentals say so.
+- **Art from the album and the artist:** the cover in high resolution (Apple's public iTunes search), and the artist's photo fading in behind the lyrics (Deezer's public search). Album, year and genre under the title.
+- **Colors from the cover:** the whole screen takes its colors from the album art, with drifting light, floating specks that rise faster while music plays, and a soft pulse on every new line.
+- **Touches:** the cover tilts a little with the mouse and breathes while playing, the controls fade when the mouse rests, a progress bar you can click to jump, and full screen with F.
+- **Keys:** Space play or pause, N next, P previous, Left and Right jump 5 seconds, L lyrics on or off, F full screen, Esc close.
+- **Small cards:** the sidebar and Home music cards show the line being sung right now.
+- **Spotify:** turn on "Spotify and other music apps too" in Settings, Connections.
+
 ## What's new in 0.17.3
 
 - **Zoom inside Xbox Remote Play and the Discord tab:** Ctrl and + (or =) zoom in, Ctrl and - zoom out, Ctrl+0 resets. Zooming in used to need Shift there.

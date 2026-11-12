@@ -1692,7 +1692,7 @@ function buildSettingsPage() {
       ...appSections,
       h('div', { class: 'section-label' }, 'Music'),
       h('div', { class: 'field' }, toggleRow('Apple Music player', 'Shows what is playing in the sidebar with play, pause and skip', musicEnabled, (v) => { musicEnabled = v; })),
-      h('div', { class: 'field' }, toggleRow('Other music apps too', 'Falls back to Spotify, a browser, or whatever is playing when Apple Music is closed', musicAnyApp, (v) => { musicAnyApp = v; }))),
+      h('div', { class: 'field' }, toggleRow('Spotify and other music apps too', 'Falls back to Spotify, a browser, or whatever is playing when Apple Music is closed', musicAnyApp, (v) => { musicAnyApp = v; }))),
     actions: [
       { label: 'Help', left: true, run: () => { openConnectionsHelp(); return false; } },
       { label: 'Find missing covers', left: true, run: async () => { await api.refetchCovers(); showToast('Looking for missing covers'); return false; } },
@@ -1881,9 +1881,9 @@ function renderNowPlaying() {
     e.cur = h('span', {});
     e.dur = h('span', {});
     e.toggle = h('button', { class: 'main', title: 'Play or pause', onclick: () => sendMedia('toggle') });
-    e.text = h('div', { class: 'np-text', title: 'Open Apple Music', style: { cursor: 'pointer' }, onclick: () => { if (NP.state.isApple) openAppleMusic(); } }, e.src, e.title, e.artist);
+    e.text = h('div', { class: 'np-text', title: 'Now Playing with lyrics (M)', style: { cursor: 'pointer' }, onclick: () => openNowPlaying() }, e.src, e.title, e.artist, h('div', { class: 'np-lyric' }));
     box.replaceChildren(h('div', { class: 'np' }, e.bg,
-      h('div', { class: 'np-top' }, e.art, e.text),
+      h('div', { class: 'np-top' }, e.art, e.text, h('button', { class: 'np-expand', title: 'Now Playing with lyrics (M)' }, icon('expand'))),
       h('div', { class: 'np-bar' }, e.fill),
       h('div', { class: 'np-times' }, e.cur, e.dur),
       h('div', { class: 'np-ctrls' },
