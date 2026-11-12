@@ -107,6 +107,7 @@ function openNowPlaying() {
   e.root = h('div', { class: 'npx', tabindex: '-1' },
     e.bgArt, e.blobs, e.artist, e.canvas, h('div', { class: 'npx-shade' }),
     h('div', { class: 'npx-top' }, e.src, h('div', { class: 'npx-tools' }, e.lyBtn,
+      h('button', { class: 'npx-tool', title: 'Sound mixer, SteelSeries Sonar (S)', onclick: () => openSoundMixer() }, icon('sliders')),
       h('button', { class: 'npx-tool', title: 'Full screen (F)', onclick: () => npFull() }, icon('expand')),
       h('button', { class: 'npx-tool', title: 'Close (Esc)', onclick: closeNowPlaying }, icon('close')))),
     h('div', { class: 'npx-main' },
@@ -169,6 +170,7 @@ function npKeys(ev) {
   else if (k.toLowerCase() === 'p') sendMedia('prev');
   else if (k.toLowerCase() === 'l') npToggleLyrics();
   else if (k.toLowerCase() === 'f') npFull();
+  else if (k.toLowerCase() === 's' && typeof openSoundMixer === 'function') openSoundMixer();
   else if (k === 'ArrowRight') npSeek(npPos() + 5);
   else if (k === 'ArrowLeft') npSeek(npPos() - 5);
   else return;

@@ -213,6 +213,18 @@ The player at the bottom of the sidebar reads what is playing from Windows media
 
 Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpers restart themselves every few hours, song artwork and achievement caches are capped, cards for removed games are dropped, and the music player only sends updates when something changes. The Discord tab and the Remote Play stream are the heavy parts; Close tab and End stream free them.
 
+## What's new in 0.18.1: SteelSeries Sonar
+
+A Sound mixer for SteelSeries Sonar (part of SteelSeries GG). Open it from Now Playing (the sliders button, or S), the Home music card, the guide's Music tab, or Ctrl+K "Sound mixer".
+
+- **Every Sonar channel:** Master, Game, Chat, Media, Aux and Mic, each with a volume slider and a mute button.
+- **Chat mix:** the game and chat balance dial (double click to center).
+- **Classic or Streamer mode:** switch between them, and in Streamer mode choose Your mix or Stream mix.
+- **Live:** changes made in GG or with a headset dial show up within two seconds.
+- **Nothing to set up:** Crimson Vault finds Sonar on its own through GG. Everything stays on this PC. If GG is closed or Sonar is off, the mixer says so.
+
+Sonar's control routes are not officially documented by SteelSeries; Crimson Vault uses the same ones as the open source SteelSeries-NET-API and steelseries-sonar-py projects, so a big GG update could change them.
+
 ## What's new in 0.18.0: Now Playing
 
 A full screen view of what is playing in Apple Music, Spotify or any player Windows knows about. Open it with **M**, the expand button on the music cards, a click on the cover, or Now Playing in the guide's Music tab.

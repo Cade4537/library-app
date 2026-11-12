@@ -109,7 +109,7 @@ function guideFriends() {
 function guideMusic() {
   const st = (typeof NP !== 'undefined' && NP.state) || {};
   if (S.lib.settings.musicEnabled === false) return [h('div', { class: 'gd-empty' }, icon('music'), h('span', {}, 'The music player is off. Turn it on in Settings.'))];
-  if (!st.active) return [h('div', { class: 'gd-empty' }, icon('music'), h('span', {}, 'Nothing playing')), h('button', { class: 'gd-wide', 'data-k': 'm:open', 'data-first': '', onclick: () => openAppleMusic() }, icon('music'), 'Open Apple Music')];
+  if (!st.active) return [h('div', { class: 'gd-empty' }, icon('music'), h('span', {}, 'Nothing playing')), h('button', { class: 'gd-wide', 'data-k': 'm:open', 'data-first': '', onclick: () => openAppleMusic() }, icon('music'), 'Open Apple Music'), h('button', { class: 'gd-wide', 'data-k': 'm:sonar', onclick: () => { if (typeof closeGuide === 'function') closeGuide(); openSoundMixer(); } }, icon('sliders'), 'Sound mixer (Sonar)')];
   const playing = st.status === 'Playing';
   const pos = Math.min(st.dur || 0, NP.base + (playing ? (Date.now() - NP.at) / 1000 : 0));
   return [
@@ -124,6 +124,7 @@ function guideMusic() {
         h('button', { class: 'icon-btn main', 'data-k': 'm:toggle', 'data-first': '', title: playing ? 'Pause' : 'Play', onclick: () => { sendMedia('toggle'); setTimeout(renderGuide, 60); } }, icon(playing ? 'pause' : 'play')),
         h('button', { class: 'icon-btn', 'data-k': 'm:next', title: 'Next', onclick: () => { sendMedia('next'); } }, icon('next')))),
     h('button', { class: 'gd-wide', 'data-k': 'm:now', onclick: () => { if (typeof closeGuide === 'function') closeGuide(); openNowPlaying(); } }, icon('expand'), 'Now Playing with lyrics'),
+    h('button', { class: 'gd-wide', 'data-k': 'm:sonar', onclick: () => { if (typeof closeGuide === 'function') closeGuide(); openSoundMixer(); } }, icon('sliders'), 'Sound mixer (Sonar)'),
     st.isApple ? h('button', { class: 'gd-wide', 'data-k': 'm:open', onclick: () => openAppleMusic() }, icon('music'), 'Open Apple Music') : null,
   ];
 }

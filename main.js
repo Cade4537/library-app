@@ -28,6 +28,8 @@ const { TrayAlerts } = require('./src/main/trayalerts');
 const { AniList } = require('./src/main/anilist');
 const { Lyrics } = require('./src/main/lyrics');
 const lyrics = new Lyrics();
+const { Sonar } = require('./src/main/sonar');
+const sonar = new Sonar();
 
 // Turning off the graphics card for this app (Settings, Health) has to happen before the app starts.
 try {
@@ -703,6 +705,13 @@ function registerIpc() {
   ipcMain.handle('media:get', () => media.state);
   ipcMain.handle('media:command', (_e, cmd) => media.command(cmd));
   // Now Playing: lyrics (LRCLIB) and artwork (iTunes, Deezer) for the current song.
+  // SteelSeries Sonar: volume, mute and chat mix for each channel (all on this PC).
+  const sonarSafe = (fn) => async (_e, ...a) => { try { const r = await fn(...a); return r && r.ok ? r : { ok: true, result: r }; } catch (e) { return { ok: false, error: e.message, code: e.code || '' }; } };
+  ipcMain.handle('sonar:state', sonarSafe(() => sonar.state()));
+  ipcMain.handle('sonar:volume', sonarSafe((id, v, mix, mode) => sonar.setVolume(String(id), Number(v), String(mix || ''), String(mode || ''))));
+  ipcMain.handle('sonar:mute', sonarSafe((id, m, mix, mode) => sonar.setMute(String(id), !!m, String(mix || ''), String(mode || ''))));
+  ipcMain.handle('sonar:chatMix', sonarSafe((b) => sonar.setChatMix(Number(b))));
+  ipcMain.handle('sonar:mode', sonarSafe((m) => sonar.setMode(String(m))));
   ipcMain.handle('music:lyrics', async (_e, t) => { try { return await lyrics.lyrics(t || {}); } catch { return { error: 'Lyrics could not be reached right now.' }; } });
   ipcMain.handle('music:extras', async (_e, t) => { try { return await lyrics.extras(t || {}); } catch { return {}; } });
   ipcMain.handle('media:openApp', async () => {
