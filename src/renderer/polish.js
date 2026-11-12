@@ -16,11 +16,19 @@ function pushAlert(a) {
   if (S.guideOpen) renderGuide();
 }
 const unreadAlerts = () => { const seen = prefs.get('alertsSeen', 0); return alertList().filter((a) => a.at > seen).length; };
+const ALERT_KIND_NAMES = { friend: 'Friends', session: 'Sessions', xbox: 'Xbox', deal: 'Deals', download: 'Downloads', storage: 'Storage', anime: 'Anime', reminder: 'Reminders', info: 'Other' };
 function guideAlerts() {
-  const list = alertList();
+  const all = alertList();
   prefs.set('alertsSeen', Date.now());
-  if (!list.length) return [h('div', { class: 'gd-empty' }, icon('bell'), h('span', {}, 'No alerts yet. Friend activity, session summaries, deals and downloads show up here.'))];
+  if (!all.length) return [h('div', { class: 'gd-empty' }, icon('bell'), h('span', {}, 'No alerts yet. Friend activity, session summaries, deals and downloads show up here.'))];
+  // Filter chips, only for the kinds actually in the list.
+  const kinds = [...new Set(all.map((a) => a.kind || 'info'))];
+  if (S.alertFilter && !kinds.includes(S.alertFilter)) S.alertFilter = null;
+  const list = S.alertFilter ? all.filter((a) => (a.kind || 'info') === S.alertFilter) : all;
   return [
+    kinds.length > 1 ? h('div', { class: 'gd-afilters' },
+      h('button', { class: 'chip' + (!S.alertFilter ? ' on' : ''), 'data-k': 'af:all', onclick: () => { S.alertFilter = null; renderGuide(); } }, `All · ${all.length}`),
+      kinds.map((k) => h('button', { class: 'chip' + (S.alertFilter === k ? ' on' : ''), 'data-k': `af:${k}`, onclick: () => { S.alertFilter = S.alertFilter === k ? null : k; renderGuide(); } }, `${ALERT_KIND_NAMES[k] || k} · ${all.filter((a) => (a.kind || 'info') === k).length}`))) : null,
     h('div', { class: 'gd-flist' }, list.slice(0, 40).map((a, i) => h('button', { class: `gd-alert k-${a.kind}`, 'data-k': `al:${a.at}`, style: `--d:${Math.min(i, 10)}`, onclick: () => { if (a.id && S.byId.has(a.id)) { S.guideOpen = false; document.body.classList.remove('guide-open'); openDetails(a.id); } else if (a.kind === 'deal') setView({ type: 'deals' }); else if (a.kind === 'storage') setView({ type: 'storage' }); else if (a.kind === 'xbox' && typeof openConsoleHistory === 'function') openConsoleHistory(); else if (a.kind === 'anime') { S.guideOpen = false; document.body.classList.remove('guide-open'); setView({ type: 'anime' }); const mid = String(a.id || '').split(':')[1]; const e = mid && S.anime && (S.anime.entries || []).find((x) => String(x.mediaId) === mid); if (e) setTimeout(() => openAnimeDetails(e), 120); } } },
       h('span', { class: 'gd-aic' }, icon(ALERT_ICONS[a.kind] || 'bell')),
       h('div', { class: 'hf-text' }, h('b', {}, a.title), a.body ? h('span', {}, a.body) : null),

@@ -79,6 +79,8 @@ contextBridge.exposeInMainWorld('library', {
   sonarState: call('sonar:state'),
   overlayHide: call('overlay:hide'),
   overlayCommand: call('overlay:command'),
+  presenceHint: call('presence:hint'),
+  musicStats: call('music:stats'),
   onOverlay: (cb) => ipcRenderer.on('overlay:open', (_e, v) => cb(v)),
   onOverlayPad: (cb) => ipcRenderer.on('overlay:pad', (_e, name, repeat) => cb(name, repeat)),
   isOverlay: (() => { try { return new URLSearchParams(location.search).get('overlay') === '1'; } catch { return false; } })(),

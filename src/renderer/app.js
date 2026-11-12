@@ -1512,6 +1512,8 @@ function buildSettingsPage() {
   let discordTab = s.discordTab !== false;
   let discordPresence = s.discordPresence !== false;
   let discordBrowsing = !!s.discordBrowsing;
+  let discordMusic = s.discordMusic || 'always';
+  let discordButton = s.discordButton !== false;
   let tvOnStart = !!s.tvOnStart;
   const app = {};
   const appSections = moreSettingsSections(s, app);
@@ -1521,6 +1523,10 @@ function buildSettingsPage() {
     const r = await api.discordTestPresence();
     showToast(r.ok ? 'Sent a test status. Check your Discord profile in a few seconds.' : 'Paste a valid Application ID first.', r.ok ? 'info' : 'error');
   } }, 'Test');
+  const dcMusicId = h('input', { class: 'text-input', value: s.discordMusicClientId || '', placeholder: 'A second Application ID, only for music', spellcheck: 'false' });
+  const dcMusicSeg = h('div', { class: 'seg' });
+  const drawDcMusic = () => fillEl(dcMusicSeg, ...[['always', 'While music plays'], ['npx', 'Only in Now Playing'], ['off', 'Off']].map(([k, n]) => h('button', { class: discordMusic === k ? 'on' : '', onclick: () => { discordMusic = k; drawDcMusic(); } }, n)));
+  drawDcMusic();
   const accentRow = h('div', { class: 'swatches' }, Object.entries(ACCENTS).map(([k, a]) => {
     const b = h('button', { class: 'swatch' + (S.accent === k ? ' on' : ''), title: a.name, style: { background: a.c }, onclick: () => {
       applyAccent(k); accentRow.querySelectorAll('.swatch').forEach((x) => x.classList.toggle('on', x === b));
@@ -1679,7 +1685,10 @@ function buildSettingsPage() {
         h('div', { class: 'help' }, 'Shows the game you are playing on your Discord profile, with its cover. Needs the Discord app running on this PC.'),
         h('div', { class: 'field', style: { marginTop: '10px' } }, h('label', {}, 'Discord Application ID'), h('div', { class: 'row' }, dcId, dcTest)),
         toggleRow('Show what I play', null, discordPresence, (v) => { discordPresence = v; }),
-        toggleRow('Show when browsing the library', 'Shows "Browsing the library" when no game is running', discordBrowsing, (v) => { discordBrowsing = v; }),
+        toggleRow('Show when browsing the library', 'Shows the page you are on (deals, stats, the Arcade) when no game is running', discordBrowsing, (v) => { discordBrowsing = v; }),
+        toggleRow('Get Crimson Vault button', 'Others see a button on your status that opens this project', discordButton, (v) => { discordButton = v; }),
+        h('div', { class: 'field', style: { marginTop: '10px' } }, h('label', {}, 'Music on Discord'), dcMusicSeg, h('div', { class: 'help' }, 'Like Spotify: the song shows as "Listening to", with the album art and a progress bar, separately from the game you are playing. Needs its own second Application ID below (its name there is what Discord shows after "Listening to", so call it something like Music).')),
+        h('div', { class: 'field' }, h('label', {}, 'Music Application ID'), dcMusicId),
         h('button', { class: 'link-btn', style: { marginTop: '6px' }, onclick: async () => { if (await confirmBox('Sign out of the Discord tab?', 'This signs out the Discord tab only. Your Discord app is not touched.', 'Sign out')) { await api.discordSignOut(); showToast('Signed out of the Discord tab'); } } }, 'Sign out of the Discord tab')),
       h('div', { class: 'section-label' }, 'Look'),
       h('div', { class: 'field' }, h('label', {}, 'Accent color'), accentRow),
@@ -1703,6 +1712,7 @@ function buildSettingsPage() {
           steamGridDbKey: sgdb.input.value.trim(), curseforgeInstancesPath: cf.value.trim(), includeApps, musicEnabled, musicAnyApp,
           steamApiKey: steamKey.input.value.trim(), steamId: steamId.value.trim(), gogOwned, openXblKey: xblKey.input.value.trim(), genreSort, ubisoftOwned,
           discordTab, discordPresence, discordBrowsing, discordClientId: dcId.value.trim(), tvOnStart,
+          discordMusic, discordButton, discordMusicClientId: dcMusicId.value.trim(),
           closeToTray: app.closeToTray, startWithWindows: app.startWithWindows, hotkey: app.hotkey, guideHotkey: app.guideHotkey, guidePad: app.guidePad, dealAlerts: app.dealAlerts,
         });
         api.applyStartup();

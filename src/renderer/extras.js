@@ -122,6 +122,25 @@ async function renderStats() {
           h('div', { class: 'st-cl-info' }, h('div', { class: 'st-cl-name' }, displayName(it)), h('div', { class: 'hero-ach' }, h('span', { style: { width: `${pct}%` } })), h('div', { class: 'st-s' }, `${a.have} of ${a.total} · ${pct}%`)));
       }))) : null);
 
+  // 0.18.5: your music, from the listening history Crimson Vault keeps on this PC.
+  if (api.musicStats) api.musicStats().then((mu) => {
+    if (!mu || !mu.plays || !box.isConnected) return;
+    const fmtListen = (ms) => { const min = Math.round(ms / 60000); return min >= 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min} min`; };
+    const plays = (n) => `${n.toLocaleString()} ${n === 1 ? 'play' : 'plays'}`;
+    const monthName = new Date().toLocaleDateString(undefined, { month: 'long' });
+    box.append(
+      h('div', { class: 'st-card' }, h('h3', { class: 'section-title' }, 'Music'),
+        h('div', { class: 'st-tiles', style: { margin: '0 0 12px' } },
+          tile('Songs played', mu.plays.toLocaleString(), `${mu.songs.length >= 60 ? '60+' : mu.songs.length} different songs`),
+          tile('Time listening', fmtListen(mu.totalMs) || '0 min', 'while Crimson Vault was open'),
+          tile(`${monthName}`, String(mu.month.songs.reduce((t, x) => t + x.n, 0).toLocaleString()), 'plays this month')),
+        h('div', { class: 'st-grid' },
+          h('div', {}, h('h3', { class: 'section-title' }, 'Top artists'), mu.artists.length ? bars(mu.artists.slice(0, 8).map((x) => ({ label: x.a || 'Unknown artist', v: x.n, title: `${x.a} · ${fmtListen(x.ms || 0)}` })), plays) : null),
+          h('div', {}, h('h3', { class: 'section-title' }, 'Top songs'), mu.songs.length ? bars(mu.songs.slice(0, 8).map((x) => ({ label: x.t, v: x.n, title: `${x.t} · ${x.a}` })), plays) : null)),
+        mu.month.artists.length ? h('div', {}, h('h3', { class: 'section-title', style: { marginTop: '12px' } }, `On repeat in ${monthName}`),
+          h('div', { class: 'st-chips' }, mu.month.artists.slice(0, 6).map((x) => h('span', { class: 'chip' }, `${x.a} · ${x.n}`)))) : null));
+  }).catch(() => {});
+
   // Daily play time from the sessions Crimson Vault saw.
   const sessions = (await api.sessions().catch(() => [])) || [];
   weeklyRecap(recapBox, sessions);

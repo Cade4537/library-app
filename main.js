@@ -85,9 +85,17 @@ const afterRun = new Map(); // game id -> { actions, ctx } to run when it closes
 const newsCache = new Map();
 let dealsCache = null;
 const rpc = new DiscordRpc();
+const rpcMusic = new DiscordRpc();
 const runningSince = new Map();
 const pendingSource = new Map();
 const APP_ICON_URL = 'https://raw.githubusercontent.com/Cade4537/library-app/main/assets/icon.png';
+const REPO_URL = 'https://github.com/Cade4537/library-app';
+// Discord Application IDs (discord.com/developers/applications, New Application; the app's NAME there
+// is what Discord shows after "Playing" or "Listening to"). One app covers playing, the Arcade, Xbox
+// and browsing; a second app is only for music, so the song can show on your profile at the same
+// time as a game, the way Spotify does. Paste the IDs here, or in Settings, Connections.
+const DISCORD_APP_ID = '';
+const DISCORD_MUSIC_APP_ID = '';
 
 // Shows the game you are playing on Discord (when Rich Presence is set up in Settings).
 // Runs a game's "after playing" actions once it has been seen running and then closes.
@@ -101,19 +109,115 @@ function checkAfterActions() {
   }
 }
 
+// What the window says you are doing in the app right now (the Arcade, a roll, a page, Now Playing).
+let uiHint = {};
+let arcadeSince = 0;
+let streamSince = 0;
 function updatePresence() {
   const s = store.data.settings;
-  rpc.configure(s.discordClientId, s.discordPresence !== false);
+  rpc.configure((s.discordClientId || DISCORD_APP_ID || '').trim(), s.discordPresence !== false);
   const now = playtime ? playtime.running : new Set();
   for (const id of [...runningSince.keys()]) if (!now.has(id)) runningSince.delete(id);
   for (const id of now) if (!runningSince.has(id)) runningSince.set(id, Date.now());
   const it = [...now].map((id) => store.data.items[id]).find((x) => x && x.kind === 'game');
-  if (!it) { rpc.set(s.discordBrowsing ? { details: 'Browsing the library', image: APP_ICON_URL, imageText: 'Crimson Vault' } : null); return; }
-  const appid = it.steamAppId || (steamInfo && steamInfo.appIdFor(it));
-  const image = appid ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/library_600x900.jpg`
-    : /^https:\/\//.test(it.coverHint || '') ? it.coverHint : APP_ICON_URL;
-  const LABELS = { steam: 'Steam', epic: 'Epic Games', gog: 'GOG', ubisoft: 'Ubisoft Connect', xbox: 'Xbox', rockstar: 'Rockstar', riot: 'Riot', curseforge: 'CurseForge' };
-  rpc.set({ details: it.customName || it.name, state: LABELS[it.source] ? `via ${LABELS[it.source]}` : undefined, start: runningSince.get(it.id), image, imageText: it.customName || it.name });
+  const buttons = s.discordButton === false ? undefined : [{ label: 'Get Crimson Vault', url: REPO_URL }];
+  // The most interesting thing wins: a PC game, then console play, then the Arcade, a roll, browsing.
+  if (it) {
+    const appid = it.steamAppId || (steamInfo && steamInfo.appIdFor(it));
+    const image = appid ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/library_600x900.jpg`
+      : /^https:\/\//.test(it.coverHint || '') ? it.coverHint : APP_ICON_URL;
+    const LABELS = { steam: 'Steam', epic: 'Epic Games', gog: 'GOG', ubisoft: 'Ubisoft Connect', xbox: 'Xbox', rockstar: 'Rockstar', riot: 'Riot', curseforge: 'CurseForge' };
+    rpc.set({ details: it.customName || it.name, state: LABELS[it.source] ? `via ${LABELS[it.source]}` : undefined, start: runningSince.get(it.id), image, imageText: it.customName || it.name, buttons });
+    return;
+  }
+  const c = consolePlay && consolePlay.current;
+  if (c && c.name) { rpc.set({ details: c.name, state: `On Xbox${c.device ? ` (${c.device})` : ''}`, start: c.s || undefined, image: APP_ICON_URL, imageText: 'Xbox console play', buttons }); return; }
+  if (streamView && streamView.open) {
+    if (!streamSince) streamSince = Date.now();
+    rpc.set({ details: 'Xbox Remote Play', state: 'Streaming a console to this PC', start: streamSince, image: APP_ICON_URL, imageText: 'Crimson Vault', buttons });
+    return;
+  }
+  streamSince = 0;
+  if (uiHint.arcade) {
+    if (!arcadeSince) arcadeSince = Date.now();
+    rpc.set({ details: `Playing ${uiHint.arcade}`, state: 'In the Arcade', start: arcadeSince, image: APP_ICON_URL, imageText: 'The Crimson Vault Arcade', buttons });
+    return;
+  }
+  arcadeSince = 0;
+  if (uiHint.roll) { rpc.set({ details: uiHint.roll === 'anime' ? 'Rolling for an anime' : 'Rolling for a game', state: 'Surprise me', image: APP_ICON_URL, imageText: 'Crimson Vault', buttons }); return; }
+  rpc.set(s.discordBrowsing ? { details: uiHint.view ? `Browsing ${uiHint.view}` : 'Browsing the library', image: APP_ICON_URL, imageText: 'Crimson Vault', buttons } : null);
+}
+
+// ---------- 0.18.5: listening history, and music on Discord like Spotify ----------
+// A song counts as listened after 30 seconds of play. Counts live in library.json on this PC only.
+const musicNow = { key: '', ms: 0, counted: false, artFor: '', art: null, flush: 0 };
+const cleanArtist = (a) => String(a || '').split(/\s+—\s+/)[0].trim();
+const monthKey = () => new Date().toISOString().slice(0, 7);
+function musicData() {
+  const d = store.data;
+  if (!d.music || typeof d.music !== 'object') d.music = {};
+  for (const k of ['songs', 'artists', 'months']) if (!d.music[k] || typeof d.music[k] !== 'object') d.music[k] = {};
+  return d.music;
+}
+function trimMusic(m) {
+  const cut = (obj, max) => { const e = Object.entries(obj); if (e.length <= max) return; e.sort((a, b) => (b[1].last || 0) - (a[1].last || 0)); for (const [k] of e.slice(max)) delete obj[k]; };
+  cut(m.songs, 2500); cut(m.artists, 800);
+  const months = Object.keys(m.months).sort();
+  for (const k of months.slice(0, -13)) delete m.months[k];
+}
+function musicTick() {
+  const st = media && media.state;
+  const playing = st && st.active && st.status === 'Playing' && st.title;
+  if (playing) {
+    const artist = cleanArtist(st.artist);
+    const key = `${artist}|${st.title}`.toLowerCase();
+    if (key !== musicNow.key) Object.assign(musicNow, { key, ms: 0, counted: false });
+    musicNow.ms += 5000;
+    const m = musicData();
+    if (!musicNow.counted && musicNow.ms >= 30000) {
+      musicNow.counted = true;
+      const song = m.songs[key] || (m.songs[key] = { t: st.title, a: artist, n: 0, ms: 0 });
+      song.n++; song.last = Date.now();
+      const ak = artist.toLowerCase() || '?';
+      const ar = m.artists[ak] || (m.artists[ak] = { a: artist || 'Unknown artist', n: 0, ms: 0 });
+      ar.n++; ar.last = Date.now();
+      const mo = m.months[monthKey()] || (m.months[monthKey()] = { songs: {}, artists: {}, ms: 0 });
+      mo.songs[key] = (mo.songs[key] || 0) + 1;
+      mo.artists[ak] = (mo.artists[ak] || 0) + 1;
+      trimMusic(m);
+      store.saveSoon();
+    }
+    if (musicNow.counted) {
+      const song = m.songs[key]; const ar = m.artists[artist.toLowerCase() || '?'];
+      if (song) song.ms = (song.ms || 0) + 5000;
+      if (ar) ar.ms = (ar.ms || 0) + 5000;
+      const mo = m.months[monthKey()]; if (mo) mo.ms = (mo.ms || 0) + 5000;
+      if (++musicNow.flush % 24 === 0) store.saveSoon();
+    }
+  }
+  updateMusicPresence();
+  updatePresence();
+}
+function updateMusicPresence() {
+  const s = store.data.settings;
+  const mode = s.discordMusic || 'always';
+  rpcMusic.configure((s.discordMusicClientId || DISCORD_MUSIC_APP_ID || '').trim(), s.discordPresence !== false && mode !== 'off');
+  const st = media && media.state;
+  const playing = st && st.active && st.status === 'Playing' && st.title;
+  if (!playing || (mode === 'npx' && !uiHint.npx)) { rpcMusic.set(null); return; }
+  const artist = cleanArtist(st.artist);
+  const album = String(st.album || String(st.artist || '').split(/\s+—\s+/)[1] || '').trim();
+  const pos = Math.max(0, Number(st.posExact != null ? st.posExact : st.pos) || 0);
+  const start = Date.now() - pos * 1000;
+  // The player's own art is a local image Discord cannot show; a public picture is looked up once per song.
+  if (musicNow.artFor !== musicNow.key) {
+    const forKey = musicNow.artFor = musicNow.key;
+    musicNow.art = null;
+    lyrics.extras({ title: st.title, artist: st.artist, dur: st.dur }).then((x) => {
+      if (x && x.art && musicNow.artFor === forKey) { musicNow.art = x.art; updateMusicPresence(); }
+    }).catch(() => {});
+  }
+  rpcMusic.set({ type: 2, details: st.title, state: artist || undefined, start, end: st.dur ? start + st.dur * 1000 : undefined, image: musicNow.art || APP_ICON_URL, imageText: album || st.title });
 }
 
 // Your SteamID: typed in Settings, found during the last scan, or read from the Steam app.
@@ -756,8 +860,24 @@ function registerIpc() {
   ipcMain.handle('discord:signOut', () => discordView && discordView.signOut());
   ipcMain.handle('discord:openApp', () => shell.openExternal('discord://'));
   ipcMain.handle('discord:source', (_e, id, sourceId) => { const r = pendingSource.get(id); if (r) { pendingSource.delete(id); r(sourceId || null); } });
+  ipcMain.handle('presence:hint', (_e, hint) => { uiHint = hint && typeof hint === 'object' ? hint : {}; updateMusicPresence(); updatePresence(); });
+  ipcMain.handle('music:stats', () => {
+    const m = musicData();
+    const mo = m.months[monthKey()] || { songs: {}, artists: {}, ms: 0 };
+    const top = (obj, by) => Object.values(obj).sort((a, b) => (b[by] || 0) - (a[by] || 0)).slice(0, 60);
+    return {
+      songs: top(m.songs, 'n'), artists: top(m.artists, 'n'),
+      totalMs: Object.values(m.artists).reduce((t, x) => t + (x.ms || 0), 0),
+      plays: Object.values(m.songs).reduce((t, x) => t + (x.n || 0), 0),
+      month: {
+        ms: mo.ms || 0,
+        songs: Object.entries(mo.songs).map(([k, n]) => ({ ...(m.songs[k] || { t: k, a: '' }), n })).sort((a, b) => b.n - a.n).slice(0, 20),
+        artists: Object.entries(mo.artists).map(([k, n]) => ({ a: (m.artists[k] || { a: k }).a, n })).sort((a, b) => b.n - a.n).slice(0, 20),
+      },
+    };
+  });
   ipcMain.handle('discord:testPresence', () => {
-    rpc.configure(store.data.settings.discordClientId, true);
+    rpc.configure((store.data.settings.discordClientId || DISCORD_APP_ID || '').trim(), true);
     rpc.set({ details: 'Testing Crimson Vault', state: 'Rich Presence works', image: APP_ICON_URL, imageText: 'Crimson Vault', start: Date.now() });
     setTimeout(updatePresence, 15000);
     return { ok: !!rpc.clientId, connected: rpc.ready };
@@ -772,7 +892,7 @@ function registerIpc() {
     delete patch.anilistAuth;
     store.data.settings = { ...before, ...patch };
     if ('anilistUser' in patch && patch.anilistUser !== before.anilistUser && anilist) anilist.cache = null;
-    if (['discordClientId', 'discordPresence', 'discordBrowsing'].some((k) => k in patch)) updatePresence();
+    if (['discordClientId', 'discordPresence', 'discordBrowsing', 'discordMusicClientId', 'discordMusic', 'discordButton'].some((k) => k in patch)) { updatePresence(); updateMusicPresence(); }
     const keyChanged = 'steamGridDbKey' in patch && patch.steamGridDbKey !== before.steamGridDbKey;
     store.changed();
     if (keyChanged) {
@@ -1059,7 +1179,7 @@ if (!app.requestSingleInstanceLock()) {
     xbox = new XboxLive(store);
     epic = new EpicClient(store);
     ubisoft = new UbisoftActivity(store);
-    consolePlay = new ConsolePlay({ store, xbox, notify: (n) => qol.notify(n), sendTo: (ch, v) => sendTo(ch, v) });
+    consolePlay = new ConsolePlay({ store, xbox, notify: (n) => qol.notify(n), sendTo: (ch, v) => { sendTo(ch, v); if (ch === 'console:state') updatePresence(); } });
     friends = new Friends(store, (s) => { sendTo('friends:state', s); if (win && !win.isDestroyed()) trayAlerts.reset(); else trayAlerts.check(s); }, getSteamId, xbox, epic);
     diag.log('start', { version: app.getVersion(), hidden: startHidden });
     app.on('child-process-gone', (_e, d) => { diag.log('process-gone', d); if (d && d.type === 'GPU') leaveFullScreen(); });
@@ -1081,6 +1201,7 @@ if (!app.requestSingleInstanceLock()) {
     setTimeout(() => deals(false).catch(() => {}), 60 * 1000);
     setInterval(() => deals(true).catch(() => {}), services.SIX_HOURS);
     playtime.start();
+    setInterval(musicTick, 5000);
     qol.start();
     consolePlay.start();
     streamView = new StreamView(() => win, (st) => sendTo('stream:state', st));
@@ -1123,6 +1244,7 @@ if (!app.requestSingleInstanceLock()) {
     if (playtime) playtime.flushSessions();
     if (consolePlay) { consolePlay.stop(); consolePlay.flush(); }
     rpc.set(null); rpc.close();
+    rpcMusic.set(null); rpcMusic.close();
     if (store) store.saveNow();
     if (media) { media.enabled = false; media.stop(); }
     if (playtime) playtime.stop();

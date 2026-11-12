@@ -74,7 +74,8 @@ class DiscordRpc {
     }
   }
 
-  // activity: { details, state, start, image, imageText } or null
+  // activity: { type, details, state, start, end, image, imageText, buttons } or null
+  // type: 0 playing (default), 2 listening, 3 watching.
   set(activity) {
     this.want = activity;
     this.flush();
@@ -92,10 +93,12 @@ class DiscordRpc {
       args: {
         pid: process.pid,
         activity: a ? {
+          type: a.type || 0,
           details: String(a.details || '').slice(0, 128) || undefined,
           state: a.state ? String(a.state).slice(0, 128) : undefined,
-          timestamps: a.start ? { start: Math.floor(a.start / 1000) } : undefined,
+          timestamps: a.start ? { start: Math.floor(a.start / 1000), end: a.end ? Math.floor(a.end / 1000) : undefined } : undefined,
           assets: a.image ? { large_image: a.image, large_text: (a.imageText || a.details || '').slice(0, 128) } : undefined,
+          buttons: Array.isArray(a.buttons) && a.buttons.length ? a.buttons.slice(0, 2) : undefined,
           instance: false,
         } : null,
       },
