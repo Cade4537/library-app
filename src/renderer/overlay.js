@@ -67,6 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const show = () => {
     OV.open = true;
     // Anything left open from last time (a menu, a dialog) is cleared first.
+    try { let n = 0; while (Array.isArray(S.modals) && S.modals.length && n++ < 12) S.modals[S.modals.length - 1](); } catch {}
     document.getElementById('menuRoot')?.replaceChildren();
     if (S.guideOpen) S.guideOpen = false;
     openGuide();

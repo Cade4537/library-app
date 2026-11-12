@@ -1,5 +1,7 @@
 # Crimson Vault
 
+**A vibe coded project:** Crimson Vault is built by describing features in plain words to an AI (Claude) and trying them out, rather than hand writing the code. It is a hobby project, shared as is; read it, fork it, or open an issue if something breaks.
+
 One launcher for every game and app on this PC: installed and owned games from every store, cover art, genre categories, friends, hours played, achievements, storage and an Apple Music player. Red and black, works with mouse, keyboard or controller.
 
 ## Run it
@@ -216,6 +218,14 @@ Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpe
 ## Privacy, terms and license
 
 Crimson Vault is a free hobby project. No account, no analytics, no ads, nothing collected. Everything it reads, stores and sends is listed in [PRIVACY.md](PRIVACY.md), the short terms are in [TERMS.md](TERMS.md), and the code is [MIT licensed](LICENSE). It comes as is, with no warranty: if you like it, great, and if you find a problem, open an issue.
+
+## What's new in 0.18.7: guide and settings polish
+
+- **Downloads in the guide** only appear while bytes are actually moving. Paused, queued and abandoned installs used to sit there forever.
+- **Friend profiles open over the guide** and the guide stays put. This also fixes the overlay: clicking a friend used to hide the overlay with the profile stranded inside it.
+- **Pairs with** on the Launchers page: SteelSeries Sonar, Apple Music and Spotify, Discord, AniList, Xbox console, the phone remote and LRCLIB lyrics, each with where to open or set it up.
+- **Alerts:** every alert has an x to dismiss just that one, and Clear only clears the kind you filtered to.
+- **Settings search** (after looking at how Steam, Discord and the usual settings design guides do it): matches are highlighted and counted, the section list narrows to sections with matches, Enter jumps to the first one, Escape clears the search, and Ctrl+F or / search settings while you are on the page.
 
 ## What's new in 0.18.6
 

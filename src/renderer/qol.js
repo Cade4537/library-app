@@ -200,7 +200,9 @@ async function refreshGuideExtras() {
 }
 setInterval(() => { if (S.guideOpen) refreshGuideExtras(); }, 5000);
 function guideDownloads() {
-  const list = QOL.downloads;
+  // Paused, queued and abandoned installs sit in the launchers' files forever; the guide only
+  // cares about what is downloading or installing right now.
+  const list = QOL.downloads.filter((d) => d.active !== false);
   if (!list.length) return null;
   const gb = (b) => `${(b / 1e9).toFixed(1)} GB`;
   return h('div', { class: 'gd-sec gd-dl', style: '--d:1' }, h('div', { class: 'gd-label' }, `Downloads · ${list.length}`),

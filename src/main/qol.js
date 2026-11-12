@@ -21,6 +21,7 @@ class Qol {
     this.sessions = new Map(); // id -> { start, ach, reminded }
     this.queue = []; // notifications held back while you play
     this.dlPrev = new Map(); // downloads seen last time, to tell when one finishes
+    this.dlProg = new Map(); // bytes seen per download, to tell when one is really moving
     this.lowWarned = new Set();
     this.watchers = [];
     this.batt = { t: 0, v: null };
@@ -169,11 +170,21 @@ class Qol {
         const staged = Number(st.bytesstaged) || 0;
         const busy = flags & (2 | 256 | 512 | 1024 | 1048576 | 2097152 | 4194304);
         if (!busy || (total && done >= total && (!stage || staged >= stage))) continue;
+        // Steam keeps "scheduled" updates in this state even when nothing is downloading (Steam
+        // closed, download window, paused). Only bytes actually moving count as active.
+        const id = `steam:${st.appid}`;
+        const moved = done + staged;
+        let prog = this.dlProg.get(id);
+        if (!prog) { prog = { moved, movedAt: 0 }; this.dlProg.set(id, prog); }
+        else { if (moved > prog.moved) prog.movedAt = Date.now(); prog.moved = moved; }
+        const paused = !!(flags & 512);
+        const queued = !(flags & (256 | 1024 | 1048576 | 2097152 | 4194304));
         out.push({
           source: 'steam', appid: st.appid, name: st.name || `App ${st.appid}`,
-          paused: !!(flags & 512), queued: !(flags & (256 | 1024 | 1048576 | 2097152 | 4194304)),
+          paused, queued,
+          active: !paused && !queued && Date.now() - prog.movedAt < 90000,
           done, total, pct: total ? Math.min(100, Math.round((done / total) * 100)) : 0,
-          id: `steam:${st.appid}`,
+          id,
         });
       }
     }
@@ -184,10 +195,13 @@ class Qol {
         if (!/\.item$/i.test(n)) continue;
         try {
           const j = JSON.parse(await fsp.readFile(path.join(dir, n), 'utf8'));
-          if (j.bIsIncompleteInstall) out.push({ source: 'epic', name: j.DisplayName || 'Epic game', paused: false, queued: false, pct: null, id: `epic:${j.AppName}` });
+          // Epic's manifests do not say whether bytes are moving, and an abandoned install sits in
+          // this state forever, so these never count as active for the guide.
+          if (j.bIsIncompleteInstall) out.push({ source: 'epic', name: j.DisplayName || 'Epic game', paused: false, queued: false, active: false, pct: null, id: `epic:${j.AppName}` });
         } catch {}
       }
     } catch {}
+    if (this.dlProg.size > 300) this.dlProg.clear();
     return out.sort((a, b) => Number(a.queued) - Number(b.queued) || Number(a.paused) - Number(b.paused));
   }
 

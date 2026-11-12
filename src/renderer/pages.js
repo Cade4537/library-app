@@ -13,20 +13,38 @@ function showSettingsPage({ body, actions }) {
   const navBtns = labels.map((l) => h('button', { class: 'set-nav-btn', 'data-for': l.id, onclick: () => { l.scrollIntoView({ behavior: 'smooth', block: 'start' }); } },
     icon(icons[l.textContent.trim().toLowerCase()] || 'gear'), h('span', {}, l.textContent)));
   const search = h('input', { class: 'text-input set-search', placeholder: 'Search settings', spellcheck: 'false', type: 'search' });
-  search.addEventListener('keydown', (e) => e.stopPropagation());
+  const hitCount = h('span', { class: 'set-hits', hidden: true });
+  search.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    // Enter jumps to the first setting that matches; Escape clears the search.
+    if (e.key === 'Enter') { const first = body.querySelector('.set-hit'); if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    if (e.key === 'Escape' && search.value) { e.preventDefault(); search.value = ''; search.dispatchEvent(new Event('input')); }
+  });
   search.addEventListener('input', () => {
     const q = norm(search.value);
     let shown = 0;
     // Each section label and the fields after it, until the next label.
-    let section = null, sectionHas = false;
-    const finish = () => { if (section) section.hidden = !!q && !sectionHas; };
+    let section = null, sectionHas = 0;
+    const secHits = {};
+    const finish = () => { if (section) { section.hidden = !!q && !sectionHas; secHits[section.id] = sectionHas; } };
     for (const el of body.children) {
-      if (el.classList.contains('section-label')) { finish(); section = el; sectionHas = false; continue; }
+      if (el.classList.contains('section-label')) { finish(); section = el; sectionHas = 0; continue; }
       const hit = !q || norm(el.textContent).includes(q);
       el.hidden = !hit;
-      if (hit) { sectionHas = true; shown++; }
+      el.classList.toggle('set-hit', hit && !!q);
+      if (hit) { sectionHas++; shown++; }
     }
     finish();
+    // The section list keeps only sections with matches, with how many each has.
+    for (const b of navBtns) {
+      const n = secHits[b.dataset.for] || 0;
+      b.hidden = !!q && !n;
+      let badge = b.querySelector('.set-nav-n');
+      if (q && n) { if (!badge) { badge = h('i', { class: 'set-nav-n' }); b.append(badge); } badge.textContent = String(n); }
+      else if (badge) badge.remove();
+    }
+    hitCount.hidden = !q;
+    hitCount.textContent = q ? `${shown} ${shown === 1 ? 'match' : 'matches'}` : '';
     empty.hidden = shown > 0;
   });
   const empty = h('div', { class: 'set-empty', hidden: true }, 'No settings match that search.');
@@ -45,7 +63,7 @@ function showSettingsPage({ body, actions }) {
   const markDirty = () => { if (!S.settingsDirty) { S.settingsDirty = true; bar.classList.add('dirty'); status.textContent = 'Unsaved changes'; } };
   body.addEventListener('input', (e) => { if (e.target !== search) markDirty(); });
   body.addEventListener('click', (e) => { if (e.target.closest('.toggle, .seg button, .size-ctl')) markDirty(); });
-  const nav = h('nav', { class: 'set-nav' }, search, navBtns);
+  const nav = h('nav', { class: 'set-nav' }, search, hitCount, navBtns);
   fillEl(box, h('div', { class: 'set-layout' }, nav, h('div', { class: 'set-main' }, body, empty)), bar);
   body.classList.add('set-body');
   // Highlight the section you are reading.

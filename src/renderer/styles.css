@@ -2140,3 +2140,14 @@ body.overlay-mode #guide { box-shadow: 0 30px 90px rgba(0,0,0,.75), 0 0 0 1px rg
 .gd-afilters .chip.on { background: var(--accent-soft); color: var(--text); border-color: var(--accent); }
 .gd-xbadge { width: 100%; height: 100%; display: grid; place-items: center; background: linear-gradient(135deg, #107c10, #0b4d0b); border-radius: inherit; color: #fff; }
 .gd-xbadge svg { width: 26px; height: 26px; }
+
+/* ---------- 0.18.7: pairs-with cards, alert dismiss, settings search ---------- */
+.l-pair { display: grid; place-items: center; background: linear-gradient(135deg, var(--accent-soft), rgba(255,255,255,.04)); color: var(--accent); }
+.l-pair svg { width: 26px; height: 26px; }
+.gd-ax { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; color: var(--faint); flex: none; opacity: 0; transition: opacity .15s; }
+.gd-ax svg { width: 14px; height: 14px; }
+.gd-alert:hover .gd-ax, .gd-alert:focus-within .gd-ax, body.pad .gd-ax { opacity: 1; }
+.gd-ax:hover { background: rgba(255,255,255,.1); color: var(--text); }
+.set-hits { font-size: 12px; color: var(--faint); padding: 0 4px 4px; }
+.set-hit { outline: 1px solid var(--accent-soft); outline-offset: 4px; border-radius: 8px; }
+.set-nav-n { font-style: normal; margin-left: auto; font-size: 11px; background: var(--accent-soft); color: var(--text); border-radius: 8px; padding: 1px 7px; }

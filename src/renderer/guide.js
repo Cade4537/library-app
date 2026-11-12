@@ -74,7 +74,7 @@ function guideFriendRow(p, i) {
   const base = (() => { const a = (p.accounts || []).find((x) => x.activity); return a ? a.activity : p.status === 'ingame' ? 'In a game' : p.status === 'away' ? 'Away' : p.status === 'offline' ? 'Offline' : 'Online'; })();
   const act = base + forTxt;
   const av = avatarFor(p);
-  return h('button', { class: `gd-friend st-${p.status}`, 'data-k': `fr:${p.name}`, title: `${p.name} · ${act}`, style: `--d:${Math.min(i, 10)}`, onclick: fromGuide(() => openFriendProfile(p)) },
+  return h('button', { class: `gd-friend st-${p.status}`, 'data-k': `fr:${p.name}`, title: `${p.name} · ${act}`, style: `--d:${Math.min(i, 10)}`, onclick: () => openFriendProfile(p) },
     h('div', { class: 'f-avwrap' }, av, h('span', { class: `f-badge st-${p.status}` })), h('div', { class: 'hf-text' }, h('b', {}, p.name), h('span', {}, act)));
 }
 
@@ -192,7 +192,7 @@ function renderGuide() {
     h('div', { class: 'gd-tabs' },
       h('b', { class: 'pb sh gd-lb' }, 'LB'),
       GUIDE_TABS.map(([k, label, ic]) => h('button', { class: 'gd-tab' + (tab === k ? ' on' : ''), 'data-k': `t:${k}`, title: label, onclick: () => { S.guideTab = k; prefs.set('guideTab', k); renderGuide(); } }, icon(ic),
-        k === 'home' && QOL.downloads.length ? h('i', { class: 'gd-dot dl' }, String(QOL.downloads.length)) : null,
+        k === 'home' && QOL.downloads.filter((d) => d.active !== false).length ? h('i', { class: 'gd-dot dl' }, String(QOL.downloads.filter((d) => d.active !== false).length)) : null,
         k === 'alerts' && unread ? h('i', { class: 'gd-dot al' }, String(Math.min(unread, 99))) : null,
         k === 'friends' && online ? h('i', { class: 'gd-dot' }, String(online)) : null,
         k === 'music' && st.active && st.status === 'Playing' ? h('i', { class: 'gd-eq' }, h('span'), h('span'), h('span')) : null)),

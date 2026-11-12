@@ -32,8 +32,9 @@ function guideAlerts() {
     h('div', { class: 'gd-flist' }, list.slice(0, 40).map((a, i) => h('button', { class: `gd-alert k-${a.kind}`, 'data-k': `al:${a.at}`, style: `--d:${Math.min(i, 10)}`, onclick: () => { if (a.id && S.byId.has(a.id)) { S.guideOpen = false; document.body.classList.remove('guide-open'); openDetails(a.id); } else if (a.kind === 'deal') setView({ type: 'deals' }); else if (a.kind === 'storage') setView({ type: 'storage' }); else if (a.kind === 'xbox' && typeof openConsoleHistory === 'function') openConsoleHistory(); else if (a.kind === 'anime') { S.guideOpen = false; document.body.classList.remove('guide-open'); setView({ type: 'anime' }); const mid = String(a.id || '').split(':')[1]; const e = mid && S.anime && (S.anime.entries || []).find((x) => String(x.mediaId) === mid); if (e) setTimeout(() => openAnimeDetails(e), 120); } } },
       h('span', { class: 'gd-aic' }, icon(ALERT_ICONS[a.kind] || 'bell')),
       h('div', { class: 'hf-text' }, h('b', {}, a.title), a.body ? h('span', {}, a.body) : null),
-      h('span', { class: 'gd-atime' }, timeAgo(a.at))))),
-    h('button', { class: 'gd-wide', 'data-k': 'al:clear', onclick: () => { prefs.set('alerts', []); renderGuide(); } }, icon('close'), 'Clear alerts'),
+      h('span', { class: 'gd-atime' }, timeAgo(a.at)),
+      h('span', { class: 'gd-ax', role: 'button', 'aria-label': 'Dismiss this alert', title: 'Dismiss', onclick: (ev) => { ev.stopPropagation(); prefs.set('alerts', alertList().filter((x) => x.at !== a.at || x.title !== a.title)); renderGuide(); } }, icon('close'))))),
+    h('button', { class: 'gd-wide', 'data-k': 'al:clear', onclick: () => { prefs.set('alerts', S.alertFilter ? alertList().filter((x) => (x.kind || 'info') !== S.alertFilter) : []); S.alertFilter = null; renderGuide(); } }, icon('close'), S.alertFilter ? `Clear ${(ALERT_KIND_NAMES[S.alertFilter] || S.alertFilter).toLowerCase()}` : 'Clear alerts'),
   ];
 }
 document.addEventListener('DOMContentLoaded', () => { if (api.onAlert) api.onAlert((a) => pushAlert(a)); });

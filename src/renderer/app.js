@@ -1356,9 +1356,27 @@ async function renderLaunchers() {
     });
     return b;
   };
+  // Things Crimson Vault pairs with that are not game launchers.
+  const st = S.lib.settings || {};
+  const pairs = [
+    { ic: 'sliders', name: 'SteelSeries Sonar', sub: 'Volume mixer for Game, Chat, Media, Aux and Mic, in the guide\'s Sound tab', btn: 'Open mixer', go: () => openSoundMixer() },
+    { ic: 'music', name: 'Apple Music and Spotify', sub: st.musicEnabled === false ? 'Off in Settings' : 'Playback controls, the full screen player and lyrics', btn: 'Now Playing', go: () => { if (NP.state.active) openNowPlaying(); else showToast('Play a song first'); } },
+    { ic: 'chat', name: 'Discord', sub: st.discordClientId ? 'Tab and Rich Presence set up' : 'A tab in the sidebar, plus Rich Presence', btn: 'Open tab', go: () => setView({ type: 'discord' }) },
+    { ic: 'tv', name: 'AniList', sub: st.anilistUser ? `Anime tracking as ${st.anilistUser}` : 'Anime tracking and Surprise me rolls', btn: 'Open Anime', go: () => setView({ type: 'anime' }) },
+    { ic: 'gamepad', name: 'Xbox console', sub: st.xboxGamertag ? `Console play and streaming as ${st.xboxGamertag}` : 'Console play history and Remote Play streaming', btn: 'Remote Play', go: () => setView({ type: 'remoteplay' }) },
+    { ic: 'monitor', name: 'Phone remote', sub: st.remoteEnabled ? 'On, for devices on your home network' : 'Start and install games from your phone', btn: 'Set up', go: () => openSettings() },
+    { ic: 'bell', name: 'LRCLIB lyrics', sub: prefs.get('lyricsOptIn', false) ? 'On, synced lyrics in Now Playing' : 'Off by default; turn on in Settings or Now Playing', btn: 'Settings', go: () => openSettings() },
+  ];
+  const pcard = (x) => h('button', { class: 'lcard pair', onclick: () => x.go() },
+    h('div', { class: 'l-icon l-pair' }, icon(x.ic)),
+    h('div', { class: 'l-body' }, h('div', { class: 'l-name' }, x.name), h('div', { class: 'l-sub' }, x.sub)),
+    h('span', { class: 'btn' }, x.btn));
   box.replaceChildren(
     h('div', { class: 'friends-bar' }, h('button', { class: 'chip', onclick: () => { S.launchers = null; renderLaunchers(); } }, icon('refresh'), 'Check again')),
-    h('div', { class: 'launcher-grid' }, list.map(card)));
+    h('div', { class: 'launcher-grid' }, list.map(card)),
+    h('h3', { class: 'section-title', style: { margin: '22px 0 4px' } }, 'Pairs with'),
+    h('div', { class: 'help', style: { margin: '0 0 10px' } }, 'Beyond launchers, Crimson Vault also works with these.'),
+    h('div', { class: 'launcher-grid' }, pairs.map(pcard)));
 }
 
 // ---------- related apps ----------
@@ -2033,6 +2051,8 @@ document.addEventListener('keydown', (e) => {
     if (goBack()) e.preventDefault();
   } else if ((e.ctrlKey && e.key.toLowerCase() === 'f') || (e.key === '/' && document.activeElement.tagName !== 'INPUT')) {
     e.preventDefault();
+    const setSearch = S.view.type === 'settings' && document.querySelector('.set-search');
+    if (setSearch) { setSearch.focus(); setSearch.select(); return; }
     $('#search').focus();
     $('#search').select();
   } else if ((e.key === 'g' || e.key === 'G') && !e.ctrlKey && !e.altKey && !e.metaKey && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName) && !S.modals.length) {
