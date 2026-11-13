@@ -150,7 +150,7 @@ function updatePresence() {
 
 // ---------- 0.18.5: listening history, and music on Discord like Spotify ----------
 // A song counts as listened after 30 seconds of play. Counts live in library.json on this PC only.
-const musicNow = { key: '', ms: 0, counted: false, artFor: '', art: null, flush: 0 };
+const musicNow = { key: '', ms: 0, counted: false, artFor: '', art: null, flush: 0, lastPos: 0 };
 const cleanArtist = (a) => String(a || '').split(/\s+—\s+/)[0].trim();
 const monthKey = () => new Date().toISOString().slice(0, 7);
 function musicData() {
@@ -171,7 +171,11 @@ function musicTick() {
   if (playing) {
     const artist = cleanArtist(st.artist);
     const key = `${artist}|${st.title}`.toLowerCase();
-    if (key !== musicNow.key) Object.assign(musicNow, { key, ms: 0, counted: false });
+    const posNow = Math.max(0, Number(st.posExact != null ? st.posExact : st.pos) || 0);
+    if (key !== musicNow.key) Object.assign(musicNow, { key, ms: 0, counted: false, lastPos: posNow });
+    // The same song starting over (on repeat, or restarted) counts as another play.
+    else if (musicNow.counted && posNow < 20 && musicNow.lastPos - posNow > 60) Object.assign(musicNow, { ms: 0, counted: false });
+    musicNow.lastPos = posNow;
     musicNow.ms += 5000;
     const m = musicData();
     if (!musicNow.counted && musicNow.ms >= 30000) {
@@ -1213,6 +1217,8 @@ if (!app.requestSingleInstanceLock()) {
     setInterval(() => deals(true).catch(() => {}), services.SIX_HOURS);
     playtime.start();
     setInterval(musicTick, 5000);
+    // Settings from removed features (the old Discord tab).
+    for (const k of ['discordTab', 'closeDiscordInTray']) if (k in store.data.settings) { delete store.data.settings[k]; store.saveSoon(); }
     qol.start();
     consolePlay.start();
     streamView = new StreamView(() => win, (st) => sendTo('stream:state', st));

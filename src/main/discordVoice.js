@@ -22,6 +22,12 @@ class DiscordVoice {
     this.authed = false;
     this.subbed = ''; // channel id whose events we listen to
     this.state = { setup: 'off', connected: false, authed: false, channel: null, users: [], mute: false, deaf: false, error: '' };
+    // If a "stopped talking" event is ever missed, the ring fades on its own.
+    this.sweep = setInterval(() => {
+      let changed = false;
+      for (const u of this.state.users) if (u.speaking && Date.now() - (u.spokeAt || 0) > 15000) { u.speaking = false; changed = true; }
+      if (changed) this.push();
+    }, 5000);
   }
 
   push() { this.d.push({ ...this.state, users: [...this.state.users] }); }
@@ -143,7 +149,7 @@ class DiscordVoice {
     }
     if (evt === 'SPEAKING_START' || evt === 'SPEAKING_STOP') {
       const u = st.users.find((x) => x.id === String(data && data.user_id));
-      if (u) { u.speaking = evt === 'SPEAKING_START'; this.push(); }
+      if (u) { u.speaking = evt === 'SPEAKING_START'; u.spokeAt = Date.now(); this.push(); }
       return;
     }
     if (evt === 'VOICE_STATE_CREATE' || evt === 'VOICE_STATE_UPDATE' || evt === 'VOICE_STATE_DELETE') {

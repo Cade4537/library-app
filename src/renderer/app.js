@@ -1354,8 +1354,8 @@ async function renderLaunchers() {
     { ic: 'chat', name: 'Discord', sub: st.discordClientId ? 'Rich Presence and your voice call in the guide' : 'Rich Presence, and your voice call in the guide', btn: 'Open Discord', go: () => api.discordOpenApp() },
     { ic: 'tv', name: 'AniList', sub: st.anilistUser ? `Anime tracking as ${st.anilistUser}` : 'Anime tracking and Surprise me rolls', btn: 'Open Anime', go: () => setView({ type: 'anime' }) },
     { ic: 'gamepad', name: 'Xbox console', sub: st.xboxGamertag ? `Console play and streaming as ${st.xboxGamertag}` : 'Console play history and Remote Play streaming', btn: 'Remote Play', go: () => setView({ type: 'remoteplay' }) },
-    { ic: 'monitor', name: 'Phone remote', sub: st.remoteEnabled ? 'On, for devices on your home network' : 'Start and install games from your phone', btn: 'Set up', go: () => openSettings() },
-    { ic: 'bell', name: 'LRCLIB lyrics', sub: prefs.get('lyricsOptIn', false) ? 'On, synced lyrics in Now Playing' : 'Off by default; turn on in Settings or Now Playing', btn: 'Settings', go: () => openSettings() },
+    { ic: 'monitor', name: 'Phone remote', sub: st.remoteEnabled ? 'On, for devices on your home network' : 'Start and install games from your phone', btn: 'Set up', go: () => openSettings('phone remote') },
+    { ic: 'bell', name: 'LRCLIB lyrics', sub: prefs.get('lyricsOptIn', false) ? 'On, synced lyrics in Now Playing' : 'Off by default; turn on in Settings or Now Playing', btn: 'Settings', go: () => openSettings('music') },
   ];
   const pcard = (x) => h('button', { class: 'lcard pair', onclick: () => x.go() },
     h('div', { class: 'l-icon l-pair' }, icon(x.ic)),
@@ -1506,7 +1506,7 @@ function connBlock(title, connected, statusText, helpId, ...kids) {
 }
 
 // Settings is a page now. openSettings() goes there; buildSettingsPage() draws it.
-function openSettings() { if (S.view.type !== 'settings') setView({ type: 'settings' }); }
+function openSettings(section) { setView({ type: 'settings', section: section || null }); }
 function buildSettingsPage() {
   const s = { ...S.lib.settings };
   const os = S.lib.ownedStatus || {};

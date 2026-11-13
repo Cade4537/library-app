@@ -9,6 +9,17 @@ function showSettingsPage({ body, actions }) {
   // Give every section an anchor for the list on the left.
   const labels = [...body.querySelectorAll('.section-label')];
   labels.forEach((l, i) => { l.id = `set-${i}`; });
+  // Opened pointed at one section (a Pairs with card): land there and flash it.
+  if (S.view.section) {
+    const want = String(S.view.section).toLowerCase();
+    const target = labels.find((l) => l.textContent.trim().toLowerCase() === want) || labels.find((l) => l.textContent.trim().toLowerCase().includes(want));
+    S.view.section = null;
+    if (target) setTimeout(() => {
+      target.scrollIntoView({ block: 'start' });
+      target.classList.add('set-flash');
+      setTimeout(() => target.classList.remove('set-flash'), 1600);
+    }, 60);
+  }
   const icons = { connections: 'link', look: 'image', app: 'gear', alerts: 'bell', 'phone remote': 'monitor', 'quality of life': 'sparkle', health: 'chart', music: 'music', discord: 'chat', updates: 'refresh' };
   const navBtns = labels.map((l) => h('button', { class: 'set-nav-btn', 'data-for': l.id, onclick: () => { l.scrollIntoView({ behavior: 'smooth', block: 'start' }); } },
     icon(icons[l.textContent.trim().toLowerCase()] || 'gear'), h('span', {}, l.textContent)));

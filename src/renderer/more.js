@@ -552,7 +552,7 @@ function healthSection() {
         h('div', {}, h('b', {}, String(d.processes)), h('span', {}, 'Processes')),
         h('div', {}, h('b', {}, String(d.powershell ? d.powershell.active : 0)), h('span', {}, 'Helper jobs running'))),
       h('div', { class: 'help' }, types),
-      h('div', { class: 'help' }, `Music helper ${d.helpers && d.helpers.music ? 'on' : 'off'} · Hours tracker ${d.helpers && d.helpers.playtime ? 'on' : 'off'} · Xbox stream ${d.streamOpen ? 'open' : 'closed'}`),
+      h('div', { class: 'help' }, `Helpers: music ${d.helpers && d.helpers.music ? 'running' : 'stopped'}, hours tracker ${d.helpers && d.helpers.playtime ? 'running' : 'stopped'}. Xbox stream ${d.streamOpen ? 'open' : 'closed'}.`),
       bad.length ? h('div', { class: 'note err', style: { margin: 0 } }, `${bad.length} recent problem${bad.length === 1 ? '' : 's'}: `, bad.slice(-3).map((l) => h('div', {}, l))) : h('div', { class: 'help' }, 'No crashes or hangs logged recently.'),
       pw ? h('div', { class: 'help' }, `Running for ${pw.uptimeHours} hours${pw.background ? ' · in the background now' : ''}`) : null,
       pw && pw.health ? h('div', { class: 'help' }, `Windows handles ${pw.health.handles != null ? pw.health.handles.toLocaleString() : '?'} · GDI ${pw.health.gdi != null ? pw.health.gdi : '?'} · USER ${pw.health.user != null ? pw.health.user : '?'} · GPU ${pw.health.gpuMB} MB${pw.restartWanted ? ' · a quiet restart is due' : ''}`) : null,

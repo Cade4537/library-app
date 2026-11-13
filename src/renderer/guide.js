@@ -139,7 +139,7 @@ function guideMusic() {
     h('div', { class: 'gd-player' },
       st.art ? h('div', { class: 'gd-pbg', style: `background-image:url("${String(st.art).replace(/"/g, '%22')}")` }) : null,
       st.art ? h('img', { class: 'gd-part', src: st.art, alt: '' }) : h('div', { class: 'gd-part' }, icon('music')),
-      h('b', { class: 'gd-ptitle' }, st.title || 'Unknown track'),
+      h('b', { class: 'gd-ptitle' }, playing ? h('span', { class: 'gd-peq', 'aria-hidden': 'true' }, h('i'), h('i'), h('i')) : null, st.title || 'Unknown track'),
       h('span', { class: 'gd-partist' }, String(st.artist || '').replace(/\s+—\s+/, ' · ')),
       h('div', { class: 'gd-pbar' + (st.dur && st.canSeek !== false ? ' seek' : ''), title: st.dur ? 'Click to jump' : undefined, onclick: (e) => {
         if (!st.dur) return;

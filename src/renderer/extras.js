@@ -124,7 +124,12 @@ async function renderStats() {
 
   // 0.18.5: your music, from the listening history Crimson Vault keeps on this PC.
   if (api.musicStats) api.musicStats().then((mu) => {
-    if (!mu || !mu.plays || !box.isConnected) return;
+    if (!box.isConnected) return;
+    if (!mu || !mu.plays) {
+      box.append(h('div', { class: 'st-card' }, h('h3', { class: 'section-title' }, 'Music'),
+        h('div', { class: 'help' }, 'Play songs in Apple Music or Spotify while Crimson Vault is open and your top artists, top songs and listening time build up here. A song counts after 30 seconds.')));
+      return;
+    }
     const fmtListen = (ms) => { const min = Math.round(ms / 60000); return min >= 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min} min`; };
     const plays = (n) => `${n.toLocaleString()} ${n === 1 ? 'play' : 'plays'}`;
     const monthName = new Date().toLocaleDateString(undefined, { month: 'long' });
