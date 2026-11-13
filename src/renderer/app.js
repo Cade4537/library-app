@@ -1710,7 +1710,7 @@ function buildSettingsPage() {
         h('div', { class: 'field' }, h('label', {}, 'Music Application ID'), dcMusicId),
         toggleRow('Voice call in the guide', 'Your current call on the guide Home: who is in it, who is talking, mute, deafen and leave', discordVoiceOn, (v) => { discordVoiceOn = v; }),
         h('div', { class: 'field', style: { marginTop: '10px' } }, h('label', {}, 'Client secret (for voice)'), dcSecret,
-          h('div', { class: 'help' }, 'From the same Discord application page (Reset Secret shows it). Kept encrypted on this PC; used once so Discord shows its Allow popup, then for quiet sign ins.')),
+          h('div', { class: 'help' }, 'From the same Discord application page (Reset Secret shows it). Kept encrypted on this PC. Also add http://127.0.0.1 under OAuth2, Redirects there and save; Discord requires it for the sign in.')),
         h('div', { class: 'field' }, h('div', { class: 'row' }, vcBtn), vcStatus)),
       h('div', { class: 'section-label' }, 'Look'),
       h('div', { class: 'field' }, h('label', {}, 'Accent color'), accentRow),

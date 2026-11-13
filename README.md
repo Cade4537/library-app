@@ -219,6 +219,10 @@ Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpe
 
 Crimson Vault is a free hobby project. No account, no analytics, no ads, nothing collected. Everything it reads, stores and sends is listed in [PRIVACY.md](PRIVACY.md), the short terms are in [TERMS.md](TERMS.md), and the code is [MIT licensed](LICENSE). It comes as is, with no warranty: if you like it, great, and if you find a problem, open an issue.
 
+## What's new in 0.19.1
+
+- **Fixed:** Connect voice failed with "Missing redirect_uri in request". The sign in exchange now sends Discord's required redirect address. One portal step goes with it: in your Discord application, under OAuth2, Redirects, add `http://127.0.0.1`, press Save Changes, then press Connect voice again.
+
 ## What's new in 0.19.0: the Discord tab becomes the call card
 
 - **The Discord tab is gone.** It was a whole copy of Discord's web app living inside Crimson Vault: heavy, needing its own sign in, and redundant next to the real Discord app. Removing it frees memory and one more background web view.

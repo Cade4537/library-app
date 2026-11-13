@@ -481,6 +481,7 @@ function importBackup() {
 
 // ---------- what's new ----------
 const WHATS_NEW = {
+  '0.19.1': ['Fixed Connect voice failing with a redirect_uri error. Add http://127.0.0.1 under OAuth2, Redirects in your Discord application, save, and press Connect voice again.'],
   '0.19.0': ['The Discord tab is gone; it was a whole second copy of Discord eating memory', 'In its place: your voice call on the guide Home, read from the Discord desktop app. Who is in it, a green ring around whoever is talking, and Mute, Deafen and Leave buttons that work, even from the overlay in a game', 'Set up once in Settings, Connections: paste the client secret and press Connect voice, then click Allow inside Discord'],
   '0.18.7': ['The guide only shows downloads that are actually moving; paused, queued and abandoned installs no longer sit there', 'Friend profiles open over the guide instead of closing it (this also fixes the overlay losing the profile)', 'Launchers page: a Pairs with section for Sonar, music, Discord, AniList, Xbox console, the phone remote and lyrics', 'Alerts: dismiss one alert with its x, and Clear follows the filter you picked', 'Settings: matches are highlighted and counted, the section list narrows while you search, Enter jumps to the first match, and Ctrl+F searches settings while you are there'],
   '0.18.6': ['Fixed: the full screen music view froze on the song it opened with. Title, cover, colors and lyrics now follow every song change.'],

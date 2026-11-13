@@ -182,7 +182,12 @@ class DiscordVoice {
       signal: AbortSignal.timeout(15000),
     });
     const j = await res.json().catch(() => ({}));
-    if (!res.ok || !j.access_token) throw new Error(j.error_description || j.error || `Discord sign in failed (${res.status}).`);
+    if (!res.ok || !j.access_token) {
+      const why = j.error_description || j.error || `Discord sign in failed (${res.status}).`;
+      // Discord's token endpoint insists on a redirect address, even for this local flow.
+      if (/redirect_uri/i.test(why)) throw new Error('One more portal step: in your Discord application, OAuth2, add http://127.0.0.1 under Redirects, press Save Changes, then Connect voice again.');
+      throw new Error(why);
+    }
     this.d.saveTokens({ access: j.access_token, refresh: j.refresh_token || '', at: Date.now() });
     return j.access_token;
   }
@@ -194,7 +199,7 @@ class DiscordVoice {
     if (!this.sock) throw new Error('The Discord app is not running on this PC.');
     const a = await this.cmd('AUTHORIZE', { client_id: this.clientId, scopes: SCOPES, prompt: 'none' });
     if (!a || !a.code) throw new Error('Discord did not hand back a sign in code.');
-    await this.token({ grant_type: 'authorization_code', code: a.code });
+    await this.token({ grant_type: 'authorization_code', code: a.code, redirect_uri: 'http://127.0.0.1' });
     await this.signIn();
     return true;
   }
