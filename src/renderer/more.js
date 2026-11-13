@@ -552,7 +552,7 @@ function healthSection() {
         h('div', {}, h('b', {}, String(d.processes)), h('span', {}, 'Processes')),
         h('div', {}, h('b', {}, String(d.powershell ? d.powershell.active : 0)), h('span', {}, 'Helper jobs running'))),
       h('div', { class: 'help' }, types),
-      h('div', { class: 'help' }, `Music helper ${d.helpers && d.helpers.music ? 'on' : 'off'} · Hours tracker ${d.helpers && d.helpers.playtime ? 'on' : 'off'} · Discord tab ${d.discordOpen ? 'loaded' : 'closed'} · Xbox stream ${d.streamOpen ? 'open' : 'closed'}`),
+      h('div', { class: 'help' }, `Music helper ${d.helpers && d.helpers.music ? 'on' : 'off'} · Hours tracker ${d.helpers && d.helpers.playtime ? 'on' : 'off'} · Xbox stream ${d.streamOpen ? 'open' : 'closed'}`),
       bad.length ? h('div', { class: 'note err', style: { margin: 0 } }, `${bad.length} recent problem${bad.length === 1 ? '' : 's'}: `, bad.slice(-3).map((l) => h('div', {}, l))) : h('div', { class: 'help' }, 'No crashes or hangs logged recently.'),
       pw ? h('div', { class: 'help' }, `Running for ${pw.uptimeHours} hours${pw.background ? ' · in the background now' : ''}`) : null,
       pw && pw.health ? h('div', { class: 'help' }, `Windows handles ${pw.health.handles != null ? pw.health.handles.toLocaleString() : '?'} · GDI ${pw.health.gdi != null ? pw.health.gdi : '?'} · USER ${pw.health.user != null ? pw.health.user : '?'} · GPU ${pw.health.gpuMB} MB${pw.restartWanted ? ' · a quiet restart is due' : ''}`) : null,
@@ -569,8 +569,6 @@ function healthSection() {
     h('div', { class: 'help', style: { margin: '4px 0 8px' } }, 'Background mode keeps Crimson Vault light when you are not using it, so it can stay open for days.'),
     tg('Lower priority in the background', 'When minimized or in the tray, every part of Crimson Vault runs at below normal priority, so games and Windows come first', 'lowPriorityInBackground'),
     tg('Free memory in the tray', 'After 3 minutes in the tray the window closes to free memory and graphics resources. Alerts, hours tracking, music and the phone remote keep working, and the window opens again from the tray icon.', 'freeWindowInTray'),
-    tg('Close the Discord tab after an hour in the tray', 'The Discord tab is a full web app and grows over time', 'closeDiscordInTray'),
-    tg('Quiet restart once a day', 'After 24 hours, or if Windows resources start to build up, Crimson Vault restarts itself in the tray when nothing is going on (never during a game, stream or download)', 'dailyRefresh'),
     tg('Use the graphics card for this app', 'Turn off if your screen, wallpaper or taskbar acts up while Crimson Vault is open. Animations get a bit less smooth. Needs a restart.', 'gpuAcceleration', true, true)];
 }
 

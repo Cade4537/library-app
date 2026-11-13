@@ -19,7 +19,6 @@ const MAIN_PAGES = [
 ];
 const LIB_TYPES = new Set(['library', 'games', 'apps', 'favorites', 'recent', 'backlog', 'added', 'home', 'arcade', 'category', 'smart', 'launcher', 'uncategorized', 'hidden', 'libcollections', 'libcategories', 'liblaunchers', 'libmanage']);
 function pageOf(type) {
-  if (type === 'discord') return 'friends';
   if (LIB_TYPES.has(type)) return 'library';
   if (type === 'storage' || type === 'launchers') return 'library';
   return type;
@@ -89,6 +88,17 @@ function guideHome() {
       h('div', { class: 'gd-gtext' }, h('span', { class: 'gd-kicker' }, h('span', { class: 'live-dot' }), 'Playing now'), h('b', {}, displayName(running)),
         h('span', { class: 'gd-sub' }, fmtHours(groupMinutes(running)) || ''),
         h('button', { class: 'btn primary', 'data-k': 'g:back', 'data-first': '', onclick: fromGuide(async () => { const r = await api.focusGame(running.id); if (!r || !r.ok) launch(running.id); }) }, icon('play'), 'Back to game'))) : null,
+    S.voice && S.voice.authed && S.voice.channel ? h('div', { class: 'gd-call', style: '--d:0' },
+      h('div', { class: 'gd-call-top' }, h('span', { class: 'live-dot' }), h('b', {}, S.voice.channel.name), h('span', { class: 'gd-sub' }, `${S.voice.users.length} in call`)),
+      h('div', { class: 'gd-callers' }, S.voice.users.slice(0, 10).map((u) => h('div', { class: 'gd-caller' + (u.speaking ? ' talk' : '') + (u.mute || u.deaf ? ' quiet' : ''), title: u.name },
+        u.avatar ? h('img', { src: u.avatar, alt: '' }) : h('span', { class: 'gd-cav' }, (u.name || '?').slice(0, 1).toUpperCase()),
+        h('span', { class: 'gd-cname' }, u.name),
+        u.mute || u.deaf ? h('span', { class: 'gd-cmute' }, icon(u.deaf ? 'volumeOff' : 'micOff')) : null))),
+      S.voice.users.length > 10 ? h('div', { class: 'gd-sub' }, `and ${S.voice.users.length - 10} more`) : null,
+      h('div', { class: 'gd-call-btns' },
+        h('button', { class: 'gd-cbtn' + (S.voice.mute ? ' on' : ''), 'data-k': 'v:mute', title: S.voice.mute ? 'Unmute' : 'Mute', onclick: async () => { const r = await api.voiceMute(!S.voice.mute); if (!r.ok) showToast(r.error || 'Discord said no', 'error'); } }, icon(S.voice.mute ? 'micOff' : 'mic'), S.voice.mute ? 'Unmute' : 'Mute'),
+        h('button', { class: 'gd-cbtn' + (S.voice.deaf ? ' on' : ''), 'data-k': 'v:deaf', title: S.voice.deaf ? 'Undeafen' : 'Deafen', onclick: async () => { const r = await api.voiceDeaf(!S.voice.deaf); if (!r.ok) showToast(r.error || 'Discord said no', 'error'); } }, icon(S.voice.deaf ? 'volumeOff' : 'volume'), S.voice.deaf ? 'Undeafen' : 'Deafen'),
+        h('button', { class: 'gd-cbtn', 'data-k': 'v:leave', title: 'Leave the call', onclick: async () => { const r = await api.voiceLeave(); if (!r.ok) showToast(r.error || 'Discord said no', 'error'); } }, icon('exit'), 'Leave'))) : null,
     !running && S.console && S.console.current ? h('div', { class: 'gd-game', style: '--d:0' },
       h('div', { class: 'gd-art' }, h('div', { class: 'gd-xbadge' }, icon('gamepad'))),
       h('div', { class: 'gd-gtext' }, h('span', { class: 'gd-kicker' }, h('span', { class: 'live-dot' }), 'On Xbox'), h('b', {}, S.console.current.name),

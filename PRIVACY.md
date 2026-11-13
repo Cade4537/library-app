@@ -16,8 +16,8 @@ This page lists everything it reads, stores and sends, so you can check for your
 ## What it never does
 
 - No keyboard logging. The only keys watched outside the app are the two shortcuts you set (show or hide, and the guide), registered through Windows. Inside its own windows it only reacts to its own shortcuts.
-- No screen recording or screenshots. The Discord tab can share your screen only when you start a share in Discord yourself.
-- No camera or microphone, except in the Discord tab during a call you start. The app's own pages are blocked from both.
+- No screen recording or screenshots.
+- No camera or microphone. The app's own pages are blocked from both.
 - No reading your clipboard. It only writes to it when you press a Copy button.
 - No reading your files, browser history, passwords or other apps' data beyond the launcher files above.
 - No selling, sharing or uploading your library, playtime or activity anywhere.
@@ -30,7 +30,7 @@ Everything stays in `%APPDATA%\Crimson Vault` on your PC:
 - `library.json`: your library, categories, notes, ratings, hours played and settings. Keys, tokens and sign ins in it are **encrypted** with Windows' protection for your user account, so another Windows user or a copy of the file on another PC cannot read them.
 - `covers` and `icons`: cached cover art.
 - `diagnostics.log`: start, crash and memory notes for troubleshooting (kept under 1 MB, never sent anywhere).
-- Sign in sessions for Steam, Epic, Xbox, AniList, Ubisoft, Discord and Xbox Remote Play, each in its own separate browser storage.
+- Sign in sessions for Steam, Epic, Xbox, AniList, Ubisoft and Xbox Remote Play, each in its own separate browser storage.
 
 Uninstalling and deleting that folder removes everything. **Settings, Backup** exports your settings without any keys or sign ins.
 
@@ -46,7 +46,7 @@ Only when the related feature is on. Each request goes straight from your PC to 
 | Microsoft / Xbox Live | Your Microsoft sign in | Xbox friends, achievements and console play, if you sign in |
 | OpenXBL (xbl.io) | Your OpenXBL key | Xbox friends, only if you add that key |
 | Ubisoft | Your Ubisoft sign in | Friend activity, if you turn it on |
-| Discord | Your Discord sign in | The Discord tab. "Playing" status goes to the Discord app on this PC, which shares it as Discord normally does |
+| Discord | Nothing leaves this PC except Discord's own sign in exchange | Rich Presence, and (with your one time approval inside Discord) your current voice channel and who is in it, read locally from the Discord app. Mute, deafen and leave send those commands to the Discord app on this PC |
 | AniList | Your AniList sign in or user name | The Anime page |
 | SteamGridDB | Your SteamGridDB key, game names | Cover art, if you add a key |
 | Steam image servers | Game IDs | Cover art for Steam games |

@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, clipboard, Tray, Menu, globalShortcut, Notification, nativeImage } = require('electron');
-const { DiscordView } = require('./src/main/discordView');
 const { DiscordRpc } = require('./src/main/discordRpc');
+const { DiscordVoice } = require('./src/main/discordVoice');
 const { StreamView } = require('./src/main/streamView');
 const { UbisoftActivity } = require('./src/main/ubisoftActivity');
 const services = require('./src/main/services');
@@ -74,7 +74,6 @@ let collections = [];
 let lastRegistry = {};
 let qol = null;
 let steamIdCache = null;
-let discordView = null;
 let streamView = null;
 let ubisoft = null;
 let tray = null;
@@ -86,8 +85,9 @@ const newsCache = new Map();
 let dealsCache = null;
 const rpc = new DiscordRpc();
 const rpcMusic = new DiscordRpc();
+let discordVoice = null;
+let voiceState = { setup: 'off', connected: false, authed: false, channel: null, users: [] };
 const runningSince = new Map();
-const pendingSource = new Map();
 const APP_ICON_URL = 'https://raw.githubusercontent.com/Cade4537/library-app/main/assets/icon.png';
 const REPO_URL = 'https://github.com/Cade4537/library-app';
 // Discord Application IDs (discord.com/developers/applications, New Application; the app's NAME there
@@ -198,6 +198,11 @@ function musicTick() {
   updateMusicPresence();
   updatePresence();
 }
+function configureVoice() {
+  if (!discordVoice) return;
+  const s = store.data.settings;
+  discordVoice.configure((s.discordClientId || DISCORD_APP_ID || '').trim(), s.discordClientSecret || '', s.discordVoiceOn !== false);
+}
 function updateMusicPresence() {
   const s = store.data.settings;
   const mode = s.discordMusic || 'always';
@@ -241,6 +246,10 @@ function publicSettings() {
   s.anilistConnected = !!(s.anilistAuth && s.anilistAuth.token);
   s.anilistName = (s.anilistAuth && s.anilistAuth.name) || '';
   delete s.anilistAuth;
+  s.hasDiscordSecret = !!s.discordClientSecret;
+  delete s.discordClientSecret;
+  s.voiceConnected = !!(s.discordVoiceTokens && s.discordVoiceTokens.access);
+  delete s.discordVoiceTokens;
   return s;
 }
 
@@ -321,7 +330,7 @@ function sendTo(channel, payload) {
   // Only live state: prompts (Discord pickers, app commands) belong to the main window.
   if (overlay && !overlay.isDestroyed() && OVERLAY_CHANNELS.has(channel)) overlay.webContents.send(channel, payload);
 }
-const OVERLAY_CHANNELS = new Set(['friends:state', 'media:state', 'update:state', 'toast', 'library:changed']);
+const OVERLAY_CHANNELS = new Set(['friends:state', 'media:state', 'update:state', 'toast', 'library:changed', 'voice:state']);
 
 // ---------- 0.18.2: the guide overlay ----------
 // A see-through window over everything (games included, unless they use exclusive full screen) that
@@ -850,16 +859,17 @@ function registerIpc() {
     return ok;
   });
 
-  ipcMain.handle('discord:bounds', (_e, b) => { if (discordView) discordView.set(b); });
-  ipcMain.handle('discord:unload', () => discordView && discordView.unload());
   ipcMain.handle('stream:bounds', (_e, b) => { if (streamView) streamView.set(b); });
   ipcMain.handle('stream:full', (_e, v) => streamView && streamView.setFull(v));
   ipcMain.handle('stream:stop', () => streamView && streamView.stop());
   ipcMain.handle('stream:state', () => ({ open: !!(streamView && streamView.open), full: !!(streamView && streamView.full) }));
-  ipcMain.handle('discord:reload', () => discordView && discordView.reload());
-  ipcMain.handle('discord:signOut', () => discordView && discordView.signOut());
   ipcMain.handle('discord:openApp', () => shell.openExternal('discord://'));
-  ipcMain.handle('discord:source', (_e, id, sourceId) => { const r = pendingSource.get(id); if (r) { pendingSource.delete(id); r(sourceId || null); } });
+  ipcMain.handle('voice:get', () => voiceState);
+  ipcMain.handle('voice:connect', async () => { try { configureVoice(); await discordVoice.authorize(); return { ok: true }; } catch (e) { diag.log('voice-auth-failed', { e: e.message }); return { ok: false, error: e.message }; } });
+  ipcMain.handle('voice:signOut', () => { if (discordVoice) discordVoice.signOut(); return { ok: true }; });
+  ipcMain.handle('voice:mute', async (_e, v) => { try { await discordVoice.setMute(v); return { ok: true }; } catch (e) { return { ok: false, error: e.message }; } });
+  ipcMain.handle('voice:deaf', async (_e, v) => { try { await discordVoice.setDeaf(v); return { ok: true }; } catch (e) { return { ok: false, error: e.message }; } });
+  ipcMain.handle('voice:leave', async () => { try { await discordVoice.leave(); return { ok: true }; } catch (e) { return { ok: false, error: e.message }; } });
   ipcMain.handle('presence:hint', (_e, hint) => { uiHint = hint && typeof hint === 'object' ? hint : {}; updateMusicPresence(); updatePresence(); });
   ipcMain.handle('music:stats', () => {
     const m = musicData();
@@ -893,6 +903,7 @@ function registerIpc() {
     store.data.settings = { ...before, ...patch };
     if ('anilistUser' in patch && patch.anilistUser !== before.anilistUser && anilist) anilist.cache = null;
     if (['discordClientId', 'discordPresence', 'discordBrowsing', 'discordMusicClientId', 'discordMusic', 'discordButton'].some((k) => k in patch)) { updatePresence(); updateMusicPresence(); }
+    if (['discordClientId', 'discordClientSecret', 'discordVoiceOn'].some((k) => k in patch)) configureVoice();
     const keyChanged = 'steamGridDbKey' in patch && patch.steamGridDbKey !== before.steamGridDbKey;
     store.changed();
     if (keyChanged) {
@@ -1110,7 +1121,7 @@ function registerIpc() {
   ipcMain.handle('app:toggleFullscreen', () => { if (win.isFullScreen()) leaveFullScreen(); else if (win.isVisible()) win.setFullScreen(true); });
   // Only a visible window may go full screen.
   ipcMain.handle('app:setFullscreen', (_e, v) => { if (!v) leaveFullScreen(); else if (win.isVisible() && !win.isMinimized()) win.setFullScreen(true); });
-  ipcMain.handle('diag:get', () => ({ ...diag.snapshot({ powershell: { ...psStats }, helpers: { music: !!(media && media.proc), playtime: !!(playtime && playtime.proc) }, discordOpen: !!(discordView && discordView.view), streamOpen: !!(streamView && streamView.open), sessions: (store.data.sessions || []).length, items: Object.keys(store.data.items).length }), log: diag.tail(30), file: diag.logFile() }));
+  ipcMain.handle('diag:get', () => ({ ...diag.snapshot({ powershell: { ...psStats }, helpers: { music: !!(media && media.proc), playtime: !!(playtime && playtime.proc) }, streamOpen: !!(streamView && streamView.open), sessions: (store.data.sessions || []).length, items: Object.keys(store.data.items).length }), log: diag.tail(30), file: diag.logFile() }));
   ipcMain.handle('app:copyText', (_e, text) => clipboard.writeText(String(text || '')));
   ipcMain.handle('app:openExternal', (_e, url) => {
     if (/^https:\/\//.test(url)) shell.openExternal(url);
@@ -1205,25 +1216,24 @@ if (!app.requestSingleInstanceLock()) {
     qol.start();
     consolePlay.start();
     streamView = new StreamView(() => win, (st) => sendTo('stream:state', st));
-    discordView = new DiscordView(() => win, (list) => new Promise((resolve) => {
-      const id = Math.random().toString(36).slice(2);
-      pendingSource.set(id, resolve);
-      sendTo('discord:pickSource', { id, list });
-      setTimeout(() => { if (pendingSource.has(id)) { pendingSource.delete(id); resolve(null); } }, 120000);
-    }));
+    discordVoice = new DiscordVoice({
+      getTokens: () => store.data.settings.discordVoiceTokens || null,
+      saveTokens: (t) => { if (t) store.data.settings.discordVoiceTokens = t; else delete store.data.settings.discordVoiceTokens; store.saveSoon(); },
+      push: (st) => { voiceState = st; sendTo('voice:state', st); },
+      log: (k, v) => diag.log(k, v),
+    });
+    configureVoice();
     power = new Power({
       store, diag,
       getWin: () => win,
-      destroyWin: () => { leaveFullScreen(); try { if (discordView) discordView.unload(); } catch {} if (win && !win.isDestroyed()) win.destroy(); win = null; },
-      // Not while a game, a console session, a stream, a scan or (for the window) the Discord tab is going.
+      destroyWin: () => { leaveFullScreen(); if (win && !win.isDestroyed()) win.destroy(); win = null; },
+      // Not while a game, a console session, a stream or a scan is going.
       isBusy: (o) => {
         const gameOn = playtime && [...playtime.running].some((id) => { const it = store.data.items[id]; return it && it.kind === 'game'; });
-        return !!(gameOn || (consolePlay && consolePlay.current) || (streamView && streamView.open) || scanning || (discordView && discordView.view) || (o.restart && updater && updater.state && updater.state.status === 'downloading'));
+        return !!(gameOn || (consolePlay && consolePlay.current) || (streamView && streamView.open) || scanning || (o.restart && updater && updater.state && updater.state.status === 'downloading'));
       },
       helperPids: () => [playtime && playtime.proc && playtime.proc.pid, media && media.proc && media.proc.pid].filter(Boolean),
       onBackground: (bg) => sendTo('app:background', bg),
-      discordLoaded: () => !!(discordView && discordView.view),
-      unloadDiscord: () => { if (discordView) discordView.unload(); sendTo('discord:unloaded', true); },
     });
     power.start();
     power.update();
@@ -1245,6 +1255,7 @@ if (!app.requestSingleInstanceLock()) {
     if (consolePlay) { consolePlay.stop(); consolePlay.flush(); }
     rpc.set(null); rpc.close();
     rpcMusic.set(null); rpcMusic.close();
+    if (discordVoice) discordVoice.close();
     if (store) store.saveNow();
     if (media) { media.enabled = false; media.stop(); }
     if (playtime) playtime.stop();

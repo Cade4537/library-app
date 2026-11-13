@@ -276,7 +276,6 @@ function viewTitle(view = S.view) {
     case 'friends': return 'Social';
     case 'launchers': return 'Launchers';
     case 'storage': return 'Storage';
-    case 'discord': return 'Social';
     case 'remoteplay': return 'Xbox Remote Play';
     case 'stats': return 'Stats';
     case 'arcade': return 'Arcade';
@@ -504,7 +503,7 @@ function render() {
   $('#news').hidden = true;
   document.body.classList.toggle('hub-on', hb);
   if (tv2 || av || dl || hb || lb || sp || st || an) {
-    for (const id of ['#friendsView', '#launchersView', '#storageView', '#grid', '#filters', '#jump', '#collections', '#news', '#empty', '#discordView', '#streamView']) $(id).hidden = true;
+    for (const id of ['#friendsView', '#launchersView', '#storageView', '#grid', '#filters', '#jump', '#collections', '#news', '#empty', '#streamView']) $(id).hidden = true;
     document.body.classList.remove('discord-on');
     renderSidebar();
     renderHeader();
@@ -522,10 +521,9 @@ function render() {
     return;
   }
   render.shownView = null;
-  const dv = S.view.type === 'discord';
+  const dv = false;
   const rv = S.view.type === 'remoteplay';
   document.body.classList.toggle('discord-on', dv || rv);
-  $('#discordView').hidden = !dv;
   $('#streamView').hidden = !rv;
   if (dv || rv) {
     for (const id of ['#friendsView', '#launchersView', '#storageView', '#grid', '#filters', '#jump', '#collections', '#empty']) $(id).hidden = true;
@@ -596,7 +594,6 @@ function renderSidebar() {
   const vis = S.lib.items.filter(visible);
   const nav = $('#nav');
   const social = navButton('friends', 'Social', 'users', (S.friends.people || []).filter((p) => p.status !== 'offline').length || null);
-  if (S.view.type === 'discord') social.classList.add('active');
   const navHead = (t) => h('div', { class: 'nav-head' }, t);
   nav.replaceChildren(
     navButton('hub', 'Home', 'home', null),
@@ -719,18 +716,11 @@ function renderHeader() {
       ])));
     }
   }
-  const noCount = ['discord', 'remoteplay', 'stats', 'arcade', 'deals', 'hub', 'library', 'libcollections', 'libcategories', 'liblaunchers', 'libmanage', 'surprise', 'launchers', 'storage', 'anime'].includes(S.view.type);
+  const noCount = ['remoteplay', 'stats', 'arcade', 'deals', 'hub', 'library', 'libcollections', 'libcategories', 'liblaunchers', 'libmanage', 'surprise', 'launchers', 'storage', 'anime'].includes(S.view.type);
   const total = S.view.type === 'friends' ? (S.friends.people || []).length : noCount ? 0 : viewItems().length;
-  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : S.view.type === 'storage' ? (S.drives ? `${fmtBytes(S.drives.reduce((a, d) => a + d.free, 0))} free` : '') : ['discord', 'remoteplay', 'stats', 'arcade', 'deals', 'hub', 'library', 'libcollections', 'libcategories', 'liblaunchers', 'libmanage', 'surprise', 'settings', 'anime'].includes(S.view.type) ? '' : `${total} ${total === 1 ? 'item' : 'items'}`)));
-  if (S.view.type === 'friends' || S.view.type === 'discord') kids.push(socialTabs());
+  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : S.view.type === 'storage' ? (S.drives ? `${fmtBytes(S.drives.reduce((a, d) => a + d.free, 0))} free` : '') : ['remoteplay', 'stats', 'arcade', 'deals', 'hub', 'library', 'libcollections', 'libcategories', 'liblaunchers', 'libmanage', 'surprise', 'settings', 'anime'].includes(S.view.type) ? '' : `${total} ${total === 1 ? 'item' : 'items'}`)));
+  if (S.view.type === 'friends') kids.push(socialTabs());
   if (isLibraryView(S.view.type)) kids.unshift(libTabs());
-  if (S.view.type === 'discord') {
-    kids.push(h('div', { class: 'discord-bar' },
-      h('span', { class: 'help', style: { flex: 1 } }, 'Discord\'s own app, right here. Voice calls keep going while you switch pages.'),
-      h('button', { class: 'btn', onclick: () => api.discordReload() }, icon('refresh'), 'Reload'),
-      h('button', { class: 'btn', onclick: () => api.discordOpenApp() }, icon('exit'), 'Open Discord app'),
-      h('button', { class: 'btn', title: 'Closes the tab to free memory. It loads again when you come back.', onclick: async () => { await api.discordUnload(); setView({ type: 'home' }); showToast('Discord tab closed to free memory'); } }, icon('close'), 'Close tab')));
-  }
   if (S.view.type === 'backlog' && !S.search) kids.push(h('div', { class: 'discord-bar' }, statusFilterBar(), h('span', { class: 'help', style: { flex: 1 } }, 'Set a status from any game\'s details page.')));
   if (S.view.type === 'smart' && !S.search && smartById(S.view.id)) kids.push(h('div', { class: 'discord-bar' }, h('span', { class: 'help', style: { flex: 1 } }, 'Fills itself from rules. New games that match show up here on their own.'), h('button', { class: 'btn', onclick: () => smartEditor(smartById(S.view.id)) }, icon('gear'), 'Edit rules')));
   if (S.view.type === 'remoteplay') {
@@ -1262,7 +1252,7 @@ function setFriends(st) {
   indexFriendGames();
   if (S.view.type === 'friends') { renderHeader(); renderFriends(); }
   else if (S.view.type === 'hub') renderHub();
-  else if (before !== [...S.friendGames.keys()].join('|') && !['launchers', 'storage', 'discord'].includes(S.view.type)) renderGrid();
+  else if (before !== [...S.friendGames.keys()].join('|') && !['launchers', 'storage'].includes(S.view.type)) renderGrid();
   if (S.guideOpen) renderGuide();
   renderSidebar();
 }
@@ -1361,7 +1351,7 @@ async function renderLaunchers() {
   const pairs = [
     { ic: 'sliders', name: 'SteelSeries Sonar', sub: 'Volume mixer for Game, Chat, Media, Aux and Mic, in the guide\'s Sound tab', btn: 'Open mixer', go: () => openSoundMixer() },
     { ic: 'music', name: 'Apple Music and Spotify', sub: st.musicEnabled === false ? 'Off in Settings' : 'Playback controls, the full screen player and lyrics', btn: 'Now Playing', go: () => { if (NP.state.active) openNowPlaying(); else showToast('Play a song first'); } },
-    { ic: 'chat', name: 'Discord', sub: st.discordClientId ? 'Tab and Rich Presence set up' : 'A tab in the sidebar, plus Rich Presence', btn: 'Open tab', go: () => setView({ type: 'discord' }) },
+    { ic: 'chat', name: 'Discord', sub: st.discordClientId ? 'Rich Presence and your voice call in the guide' : 'Rich Presence, and your voice call in the guide', btn: 'Open Discord', go: () => api.discordOpenApp() },
     { ic: 'tv', name: 'AniList', sub: st.anilistUser ? `Anime tracking as ${st.anilistUser}` : 'Anime tracking and Surprise me rolls', btn: 'Open Anime', go: () => setView({ type: 'anime' }) },
     { ic: 'gamepad', name: 'Xbox console', sub: st.xboxGamertag ? `Console play and streaming as ${st.xboxGamertag}` : 'Console play history and Remote Play streaming', btn: 'Remote Play', go: () => setView({ type: 'remoteplay' }) },
     { ic: 'monitor', name: 'Phone remote', sub: st.remoteEnabled ? 'On, for devices on your home network' : 'Start and install games from your phone', btn: 'Set up', go: () => openSettings() },
@@ -1527,11 +1517,11 @@ function buildSettingsPage() {
   let gogOwned = s.gogOwned !== false;
   let ubisoftOwned = s.ubisoftOwned !== false;
   let genreSort = s.genreSort !== false;
-  let discordTab = s.discordTab !== false;
   let discordPresence = s.discordPresence !== false;
   let discordBrowsing = !!s.discordBrowsing;
   let discordMusic = s.discordMusic || 'always';
   let discordButton = s.discordButton !== false;
+  let discordVoiceOn = s.discordVoiceOn !== false;
   let tvOnStart = !!s.tvOnStart;
   const app = {};
   const appSections = moreSettingsSections(s, app);
@@ -1542,6 +1532,18 @@ function buildSettingsPage() {
     showToast(r.ok ? 'Sent a test status. Check your Discord profile in a few seconds.' : 'Paste a valid Application ID first.', r.ok ? 'info' : 'error');
   } }, 'Test');
   const dcMusicId = h('input', { class: 'text-input', value: s.discordMusicClientId || '', placeholder: 'A second Application ID, only for music', spellcheck: 'false' });
+  const dcSecret = h('input', { class: 'text-input', type: 'password', value: '', placeholder: s.hasDiscordSecret ? 'Saved. Paste again only to replace it' : 'Client secret, from the same application page', spellcheck: 'false', autocomplete: 'off' });
+  const vcStatus = h('span', { class: 'help' }, s.voiceConnected ? 'Approved. Your call shows on the guide Home.' : 'Not approved yet.');
+  const vcBtn = h('button', { class: 'btn', onclick: async () => {
+    vcBtn.disabled = true;
+    vcStatus.textContent = 'Asking Discord. Watch for a popup in the Discord app.';
+    const patch = { discordClientId: dcId.value.trim(), discordVoiceOn };
+    if (dcSecret.value.trim()) patch.discordClientSecret = dcSecret.value.trim();
+    await api.updateSettings(patch);
+    const r = await api.voiceConnect();
+    vcBtn.disabled = false;
+    vcStatus.textContent = r.ok ? 'Approved. Your call shows on the guide Home.' : r.error || 'That did not work.';
+  } }, 'Connect voice');
   const dcMusicSeg = h('div', { class: 'seg' });
   const drawDcMusic = () => fillEl(dcMusicSeg, ...[['always', 'While music plays'], ['npx', 'Only in Now Playing'], ['off', 'Off']].map(([k, n]) => h('button', { class: discordMusic === k ? 'on' : '', onclick: () => { discordMusic = k; drawDcMusic(); } }, n)));
   drawDcMusic();
@@ -1698,7 +1700,6 @@ function buildSettingsPage() {
         h('div', { class: 'row' }, cf, cfBrowse),
         h('div', { class: 'help' }, 'Only needed if you moved CurseForge\'s Minecraft folder.')),
       h('div', { class: 'section-label' }, 'Discord'),
-      h('div', { class: 'field' }, toggleRow('Discord tab', 'Discord\'s own app inside Crimson Vault, in the sidebar', discordTab, (v) => { discordTab = v; })),
       connBlock('Rich Presence', !!s.discordClientId && discordPresence, s.discordClientId ? (discordPresence ? 'On' : 'Off') : 'Not set up', 'discord',
         h('div', { class: 'help' }, 'Shows the game you are playing on your Discord profile, with its cover. Needs the Discord app running on this PC.'),
         h('div', { class: 'field', style: { marginTop: '10px' } }, h('label', {}, 'Discord Application ID'), h('div', { class: 'row' }, dcId, dcTest)),
@@ -1707,7 +1708,10 @@ function buildSettingsPage() {
         toggleRow('Get Crimson Vault button', 'Others see a button on your status that opens this project', discordButton, (v) => { discordButton = v; }),
         h('div', { class: 'field', style: { marginTop: '10px' } }, h('label', {}, 'Music on Discord'), dcMusicSeg, h('div', { class: 'help' }, 'Like Spotify: the song shows as "Listening to", with the album art and a progress bar, separately from the game you are playing. Needs its own second Application ID below (its name there is what Discord shows after "Listening to", so call it something like Music).')),
         h('div', { class: 'field' }, h('label', {}, 'Music Application ID'), dcMusicId),
-        h('button', { class: 'link-btn', style: { marginTop: '6px' }, onclick: async () => { if (await confirmBox('Sign out of the Discord tab?', 'This signs out the Discord tab only. Your Discord app is not touched.', 'Sign out')) { await api.discordSignOut(); showToast('Signed out of the Discord tab'); } } }, 'Sign out of the Discord tab')),
+        toggleRow('Voice call in the guide', 'Your current call on the guide Home: who is in it, who is talking, mute, deafen and leave', discordVoiceOn, (v) => { discordVoiceOn = v; }),
+        h('div', { class: 'field', style: { marginTop: '10px' } }, h('label', {}, 'Client secret (for voice)'), dcSecret,
+          h('div', { class: 'help' }, 'From the same Discord application page (Reset Secret shows it). Kept encrypted on this PC; used once so Discord shows its Allow popup, then for quiet sign ins.')),
+        h('div', { class: 'field' }, h('div', { class: 'row' }, vcBtn), vcStatus)),
       h('div', { class: 'section-label' }, 'Look'),
       h('div', { class: 'field' }, h('label', {}, 'Accent color'), accentRow),
       h('div', { class: 'field' }, h('label', {}, 'Card size'), h('label', { class: 'size-ctl wide' }, icon('image'), sizeRange)),
@@ -1729,8 +1733,9 @@ function buildSettingsPage() {
         await api.updateSettings({
           steamGridDbKey: sgdb.input.value.trim(), curseforgeInstancesPath: cf.value.trim(), includeApps, musicEnabled, musicAnyApp,
           steamApiKey: steamKey.input.value.trim(), steamId: steamId.value.trim(), gogOwned, openXblKey: xblKey.input.value.trim(), genreSort, ubisoftOwned,
-          discordTab, discordPresence, discordBrowsing, discordClientId: dcId.value.trim(), tvOnStart,
-          discordMusic, discordButton, discordMusicClientId: dcMusicId.value.trim(),
+          discordPresence, discordBrowsing, discordClientId: dcId.value.trim(), tvOnStart,
+          discordMusic, discordButton, discordMusicClientId: dcMusicId.value.trim(), discordVoiceOn,
+          ...(dcSecret.value.trim() ? { discordClientSecret: dcSecret.value.trim() } : {}),
           closeToTray: app.closeToTray, startWithWindows: app.startWithWindows, hotkey: app.hotkey, guideHotkey: app.guideHotkey, guidePad: app.guidePad, dealAlerts: app.dealAlerts,
         });
         api.applyStartup();
@@ -2084,7 +2089,7 @@ function wire() {
     S.search = search.value.trim();
     if (S.view.type === 'friends') { renderFriends(); return; }
     // Pages without a grid (Home, Library, Deals, Stats...) switch to Everything to show results.
-    if (S.search && ['hub', 'library', 'deals', 'stats', 'arcade', 'discord', 'remoteplay', 'launchers', 'storage'].includes(S.view.type)) { setView({ type: 'home' }); return; }
+    if (S.search && ['hub', 'library', 'deals', 'stats', 'arcade', 'remoteplay', 'launchers', 'storage'].includes(S.view.type)) { setView({ type: 'home' }); return; }
     renderHeader(); renderJump(); renderGrid();
   };
   search.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); spatial.focusDefault(); } });
@@ -2098,6 +2103,7 @@ function wire() {
   dropTarget($('#catHead'), { cat: (id) => api.moveCategory(id, null, null) });
   api.onToast((t) => showToast(t.text, t.kind));
   api.onMedia((st) => window.setMediaState(st));
+  if (api.onVoice) api.onVoice((v) => { S.voice = v; if (S.guideOpen && S.guideTab === 'home') renderGuide(); });
   api.onFriends(setFriends);
   api.onUpdate(setUpdateState);
   $('#updateBtn').addEventListener('click', () => api.installUpdate());
@@ -2116,6 +2122,7 @@ function wire() {
   S.version = await api.version();
   setUpdateState(await api.getUpdate());
   window.setMediaState(await api.getMedia());
+  if (api.voiceState) api.voiceState().then((v) => { S.voice = v; }).catch(() => {});
   setFriends(await api.getFriends());
   loadDrives();
   setInterval(loadDrives, 5 * 60 * 1000);

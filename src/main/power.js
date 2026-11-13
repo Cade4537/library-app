@@ -27,7 +27,7 @@ foreach ($id in @(${pids.join(',')})) {
 
 class Power {
   constructor(d) {
-    // d: { store, getWin, destroyWin, isBusy, helperPids, onBackground, diag, discordLoaded, unloadDiscord }
+    // d: { store, getWin, destroyWin, isBusy, helperPids, onBackground, diag }
     this.d = d;
     this.background = false;
     this.hiddenSince = 0;
@@ -68,13 +68,8 @@ class Power {
     const win = this.d.getWin();
     const inTray = !!(win && !win.isDestroyed() && !win.isVisible()) || !win;
     const hiddenMin = this.hiddenSince ? (Date.now() - this.hiddenSince) / MIN : 0;
-    // New child processes (a helper restart, the Discord tab) get the low priority too.
+    // New child processes (a helper restart) get the low priority too.
     if (this.background) this.setPriority(true);
-    // Close the Discord tab after an hour in the tray (it is a full web app and grows over time).
-    if (inTray && hiddenMin >= 60 && this.s().closeDiscordInTray !== false && this.d.discordLoaded()) {
-      this.d.unloadDiscord();
-      this.d.diag.log('discord-closed-in-tray');
-    }
     // Close the window itself after 3 minutes in the tray. Nothing is lost: it opens again from the tray.
     if (win && !win.isDestroyed() && inTray && hiddenMin >= 3 && this.s().freeWindowInTray !== false && this.s().closeToTray !== false && !this.d.isBusy({ window: true })) {
       this.d.diag.log('window-freed', { hiddenMin: Math.round(hiddenMin) });

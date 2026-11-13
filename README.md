@@ -166,7 +166,7 @@ Every game has Pause and Quit buttons on screen and a pause menu, plus controlle
 
 ## Discord
 
-- **Discord tab:** Discord's own web app in the sidebar, signed in once and kept. Voice calls keep going while you switch pages, and screen share asks which screen or window to share. Turn the tab off in Settings > Discord.
+- **Discord:** Rich Presence for games and music, and your current voice call in the guide: who is in it, who is talking, mute, deafen and leave, all through the Discord app on this PC.
 - **Rich Presence:** shows the game you are playing on your Discord profile with its cover, for every launcher (including Xbox and Epic games Discord does not detect). Needs a free Discord Application ID; Settings > Help > Discord walks through it in a minute.
 
 ## Controller mode
@@ -218,6 +218,13 @@ Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpe
 ## Privacy, terms and license
 
 Crimson Vault is a free hobby project. No account, no analytics, no ads, nothing collected. Everything it reads, stores and sends is listed in [PRIVACY.md](PRIVACY.md), the short terms are in [TERMS.md](TERMS.md), and the code is [MIT licensed](LICENSE). It comes as is, with no warranty: if you like it, great, and if you find a problem, open an issue.
+
+## What's new in 0.19.0: the Discord tab becomes the call card
+
+- **The Discord tab is gone.** It was a whole copy of Discord's web app living inside Crimson Vault: heavy, needing its own sign in, and redundant next to the real Discord app. Removing it frees memory and one more background web view.
+- **Your call, in the guide.** In its place, the guide Home now shows the voice call you are in, read from the Discord desktop app itself: channel name, who is in it with avatars, a green ring around whoever is talking, and working Mute, Deafen and Leave buttons. It also works in the overlay, so you can mute Discord from inside a game.
+- **One time setup:** Settings, Connections, Rich Presence now has a client secret field and a Connect voice button. Press it and Discord itself shows an Allow popup once. The approval is stored encrypted on this PC.
+- The Pairs with card for Discord now opens the Discord app.
 
 ## What's new in 0.18.7: guide and settings polish
 
@@ -288,7 +295,7 @@ A full screen view of what is playing in Apple Music, Spotify or any player Wind
 
 ## What's new in 0.17.3
 
-- **Zoom inside Xbox Remote Play and the Discord tab:** Ctrl and + (or =) zoom in, Ctrl and - zoom out, Ctrl+0 resets. Zooming in used to need Shift there.
+- **Zoom inside Xbox Remote Play:** Ctrl and + (or =) zoom in, Ctrl and - zoom out, Ctrl+0 resets. Zooming in used to need Shift there.
 
 ## What's new in 0.17.2
 
@@ -376,7 +383,6 @@ A full screen view of what is playing in Apple Music, Spotify or any player Wind
 - **Background mode, for leaving Crimson Vault open for days:**
   - Minimized or in the tray, every part of the app runs at below normal priority, and the page stops its timers and animations.
   - After 3 minutes in the tray the window closes to free memory and graphics resources. Alerts, hours tracking, Xbox play, music and the phone remote keep working, and the window opens again from the tray icon. Alerts that came in meanwhile show up in the Alerts tab.
-  - The Discord tab closes after an hour in the tray.
   - Once a day, or if Windows handles or memory start to build up, Crimson Vault restarts itself quietly in the tray when nothing is going on (never during a game, a console session, a stream or a download).
   - Drive space is read straight from the disk instead of starting PowerShell every few minutes.
   - Settings, Health shows Windows handle and graphics counts, logs them every 30 minutes, and has a switch to stop using the graphics card if the screen, wallpaper or taskbar act up.

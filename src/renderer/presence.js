@@ -18,7 +18,7 @@
   const VIEW_NAMES = {
     deals: 'deals and news', stats: 'statistics', arcade: 'the Arcade', anime: 'anime',
     friends: 'friends', storage: 'storage', remoteplay: 'Xbox Remote Play', launchers: 'launchers',
-    discord: 'Discord', backlog: 'the backlog',
+    backlog: 'the backlog',
   };
   document.addEventListener('DOMContentLoaded', () => {
     const wrap = (name, after) => {

@@ -277,12 +277,10 @@ async function appendDealNews(box) {
 
 // ---------- Social tabs ----------
 function socialTabs() {
-  const discord = S.lib.settings.discordTab !== false;
   const cur = S.view.type;
   return h('div', { class: 'social-bar' },
     h('div', { class: 'seg' },
-      h('button', { class: cur === 'friends' ? 'on' : '', onclick: () => setView({ type: 'friends' }) }, icon('users'), ' Friends'),
-      discord ? h('button', { class: cur === 'discord' ? 'on' : '', onclick: () => setView({ type: 'discord' }) }, icon('chat'), ' Discord') : null),
+      h('button', { class: cur === 'friends' ? 'on' : '', onclick: () => setView({ type: 'friends' }) }, icon('users'), ' Friends')),
     h('span', { style: { flex: 1 } }),
     h('label', { class: 'mini-toggle', title: 'A pop up when a friend starts playing a game you own' },
       h('input', { type: 'checkbox', checked: prefs.get('friendAlerts', true), onchange: (e) => prefs.set('friendAlerts', e.target.checked) }), 'Friend alerts'),

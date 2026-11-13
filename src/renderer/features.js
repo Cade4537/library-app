@@ -1,6 +1,6 @@
 /* global api, S, $, h, icon, prefs, openModal, openDetails, launch, artFor, displayName, visible, SOURCES, fmtHours, timeAgo,
    childrenOf, descendants, hashHue, render, renderSidebar, setHeroBg, heroUrlFor, spatial, hydrateIcons, showToast, closeTopLayer, notInstalled */
-// Discord tab, accent colors, the collapsible sidebar and the full screen controller mode.
+// Accent colors, the collapsible sidebar, embeds and the full screen controller mode.
 
 // ---------- accent colors ----------
 const ACCENTS = {
@@ -34,10 +34,10 @@ function setSideCollapsed(v) {
   setTimeout(syncDiscord, 220);
 }
 
-// ---------- Discord tab ----------
+// ---------- Embedded views (Xbox Remote Play) ----------
 // Discord and the Remote Play stream are native views laid over the page. They follow their
 // placeholder box, and step aside while a menu, dialog or controller mode is on top.
-const embedShown = { discord: false, stream: false };
+const embedShown = { stream: false };
 function syncEmbed(kind, hostSel, viewType, send) {
   if (!api || !send) return;
   const clear = !S.modals.length && !document.querySelector('#menuRoot .menu') && !S.guideOpen;
@@ -52,27 +52,9 @@ function syncEmbed(kind, hostSel, viewType, send) {
   embedShown[kind] = true;
 }
 function syncDiscord() {
-  syncEmbed('discord', '#discordHost', 'discord', api && api.discordBounds);
   syncEmbed('stream', '#streamHost', 'remoteplay', api && api.streamBounds);
 }
 
-// Screen share from the Discord tab: pick a screen or window.
-function pickShareSource({ id, list }) {
-  let chosen = null;
-  const screens = list.filter((s) => s.screen);
-  const windows = list.filter((s) => !s.screen);
-  const tile = (s) => h('button', { class: 'src-tile', onclick: () => { chosen = s.id; m.close(); } },
-    h('img', { src: s.thumb, alt: '' }), h('span', {}, s.name));
-  const m = openModal({
-    title: 'Share your screen',
-    body: h('div', {},
-      screens.length ? [h('h3', { class: 'section-title' }, 'Screens'), h('div', { class: 'src-grid' }, screens.map(tile))] : null,
-      windows.length ? [h('h3', { class: 'section-title', style: { marginTop: '16px' } }, 'Windows'), h('div', { class: 'src-grid' }, windows.map(tile))] : null),
-    actions: [{ label: 'Cancel' }],
-    cls: 'wide',
-    onClose: () => api.discordSource(id, chosen),
-  });
-}
 
 // ---------- full screen controller mode ----------
 function tvRows() {
@@ -165,12 +147,9 @@ function wireFeatures() {
   $('#streamStartBtn').addEventListener('click', () => startRemotePlay('inapp'));
   if (api.streamState) api.streamState().then((st) => { S.stream = st; if (S.view.type === 'remoteplay') render(); });
   window.addEventListener('resize', syncDiscord);
-  const host = $('#discordHost');
-  if (window.ResizeObserver && host) new ResizeObserver(() => syncDiscord()).observe(host);
   const sHost = $('#streamHost');
   if (window.ResizeObserver && sHost) new ResizeObserver(() => syncDiscord()).observe(sHost);
   if (api.onStreamState) api.onStreamState((st) => { S.stream = st; if (S.view.type === 'remoteplay' || !st.open) render(); else renderSidebar(); });
-  if (api.onDiscordPickSource) api.onDiscordPickSource(pickShareSource);
   setInterval(tvClock, 15000);
   document.addEventListener('keydown', (e) => {
     if (!S.tv) return;
