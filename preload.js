@@ -59,6 +59,7 @@ contextBridge.exposeInMainWorld('library', {
   onStreamState: (cb) => ipcRenderer.on('stream:state', (_e, s) => cb(s)),
   discordTestPresence: call('discord:testPresence'),
   storeInfo: call('item:storeInfo'),
+  keyshopPrices: call('item:keyshopPrices'),
   deals: call('deals:get'),
   news: call('news:get'),
   remoteInfo: call('remote:info'),

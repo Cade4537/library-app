@@ -49,6 +49,7 @@ Only when the related feature is on. Each request goes straight from your PC to 
 | Discord | Nothing leaves this PC except Discord's own sign in exchange | Rich Presence, and (with your one time approval inside Discord) your current voice channel and who is in it, read locally from the Discord app. Mute, deafen and leave send those commands to the Discord app on this PC |
 | AniList | Your AniList sign in or user name | The Anime page |
 | SteamGridDB | Your SteamGridDB key, game names | Cover art, if you add a key |
+| GG.deals | Your GG.deals key and Steam app IDs | Official and keyshop prices on game pages, only if you add a key |
 | Steam image servers | Game IDs | Cover art for Steam games |
 | LRCLIB (lrclib.net) | Song name, artist, album and length | Lyrics, **only if you turn lyrics on** (off by default) |
 | Apple iTunes search, Deezer | Song name and artist | Album and artist pictures on Now Playing |

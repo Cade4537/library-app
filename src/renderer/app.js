@@ -1091,6 +1091,50 @@ function pickCategory(current) {
 }
 
 // ---------- game details ----------
+// 0.21.0: where else to buy it. Lowest official and keyshop prices come from GG.deals (with a key in
+// Settings); the Loaded and Instant Gaming buttons open that store's search in the browser.
+const KEYSHOPS = [
+  ['Loaded', (q) => `https://www.loaded.com/catalogsearch/result/?q=${encodeURIComponent(q)}`],
+  ['Instant Gaming', (q) => `https://www.instant-gaming.com/en/search/?query=${encodeURIComponent(q)}`],
+];
+function keyshopBox(it) {
+  const name = displayName(it).replace(/[®™©]/g, '').trim();
+  const money = (v, cur) => {
+    if (v == null || v === '') return null;
+    try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur || 'USD' }).format(Number(v)); } catch { return `${v} ${cur || ''}`.trim(); }
+  };
+  const priceLine = h('div', { class: 'ks-prices' }, h('span', { class: 'ks-wait' }, 'Checking prices'));
+  const allBtn = h('button', { class: 'btn ks-all', hidden: true }, icon('external'), 'All offers');
+  const box = h('div', { class: 'ks' },
+    priceLine,
+    h('div', { class: 'ks-btns' },
+      KEYSHOPS.map(([label, url]) => h('button', { class: 'btn', title: `Search ${label} for ${name}`, onclick: () => api.openUrl(url(name)) }, icon('external'), label)),
+      allBtn),
+    h('div', { class: 'ks-note' }, 'Keyshops resell keys from distributors, not the publisher. Check the region and platform before buying.'));
+  api.keyshopPrices(it.id).then((r) => {
+    if (!box.isConnected && !document.body.contains(box)) { /* still fill: the modal may attach a moment later */ }
+    if (r && r.ok) {
+      const p = r.prices || {};
+      const cell = (label, now, low) => {
+        const n = money(now, p.currency);
+        const l = money(low, p.currency);
+        return h('div', { class: 'ks-cell' }, h('span', { class: 'ks-l' }, label), h('b', {}, n || 'None now'), l ? h('span', { class: 'ks-low' }, `Lowest ever ${l}`) : null);
+      };
+      const cheaper = p.currentKeyshops != null && p.currentRetail != null && Number(p.currentKeyshops) < Number(p.currentRetail);
+      priceLine.replaceChildren(cell('Official stores', p.currentRetail, p.historicalRetail), cell('Keyshops', p.currentKeyshops, p.historicalKeyshops));
+      priceLine.classList.toggle('ks-cheaper', cheaper);
+      if (r.url) { allBtn.hidden = false; allBtn.onclick = () => api.openUrl(r.url); allBtn.title = 'Every store and keyshop on GG.deals'; }
+      return;
+    }
+    const msg = r && r.nokey ? 'Add a free GG.deals key in Settings, Connections to see prices here.'
+      : r && r.nosteam ? 'Prices need a Steam version of this game to look up.'
+        : r && r.none ? 'GG.deals has no prices for this game.'
+          : (r && r.error) || 'Prices could not be checked.';
+    priceLine.replaceChildren(h('span', { class: 'ks-wait' }, msg));
+  }).catch(() => priceLine.replaceChildren(h('span', { class: 'ks-wait' }, 'Prices could not be checked.')));
+  return box;
+}
+
 function openDetails(id) {
   const it = S.byId.get(id);
   if (!it) return;
@@ -1146,7 +1190,7 @@ function openDetails(id) {
           stat('Last played', it.running ? 'Playing now' : timeAgo(it.lastPlayed)),
           it.installed && it.meta && it.meta.sizeBytes ? stat('Size', fmtBytes(it.meta.sizeBytes)) : null,
           h('div', { class: 'stat' }, achStat, h('div', { class: 'stat-l' }, 'Achievements'))),
-        actions, ex.backlog)),
+        actions, ex.backlog, it.kind === 'game' ? keyshopBox(it) : null)),
     about,
     ex.news,
     h('h3', { class: 'section-title', style: { marginTop: '24px' } }, 'Achievements'),
@@ -1557,6 +1601,8 @@ function buildSettingsPage() {
   sizeRange.addEventListener('input', () => { S.size = +sizeRange.value; prefs.set('size', S.size); document.documentElement.style.setProperty('--card-w', `${S.size}px`); renderFilters(); });
 
   const sgdb = secretInput(s.steamGridDbKey, 'Paste your SteamGridDB API key');
+  const ggKey = secretInput(s.ggDealsKey, 'Paste your GG.deals API key');
+  const ggRegion = h('select', { class: 'text-input' }, [['us', 'United States'], ['ca', 'Canada'], ['gb', 'United Kingdom'], ['eu', 'Europe (euro)'], ['ie', 'Ireland'], ['de', 'Germany'], ['fr', 'France'], ['es', 'Spain'], ['it', 'Italy'], ['nl', 'Netherlands'], ['be', 'Belgium'], ['ch', 'Switzerland'], ['pl', 'Poland'], ['dk', 'Denmark'], ['fi', 'Finland'], ['no', 'Norway'], ['se', 'Sweden'], ['au', 'Australia'], ['br', 'Brazil']].map(([v, n]) => h('option', { value: v, selected: (s.ggDealsRegion || 'us') === v }, n)));
   const steamKey = secretInput(s.steamApiKey, 'Paste your Steam Web API key');
   const xblKey = secretInput(s.openXblKey, 'Paste your OpenXBL API key');
   const steamId = h('input', { class: 'text-input', value: s.steamId || '', placeholder: os.steamId ? `Found automatically: ${os.steamId}` : 'Leave empty to detect from Steam', spellcheck: 'false' });
@@ -1691,6 +1737,10 @@ function buildSettingsPage() {
       connBlock('SteamGridDB', !!s.steamGridDbKey, null, 'sgdb',
         h('div', { class: 'field' }, h('label', {}, 'SteamGridDB API key'), sgdb.row,
           h('div', { class: 'help' }, 'Cover art for games from other launchers and for apps.'))),
+      connBlock('GG.deals', !!s.ggDealsKey, null, 'ggdeals',
+        h('div', { class: 'field' }, h('label', {}, 'GG.deals API key'), ggKey.row,
+          h('div', { class: 'help' }, 'Free. Sign in at gg.deals, open Settings, API, and generate a key. Game pages then show the lowest official and keyshop prices (Loaded, Instant Gaming and others).')),
+        h('div', { class: 'field' }, h('label', {}, 'Prices for'), ggRegion)),
       anilistConnBlock(s, connBlock),
       h('div', { class: 'section-label' }, 'Library'),
       h('div', { class: 'field' }, toggleRow('Sort games by genre', 'Uses Steam store info, like Action, RPG or Racing. Demos and playtests always go to Demos.', genreSort, (v) => { genreSort = v; })),
@@ -1731,7 +1781,7 @@ function buildSettingsPage() {
       { label: 'Cancel' },
       { label: 'Save', primary: true, run: async () => {
         await api.updateSettings({
-          steamGridDbKey: sgdb.input.value.trim(), curseforgeInstancesPath: cf.value.trim(), includeApps, musicEnabled, musicAnyApp,
+          steamGridDbKey: sgdb.input.value.trim(), ggDealsKey: ggKey.input.value.trim(), ggDealsRegion: ggRegion.value, curseforgeInstancesPath: cf.value.trim(), includeApps, musicEnabled, musicAnyApp,
           steamApiKey: steamKey.input.value.trim(), steamId: steamId.value.trim(), gogOwned, openXblKey: xblKey.input.value.trim(), genreSort, ubisoftOwned,
           discordPresence, discordBrowsing, discordClientId: dcId.value.trim(), tvOnStart,
           discordMusic, discordButton, discordMusicClientId: dcMusicId.value.trim(), discordVoiceOn,
@@ -1804,6 +1854,12 @@ function openConnectionsHelp(focus) {
       ['Go to your API page. ', linkBtn('Open SteamGridDB API page', 'https://www.steamgriddb.com/profile/preferences/api')],
       'Click Generate API Key and copy it.',
       'In this app, open Settings, paste it into SteamGridDB API key, and click Save. Covers start filling in right away.',
+    ]),
+    helpSection('ggdeals', 'GG.deals: official and keyshop prices', 'Shows the lowest current and all time prices on each game page, split into official stores and keyshops like Loaded and Instant Gaming.', [
+      ['Open GG.deals and sign in (Steam sign in works). ', linkBtn('Open GG.deals', 'https://gg.deals')],
+      ['Open the API page and generate your key. ', linkBtn('Open GG.deals API page', 'https://gg.deals/api/')],
+      'In this app, open Settings, Connections, GG.deals, paste the key, pick your region, and click Save.',
+      'Open any game. Prices show under the buttons, with Loaded, Instant Gaming and All offers next to them.',
     ]),
     helpSection('anilist', 'AniList: your anime list', 'Reading your list only needs your AniList user name (Settings, Connections, AniList, or the Anime page). Signing in lets you change episodes, status and scores from Crimson Vault and shows a private list. AniList asks every app to use its own free API client, so this takes a minute once.', [
       ['Open AniList\'s developer settings and sign in. ', linkBtn('Open AniList developer page', 'https://anilist.co/settings/developer')],

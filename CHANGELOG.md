@@ -2,6 +2,18 @@
 
 Older release notes, newest first. The latest release's notes stay in the README.
 
+## What's new in 0.20.0: the guide, refit
+
+- **The guide looks the part now.** Smoked glass with one crimson light along its opening edge, a bigger clock, calmer unified cards, a glossy sheen on the playing game's cover, a tiny live equalizer beside the song, pulsing speaking rings in the call card, and proper focus outlines everywhere for the controller. Reduce motion in Quick settings stills all of it.
+- **Songs on repeat count every play.** The listening history used to count a looped song once.
+- **Pairs with cards deep link.** The phone remote and lyrics cards open Settings at the exact section and flash it.
+- **Call card:** a missed "stopped talking" event can no longer leave a green ring stuck.
+- **Housekeeping:** old release notes live in [CHANGELOG.md](CHANGELOG.md) now, the empty Music section on Stats explains how it fills up, the diagnostics line reads like words, and settings left behind by the removed Discord tab are cleaned up.
+
+## What's new in 0.19.1
+
+- **Fixed:** Connect voice failed with "Missing redirect_uri in request". The sign in exchange now sends Discord's required redirect address. One portal step goes with it: in your Discord application, under OAuth2, Redirects, add `http://127.0.0.1`, press Save Changes, then press Connect voice again.
+
 ## What's new in 0.19.0: the Discord tab becomes the call card
 
 - **The Discord tab is gone.** It was a whole copy of Discord's web app living inside Crimson Vault: heavy, needing its own sign in, and redundant next to the real Discord app. Removing it frees memory and one more background web view.

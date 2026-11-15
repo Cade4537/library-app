@@ -481,6 +481,7 @@ function importBackup() {
 
 // ---------- what's new ----------
 const WHATS_NEW = {
+  '0.21.0': ['Game pages show where to buy: the lowest official store and keyshop prices from GG.deals, with lowest ever prices', 'Loaded and Instant Gaming buttons on every game page open that store\'s search', 'Add a free GG.deals key in Settings, Connections to turn prices on'],
   '0.20.0': ['The guide refit: smoked glass with a crimson light along its edge, calmer cards, a live equalizer on the song, pulsing rings on whoever is talking, and clean focus outlines for the controller', 'Songs on repeat now count every play, not just the first', 'Pairs with cards jump to the exact Settings section and flash it', 'Speaking rings in the call card can no longer stick', 'Old release notes moved to CHANGELOG.md so the README front page is short', 'Leftover settings from the removed Discord tab are cleaned up'],
   '0.19.1': ['Fixed Connect voice failing with a redirect_uri error. Add http://127.0.0.1 under OAuth2, Redirects in your Discord application, save, and press Connect voice again.'],
   '0.19.0': ['The Discord tab is gone; it was a whole second copy of Discord eating memory', 'In its place: your voice call on the guide Home, read from the Discord desktop app. Who is in it, a green ring around whoever is talking, and Mute, Deafen and Leave buttons that work, even from the overlay in a game', 'Set up once in Settings, Connections: paste the client secret and press Connect voice, then click Allow inside Discord'],

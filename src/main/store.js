@@ -5,6 +5,8 @@ const { DEFAULT_TREE } = require('./categorize');
 
 const DEFAULT_SETTINGS = {
   steamGridDbKey: '',
+  ggDealsKey: '',
+  ggDealsRegion: 'us',
   curseforgeInstancesPath: '',
   includeApps: true,
   musicEnabled: true,
@@ -26,7 +28,7 @@ const newId = () => crypto.randomUUID();
 // 0.18.4: keys, tokens and sign ins are encrypted on disk with Windows' own protection for your
 // account (Electron safeStorage, which uses DPAPI). Another Windows user, or a copy of the file on
 // another PC, cannot read them. Everything else in library.json stays plain so it is easy to back up.
-const SECRET_FIELD = /^(steamGridDbKey|steamApiKey|openXblKey|xboxLive|epicAuth|anilistAuth)$|token|password|cookie|secret/i;
+const SECRET_FIELD = /^(steamGridDbKey|ggDealsKey|steamApiKey|openXblKey|xboxLive|epicAuth|anilistAuth)$|token|password|cookie|secret/i;
 let vault = null;
 try {
   const { safeStorage } = require('electron');

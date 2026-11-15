@@ -1,6 +1,8 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, clipboard, Tray, Menu, globalShortcut, Notification, nativeImage } = require('electron');
 const { DiscordRpc } = require('./src/main/discordRpc');
 const { DiscordVoice } = require('./src/main/discordVoice');
+const { GgDeals } = require('./src/main/ggdeals');
+let ggDeals = null;
 const { StreamView } = require('./src/main/streamView');
 const { UbisoftActivity } = require('./src/main/ubisoftActivity');
 const services = require('./src/main/services');
@@ -897,6 +899,15 @@ function registerIpc() {
     return { ok: !!rpc.clientId, connected: rpc.ready };
   });
   ipcMain.handle('item:storeInfo', (_e, id) => storeInfo(store.data.items[id]));
+  // Lowest official and keyshop prices for a game, from GG.deals (needs a key in Settings).
+  ipcMain.handle('item:keyshopPrices', async (_e, id) => {
+    const it = store.data.items[id];
+    if (!it || it.kind !== 'game') return { none: true };
+    const appid = it.steamAppId || (steamInfo && steamInfo.appIdFor(it));
+    if (!appid) return { nosteam: true };
+    if (!ggDeals) ggDeals = new GgDeals(() => store.data.settings);
+    return ggDeals.prices(appid);
+  });
   ipcMain.handle('stats:sessions', () => (store.data.sessions || []).slice(-1000));
   ipcMain.handle('item:focus', (_e, id) => focusGame(store.data.items[id]));
 
@@ -909,6 +920,7 @@ function registerIpc() {
     if (['discordClientId', 'discordPresence', 'discordBrowsing', 'discordMusicClientId', 'discordMusic', 'discordButton'].some((k) => k in patch)) { updatePresence(); updateMusicPresence(); }
     if (['discordClientId', 'discordClientSecret', 'discordVoiceOn'].some((k) => k in patch)) configureVoice();
     const keyChanged = 'steamGridDbKey' in patch && patch.steamGridDbKey !== before.steamGridDbKey;
+    if (ggDeals && ['ggDealsKey', 'ggDealsRegion'].some((k) => k in patch && patch[k] !== before[k])) ggDeals.clear();
     store.changed();
     if (keyChanged) {
       covers.keyError = false;

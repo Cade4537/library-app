@@ -219,17 +219,12 @@ Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpe
 
 Crimson Vault is a free hobby project. No account, no analytics, no ads, nothing collected. Everything it reads, stores and sends is listed in [PRIVACY.md](PRIVACY.md), the short terms are in [TERMS.md](TERMS.md), and the code is [MIT licensed](LICENSE). It comes as is, with no warranty: if you like it, great, and if you find a problem, open an issue.
 
-## What's new in 0.20.0: the guide, refit
+## What's new in 0.21.0: where to buy
 
-- **The guide looks the part now.** Smoked glass with one crimson light along its opening edge, a bigger clock, calmer unified cards, a glossy sheen on the playing game's cover, a tiny live equalizer beside the song, pulsing speaking rings in the call card, and proper focus outlines everywhere for the controller. Reduce motion in Quick settings stills all of it.
-- **Songs on repeat count every play.** The listening history used to count a looped song once.
-- **Pairs with cards deep link.** The phone remote and lyrics cards open Settings at the exact section and flash it.
-- **Call card:** a missed "stopped talking" event can no longer leave a green ring stuck.
-- **Housekeeping:** old release notes live in [CHANGELOG.md](CHANGELOG.md) now, the empty Music section on Stats explains how it fills up, the diagnostics line reads like words, and settings left behind by the removed Discord tab are cleaned up.
-
-## What's new in 0.19.1
-
-- **Fixed:** Connect voice failed with "Missing redirect_uri in request". The sign in exchange now sends Discord's required redirect address. One portal step goes with it: in your Discord application, under OAuth2, Redirects, add `http://127.0.0.1`, press Save Changes, then press Connect voice again.
+- **Prices on every game page.** With a free GG.deals key (Settings, Connections, GG.deals), each game shows the lowest price right now in official stores and in keyshops, plus the lowest ever for each. When keyshops are cheaper, that side lights up green. **All offers** opens the game on GG.deals with every store listed.
+- **Loaded and Instant Gaming buttons** on every game page open that store's search for the game in your browser. They work with or without a key.
+- Keyshops resell keys from distributors rather than the publisher, so the page reminds you to check the region and platform before buying.
+- Prices need a Steam version of the game to look up, and GG.deals allows 100 lookups a minute, so they load one game at a time and are kept for 6 hours.
 
 Older releases are in [CHANGELOG.md](CHANGELOG.md).
 
