@@ -10,6 +10,7 @@
 const MAIN_PAGES = [
   ['hub', 'Home', 'home'],
   ['library', 'Library', 'grid'],
+  ['store', 'Store', 'cart'],
   ['deals', 'Deals & News', 'tag'],
   ['friends', 'Social', 'users'],
   ['stats', 'Statistics', 'chart'],

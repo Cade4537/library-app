@@ -41,6 +41,7 @@ Only when the related feature is on. Each request goes straight from your PC to 
 | Service | What is sent | When |
 |---|---|---|
 | Steam (store and Web API) | Your Steam ID and API key, game IDs | Owned games, friends, achievements, store info, if you add a key |
+| Steam store (public) | Your search words, game IDs and a country code | The Store page: browsing, searching and game details. No account involved |
 | Epic Games | Your Epic sign in | Owned games and friends, if you sign in |
 | GOG | Game IDs | Store info, and owned games from GOG Galaxy's own file |
 | Microsoft / Xbox Live | Your Microsoft sign in | Xbox friends, achievements and console play, if you sign in |

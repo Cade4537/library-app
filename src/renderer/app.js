@@ -281,6 +281,7 @@ function viewTitle(view = S.view) {
     case 'arcade': return 'Arcade';
     case 'backlog': return 'Backlog';
     case 'deals': return 'Deals & News';
+    case 'store': return 'Store';
     case 'smart': return (smartById(view.id) || {}).name || 'Smart collection';
     case 'launcher': return `${SOURCES[view.source] || view.source} games`;
     case 'category': return (S.cats.get(view.id) || {}).name || 'Category';
@@ -485,6 +486,7 @@ function render() {
   const tv2 = S.view.type === 'stats';
   const av = S.view.type === 'arcade';
   const dl = S.view.type === 'deals';
+  const so = S.view.type === 'store';
   const hb = S.view.type === 'hub';
   const lb = ['library', 'libcollections', 'libcategories', 'liblaunchers', 'libmanage'].includes(S.view.type);
   const sp = S.view.type === 'surprise';
@@ -498,11 +500,12 @@ function render() {
   $('#statsView').hidden = !tv2;
   $('#arcadeView').hidden = !av;
   $('#dealsView').hidden = !dl;
+  $('#storeView').hidden = !so;
   $('#hubView').hidden = !hb;
   $('#libraryView').hidden = !lb;
   $('#news').hidden = true;
   document.body.classList.toggle('hub-on', hb);
-  if (tv2 || av || dl || hb || lb || sp || st || an) {
+  if (tv2 || av || dl || so || hb || lb || sp || st || an) {
     for (const id of ['#friendsView', '#launchersView', '#storageView', '#grid', '#filters', '#jump', '#collections', '#news', '#empty', '#streamView']) $(id).hidden = true;
     document.body.classList.remove('discord-on');
     renderSidebar();
@@ -513,6 +516,7 @@ function render() {
     else if (an) renderAnimePage(render.shownView !== 'anime');
     else if (st) { if (render.shownView !== 'settings') buildSettingsPage(); }
     else if (dl) { if (render.shownView !== 'deals') renderDeals(); }
+    else if (so) { if (render.shownView !== 'store') renderStorePage(); }
     else if (av) { if (render.shownView !== 'arcade') renderArcade(); }
     else if (render.shownView !== 'stats') renderStats();
     render.shownView = S.view.type;
@@ -598,6 +602,7 @@ function renderSidebar() {
   nav.replaceChildren(
     navButton('hub', 'Home', 'home', null),
     navButton('library', 'Library', 'grid', vis.length),
+    navButton('store', 'Store', 'cart', null),
     navButton('deals', 'Deals & News', 'tag', null),
     social,
     navButton('stats', 'Statistics', 'chart', null),
@@ -716,9 +721,9 @@ function renderHeader() {
       ])));
     }
   }
-  const noCount = ['remoteplay', 'stats', 'arcade', 'deals', 'hub', 'library', 'libcollections', 'libcategories', 'liblaunchers', 'libmanage', 'surprise', 'launchers', 'storage', 'anime'].includes(S.view.type);
+  const noCount = ['remoteplay', 'stats', 'arcade', 'deals', 'store', 'hub', 'library', 'libcollections', 'libcategories', 'liblaunchers', 'libmanage', 'surprise', 'launchers', 'storage', 'anime'].includes(S.view.type);
   const total = S.view.type === 'friends' ? (S.friends.people || []).length : noCount ? 0 : viewItems().length;
-  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : S.view.type === 'storage' ? (S.drives ? `${fmtBytes(S.drives.reduce((a, d) => a + d.free, 0))} free` : '') : ['remoteplay', 'stats', 'arcade', 'deals', 'hub', 'library', 'libcollections', 'libcategories', 'liblaunchers', 'libmanage', 'surprise', 'settings', 'anime'].includes(S.view.type) ? '' : `${total} ${total === 1 ? 'item' : 'items'}`)));
+  kids.push(h('div', { class: 'title-row' }, h('h1', {}, S.search ? `Results for "${S.search}"` : viewTitle()), h('span', { class: 'count' }, S.view.type === 'friends' ? `${(S.friends.people || []).filter((p) => p.status !== 'offline').length} online` : S.view.type === 'launchers' ? (S.launchers ? `${S.launchers.filter((l) => l.installed).length} installed` : '') : S.view.type === 'storage' ? (S.drives ? `${fmtBytes(S.drives.reduce((a, d) => a + d.free, 0))} free` : '') : ['remoteplay', 'stats', 'arcade', 'deals', 'store', 'hub', 'library', 'libcollections', 'libcategories', 'liblaunchers', 'libmanage', 'surprise', 'settings', 'anime'].includes(S.view.type) ? '' : `${total} ${total === 1 ? 'item' : 'items'}`)));
   if (S.view.type === 'friends') kids.push(socialTabs());
   if (isLibraryView(S.view.type)) kids.unshift(libTabs());
   if (S.view.type === 'backlog' && !S.search) kids.push(h('div', { class: 'discord-bar' }, statusFilterBar(), h('span', { class: 'help', style: { flex: 1 } }, 'Set a status from any game\'s details page.')));
@@ -1097,8 +1102,9 @@ const KEYSHOPS = [
   ['Loaded', (q) => `https://www.loaded.com/catalogsearch/result/?q=${encodeURIComponent(q)}`],
   ['Instant Gaming', (q) => `https://www.instant-gaming.com/en/search/?query=${encodeURIComponent(q)}`],
 ];
-function keyshopBox(it) {
-  const name = displayName(it).replace(/[®™©]/g, '').trim();
+function keyshopBox(it) { return keyshopPanel(displayName(it), () => api.keyshopPrices(it.id)); }
+function keyshopPanel(title, load) {
+  const name = String(title || '').replace(/[®™©]/g, '').trim();
   const money = (v, cur) => {
     if (v == null || v === '') return null;
     try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur || 'USD' }).format(Number(v)); } catch { return `${v} ${cur || ''}`.trim(); }
@@ -1111,8 +1117,7 @@ function keyshopBox(it) {
       KEYSHOPS.map(([label, url]) => h('button', { class: 'btn', title: `Search ${label} for ${name}`, onclick: () => api.openUrl(url(name)) }, icon('external'), label)),
       allBtn),
     h('div', { class: 'ks-note' }, 'Keyshops resell keys from distributors, not the publisher. Check the region and platform before buying.'));
-  api.keyshopPrices(it.id).then((r) => {
-    if (!box.isConnected && !document.body.contains(box)) { /* still fill: the modal may attach a moment later */ }
+  load().then((r) => {
     if (r && r.ok) {
       const p = r.prices || {};
       const cell = (label, now, low) => {
@@ -2145,7 +2150,7 @@ function wire() {
     S.search = search.value.trim();
     if (S.view.type === 'friends') { renderFriends(); return; }
     // Pages without a grid (Home, Library, Deals, Stats...) switch to Everything to show results.
-    if (S.search && ['hub', 'library', 'deals', 'stats', 'arcade', 'remoteplay', 'launchers', 'storage'].includes(S.view.type)) { setView({ type: 'home' }); return; }
+    if (S.search && ['hub', 'library', 'deals', 'store', 'stats', 'arcade', 'remoteplay', 'launchers', 'storage'].includes(S.view.type)) { setView({ type: 'home' }); return; }
     renderHeader(); renderJump(); renderGrid();
   };
   search.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); spatial.focusDefault(); } });

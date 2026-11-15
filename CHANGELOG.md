@@ -2,6 +2,13 @@
 
 Older release notes, newest first. The latest release's notes stay in the README.
 
+## What's new in 0.21.0: where to buy
+
+- **Prices on every game page.** With a free GG.deals key (Settings, Connections, GG.deals), each game shows the lowest price right now in official stores and in keyshops, plus the lowest ever for each. When keyshops are cheaper, that side lights up green. **All offers** opens the game on GG.deals with every store listed.
+- **Loaded and Instant Gaming buttons** on every game page open that store's search for the game in your browser. They work with or without a key.
+- Keyshops resell keys from distributors rather than the publisher, so the page reminds you to check the region and platform before buying.
+- Prices need a Steam version of the game to look up, and GG.deals allows 100 lookups a minute, so they load one game at a time and are kept for 6 hours.
+
 ## What's new in 0.20.0: the guide, refit
 
 - **The guide looks the part now.** Smoked glass with one crimson light along its opening edge, a bigger clock, calmer unified cards, a glossy sheen on the playing game's cover, a tiny live equalizer beside the song, pulsing speaking rings in the call card, and proper focus outlines everywhere for the controller. Reduce motion in Quick settings stills all of it.

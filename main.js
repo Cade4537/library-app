@@ -270,6 +270,71 @@ function pickMovie(movies) {
   }
   return null;
 }
+// The Store page asks Steam's public store (no account or key needed) in the country of your
+// GG.deals region, so both price columns use the same currency.
+const STEAM_CC = { us: 'US', ca: 'CA', gb: 'GB', eu: 'DE', ie: 'IE', de: 'DE', fr: 'FR', es: 'ES', it: 'IT', nl: 'NL', be: 'BE', ch: 'CH', pl: 'PL', dk: 'DK', fi: 'FI', no: 'NO', se: 'SE', au: 'AU', br: 'BR' };
+const storeCc = () => STEAM_CC[String(store.data.settings.ggDealsRegion || 'us').toLowerCase()] || 'US';
+const storeMem = new Map(); // url -> { at, value }
+async function steamJson(url, ttl) {
+  const hit = storeMem.get(url);
+  if (hit && Date.now() - hit.at < ttl) return hit.value;
+  const res = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(12000) });
+  if (!res.ok) throw new Error(`Steam answered ${res.status}`);
+  const value = await res.json();
+  storeMem.set(url, { at: Date.now(), value });
+  if (storeMem.size > 300) storeMem.delete(storeMem.keys().next().value);
+  return value;
+}
+const capsule = (id) => `https://cdn.cloudflare.steamstatic.com/steam/apps/${id}/header.jpg`;
+async function storeSearch(term) {
+  const q = String(term || '').trim().slice(0, 100);
+  if (!q) return { items: [] };
+  try {
+    const j = await steamJson(`https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(q)}&l=english&cc=${storeCc()}`, 10 * 60 * 1000);
+    const items = ((j && j.items) || []).filter((x) => x.type === 'app' && x.id).slice(0, 30).map((x) => ({
+      appid: String(x.id), name: x.name, img: capsule(x.id),
+      price: x.price ? { final: x.price.final / 100, initial: x.price.initial / 100, currency: x.price.currency } : null,
+      score: Number(x.metascore) || null,
+    }));
+    return { items };
+  } catch (e) { return { error: 'Steam store could not be reached.' }; }
+}
+async function storeFeatured() {
+  try {
+    const j = await steamJson(`https://store.steampowered.com/api/featuredcategories?l=english&cc=${storeCc()}`, 30 * 60 * 1000);
+    const row = (k) => (((j || {})[k] || {}).items || []).filter((x) => x.id && x.type !== 2).slice(0, 18).map((x) => ({
+      appid: String(x.id), name: x.name, img: capsule(x.id),
+      price: x.final_price != null ? { final: x.final_price / 100, initial: (x.original_price || x.final_price) / 100, currency: x.currency } : null,
+      discount: x.discount_percent || 0,
+    }));
+    return { rows: [['specials', 'On sale'], ['top_sellers', 'Top sellers'], ['new_releases', 'New releases'], ['coming_soon', 'Coming soon']].map(([k, t]) => ({ key: k, title: t, items: row(k) })).filter((r) => r.items.length) };
+  } catch (e) { return { error: 'Steam store could not be reached.' }; }
+}
+async function storeApp(appid) {
+  const id = String(appid || '').replace(/\D/g, '');
+  if (!id) return null;
+  try {
+    const j = await steamJson(`https://store.steampowered.com/api/appdetails?appids=${id}&l=english&cc=${storeCc()}`, 60 * 60 * 1000);
+    const d = ((j || {})[id] || {}).data;
+    if (!d) return null;
+    const po = d.price_overview;
+    return {
+      appid: id, name: d.name, img: d.header_image || capsule(id),
+      desc: String(d.short_description || '').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim(),
+      date: d.release_date ? (d.release_date.coming_soon ? `Coming ${d.release_date.date || 'soon'}` : d.release_date.date) : '',
+      devs: (d.developers || []).slice(0, 2), pubs: (d.publishers || []).slice(0, 2),
+      genres: (d.genres || []).map((g) => g.description).slice(0, 4),
+      bg: d.background_raw || d.background || '', hero: `https://cdn.cloudflare.steamstatic.com/steam/apps/${id}/library_hero.jpg`,
+      shots: (d.screenshots || []).slice(0, 8).map((x) => ({ thumb: x.path_thumbnail, full: x.path_full })),
+      movie: pickMovie(d.movies),
+      metacritic: d.metacritic && d.metacritic.score ? d.metacritic.score : null,
+      free: !!d.is_free,
+      price: po ? { final: po.final / 100, initial: po.initial / 100, currency: po.currency, discount: po.discount_percent || 0 } : null,
+      platforms: d.platforms || {},
+    };
+  } catch { return null; }
+}
+
 async function storeInfo(it) {
   if (!it || it.kind !== 'game') return null;
   const appid = it.steamAppId || (steamInfo && steamInfo.appIdFor(it));
@@ -900,6 +965,14 @@ function registerIpc() {
   });
   ipcMain.handle('item:storeInfo', (_e, id) => storeInfo(store.data.items[id]));
   // Lowest official and keyshop prices for a game, from GG.deals (needs a key in Settings).
+  // ---------- 0.22.0: the Store page. Any game on Steam, searched or browsed, with prices. ----------
+  ipcMain.handle('store:search', (_e, term) => storeSearch(term));
+  ipcMain.handle('store:featured', () => storeFeatured());
+  ipcMain.handle('store:app', (_e, appid) => storeApp(appid));
+  ipcMain.handle('store:prices', (_e, appid) => {
+    if (!ggDeals) ggDeals = new GgDeals(() => store.data.settings);
+    return ggDeals.prices(appid);
+  });
   ipcMain.handle('item:keyshopPrices', async (_e, id) => {
     const it = store.data.items[id];
     if (!it || it.kind !== 'game') return { none: true };

@@ -16,7 +16,7 @@
     const t = setInterval(() => { if (!document.querySelector(sel)) { clearInterval(t); hint[key] = off; send(); } }, 2000);
   };
   const VIEW_NAMES = {
-    deals: 'deals and news', stats: 'statistics', arcade: 'the Arcade', anime: 'anime',
+    deals: 'deals and news', store: 'the store', stats: 'statistics', arcade: 'the Arcade', anime: 'anime',
     friends: 'friends', storage: 'storage', remoteplay: 'Xbox Remote Play', launchers: 'launchers',
     backlog: 'the backlog',
   };

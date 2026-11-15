@@ -219,12 +219,12 @@ Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpe
 
 Crimson Vault is a free hobby project. No account, no analytics, no ads, nothing collected. Everything it reads, stores and sends is listed in [PRIVACY.md](PRIVACY.md), the short terms are in [TERMS.md](TERMS.md), and the code is [MIT licensed](LICENSE). It comes as is, with no warranty: if you like it, great, and if you find a problem, open an issue.
 
-## What's new in 0.21.0: where to buy
+## What's new in 0.22.0: the Store
 
-- **Prices on every game page.** With a free GG.deals key (Settings, Connections, GG.deals), each game shows the lowest price right now in official stores and in keyshops, plus the lowest ever for each. When keyshops are cheaper, that side lights up green. **All offers** opens the game on GG.deals with every store listed.
-- **Loaded and Instant Gaming buttons** on every game page open that store's search for the game in your browser. They work with or without a key.
-- Keyshops resell keys from distributors rather than the publisher, so the page reminds you to check the region and platform before buying.
-- Prices need a Steam version of the game to look up, and GG.deals allows 100 lookups a minute, so they load one game at a time and are kept for 6 hours.
+- **A Store page** in the sidebar (and the guide). Browse On sale, Top sellers, New releases and Coming soon, or search any game on Steam, owned or not. Every card shows the Steam price and discount.
+- **Open any game** for its description, release date, developer, publisher, genre, Metacritic score and screenshots, its Steam price, and (with your GG.deals key) the lowest official store and keyshop prices, with **Loaded**, **Instant Gaming** and **All offers** buttons.
+- **Already own it?** The card says Owned, and the game page opens your copy in the library.
+- Steam prices use the country of your GG.deals region in Settings, so both price columns share a currency.
 
 Older releases are in [CHANGELOG.md](CHANGELOG.md).
 
