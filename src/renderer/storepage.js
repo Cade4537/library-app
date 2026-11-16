@@ -22,7 +22,7 @@ function storeCard(g) {
   const pr = g.price;
   const disc = g.discount || (pr && pr.initial > pr.final ? Math.round((1 - pr.final / pr.initial) * 100) : 0);
   return h('button', { class: 'sto-card', title: g.name, onclick: () => openStoreGame(g.appid, g) },
-    h('div', { class: 'sto-img' }, h('img', { src: g.img, alt: '', loading: 'lazy', onerror: (e) => { e.target.remove(); } }),
+    h('div', { class: 'sto-img', 'data-l': (g.name || '?').slice(0, 1).toUpperCase() }, h('img', { src: g.img, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer', onerror: (e) => { const fb = `https://cdn.cloudflare.steamstatic.com/steam/apps/${g.appid}/header.jpg`; if (e.target.src !== fb) e.target.src = fb; else e.target.remove(); } }),
       own ? h('span', { class: 'sto-own' }, icon('check'), 'Owned') : null),
     h('div', { class: 'sto-meta' },
       h('b', { class: 'sto-name' }, g.name),
@@ -89,11 +89,13 @@ async function openStoreGame(appid, preview) {
   const actions = h('div', { class: 'det-actions' },
     own ? h('button', { class: 'btn primary', onclick: () => { m.close(); openDetails(own.id); } }, icon('play'), 'Open in library') : null,
     h('button', { class: own ? 'btn' : 'btn primary', onclick: () => api.openUrl(`steam://store/${appid}`) }, icon('external'), 'Steam store page'));
+  const artImg = h('img', { src: `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/library_600x900.jpg`, alt: '', referrerpolicy: 'no-referrer', onerror: () => { artImg.dataset.failed = '1'; artImg.src = (preview && preview.img) || `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/header.jpg`; artBox.classList.add('wide-art'); } });
+  const artBox = h('div', { class: 'det-art sto-art' }, artImg);
   let m;
   const body = h('div', { class: 'det' },
     heroBg, h('div', { class: 'det-hero-shade' }),
     h('div', { class: 'det-top' },
-      h('div', { class: 'det-art sto-art' }, h('img', { src: `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/library_600x900.jpg`, alt: '', onerror: (e) => { e.target.src = `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/header.jpg`; } })),
+      artBox,
       h('div', { class: 'det-info' }, kicker, title, steamPrice, actions,
         keyshopPanel(name, () => api.storePrices(appid)))),
     about);
@@ -102,7 +104,8 @@ async function openStoreGame(appid, preview) {
   const info = await api.storeApp(appid).catch(() => null);
   if (!info) { about.replaceChildren(h('p', { class: 'det-desc' }, 'Steam did not return details for this game.')); return; }
   title.textContent = info.name || name;
-  if (info.bg) heroBg.style.backgroundImage = `url("${info.hero}"), url("${info.bg}")`;
+  if (artImg.dataset.failed && info.img) artImg.src = info.img;
+  heroBg.style.backgroundImage = [info.hero, info.bg, info.img].filter(Boolean).map((u) => `url("${u}")`).join(', ');
   const pr = info.price;
   fillEl(steamPrice,
     h('span', { class: 'sto-steam-l' }, 'Steam'),

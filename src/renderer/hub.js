@@ -104,6 +104,7 @@ function renderHub() {
       h('div', { class: 'hub-main' }, hubHero(last), hubSide(online, playing)),
       h('div', { class: 'hub-tiles' },
         tile('t:library', 'grid', 'Library', `${installed} games installed`, () => setView({ type: 'library' }), 'big'),
+        tile('t:store', 'cart', 'Store', 'Browse and compare prices', () => setView({ type: 'store' })),
         tile('t:deals', 'tag', 'Deals & News', free.length || sale ? [free.length ? `${free.length} free` : null, sale ? `${sale} on sale` : null].filter(Boolean).join(' · ') : 'Wishlist, free games, news', () => setView({ type: 'deals' })),
         tile('t:social', 'users', 'Social', online.length ? `${online.length} online${playing.length ? ` · ${playing.length} playing` : ''}` : 'Friends and Discord', () => setView({ type: 'friends' })),
         tile('t:stats', 'chart', 'Statistics', `${fmtHours(games.reduce((a, it) => a + (it.minutes || 0), 0)) || '0 hrs'} played`, () => setView({ type: 'stats' })),

@@ -286,13 +286,22 @@ async function steamJson(url, ttl) {
   return value;
 }
 const capsule = (id) => `https://cdn.cloudflare.steamstatic.com/steam/apps/${id}/header.jpg`;
+// Newer Steam games keep their pictures at addresses with a unique code (.../apps/ID/CODE/header.jpg),
+// so a picture built from the ID alone only works for older games. Steam's answers carry the right one.
+const steamPic = (url, id) => {
+  const u = String(url || '');
+  if (!/^https:\/\/[a-z0-9.-]*steamstatic\.com\//i.test(u)) return capsule(id);
+  return u.replace(/capsule_(231x87|sm_120|184x69)(\.jpg)/, 'header$2');
+};
+// Steam hardware shows up in its top sellers; this is a game store.
+const HARDWARE = /^Steam (Deck|Frame|Controller|Machine|Link)\b|^Valve Index\b/i;
 async function storeSearch(term) {
   const q = String(term || '').trim().slice(0, 100);
   if (!q) return { items: [] };
   try {
     const j = await steamJson(`https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(q)}&l=english&cc=${storeCc()}`, 10 * 60 * 1000);
-    const items = ((j && j.items) || []).filter((x) => x.type === 'app' && x.id).slice(0, 30).map((x) => ({
-      appid: String(x.id), name: x.name, img: capsule(x.id),
+    const items = ((j && j.items) || []).filter((x) => x.type === 'app' && x.id && !HARDWARE.test(x.name || '')).slice(0, 30).map((x) => ({
+      appid: String(x.id), name: x.name, img: steamPic(x.tiny_image, x.id),
       price: x.price ? { final: x.price.final / 100, initial: x.price.initial / 100, currency: x.price.currency } : null,
       score: Number(x.metascore) || null,
     }));
@@ -302,8 +311,9 @@ async function storeSearch(term) {
 async function storeFeatured() {
   try {
     const j = await steamJson(`https://store.steampowered.com/api/featuredcategories?l=english&cc=${storeCc()}`, 30 * 60 * 1000);
-    const row = (k) => (((j || {})[k] || {}).items || []).filter((x) => x.id && x.type !== 2).slice(0, 18).map((x) => ({
-      appid: String(x.id), name: x.name, img: capsule(x.id),
+    const seen = new Set();
+    const row = (k) => (((j || {})[k] || {}).items || []).filter((x) => x.id && x.type !== 2 && !HARDWARE.test(x.name || '')).filter((x) => { const key = `${k}:${x.id}`; if (seen.has(key)) return false; seen.add(key); return true; }).slice(0, 18).map((x) => ({
+      appid: String(x.id), name: x.name, img: steamPic(x.header_image || x.large_capsule_image, x.id),
       price: x.final_price != null ? { final: x.final_price / 100, initial: (x.original_price || x.final_price) / 100, currency: x.currency } : null,
       discount: x.discount_percent || 0,
     }));
@@ -319,7 +329,7 @@ async function storeApp(appid) {
     if (!d) return null;
     const po = d.price_overview;
     return {
-      appid: id, name: d.name, img: d.header_image || capsule(id),
+      appid: id, name: d.name, img: steamPic(d.header_image, id), capsule: steamPic(d.capsule_imagev5 || d.capsule_image, id),
       desc: String(d.short_description || '').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim(),
       date: d.release_date ? (d.release_date.coming_soon ? `Coming ${d.release_date.date || 'soon'}` : d.release_date.date) : '',
       devs: (d.developers || []).slice(0, 2), pubs: (d.publishers || []).slice(0, 2),

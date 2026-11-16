@@ -219,6 +219,12 @@ Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpe
 
 Crimson Vault is a free hobby project. No account, no analytics, no ads, nothing collected. Everything it reads, stores and sends is listed in [PRIVACY.md](PRIVACY.md), the short terms are in [TERMS.md](TERMS.md), and the code is [MIT licensed](LICENSE). It comes as is, with no warranty: if you like it, great, and if you find a problem, open an issue.
 
+## What's new in 0.22.1
+
+- **Fixed:** many Store pictures were blank. Newer Steam games keep their pictures at addresses with a unique code in them, so the Store now uses the addresses Steam gives with each game, and falls back to the game's first letter if a picture still fails.
+- **Store tile** on the home screen.
+- Steam Deck, Steam Frame and other hardware no longer appear in the game rows.
+
 ## What's new in 0.22.0: the Store
 
 - **A Store page** in the sidebar (and the guide). Browse On sale, Top sellers, New releases and Coming soon, or search any game on Steam, owned or not. Every card shows the Steam price and discount.
