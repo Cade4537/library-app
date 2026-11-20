@@ -2,6 +2,19 @@
 
 Older release notes, newest first. The latest release's notes stay in the README.
 
+## What's new in 0.22.1
+
+- **Fixed:** many Store pictures were blank. Newer Steam games keep their pictures at addresses with a unique code in them, so the Store now uses the addresses Steam gives with each game, and falls back to the game's first letter if a picture still fails.
+- **Store tile** on the home screen.
+- Steam Deck, Steam Frame and other hardware no longer appear in the game rows.
+
+## What's new in 0.22.0: the Store
+
+- **A Store page** in the sidebar (and the guide). Browse On sale, Top sellers, New releases and Coming soon, or search any game on Steam, owned or not. Every card shows the Steam price and discount.
+- **Open any game** for its description, release date, developer, publisher, genre, Metacritic score and screenshots, its Steam price, and (with your GG.deals key) the lowest official store and keyshop prices, with **Loaded**, **Instant Gaming** and **All offers** buttons.
+- **Already own it?** The card says Owned, and the game page opens your copy in the library.
+- Steam prices use the country of your GG.deals region in Settings, so both price columns share a currency.
+
 ## What's new in 0.21.0: where to buy
 
 - **Prices on every game page.** With a free GG.deals key (Settings, Connections, GG.deals), each game shows the lowest price right now in official stores and in keyshops, plus the lowest ever for each. When keyshops are cheaper, that side lights up green. **All offers** opens the game on GG.deals with every store listed.

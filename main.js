@@ -4,6 +4,9 @@ const { DiscordVoice } = require('./src/main/discordVoice');
 const { GgDeals } = require('./src/main/ggdeals');
 let ggDeals = null;
 const { StreamView } = require('./src/main/streamView');
+const { RemotePlayTracker } = require('./src/main/rptrack');
+let rpTrack = null;
+let rpConsole = '';
 const { UbisoftActivity } = require('./src/main/ubisoftActivity');
 const services = require('./src/main/services');
 const { runActions, withArgs } = require('./src/main/actions');
@@ -943,6 +946,7 @@ function registerIpc() {
   ipcMain.handle('stream:bounds', (_e, b) => { if (streamView) streamView.set(b); });
   ipcMain.handle('stream:full', (_e, v) => streamView && streamView.setFull(v));
   ipcMain.handle('stream:stop', () => streamView && streamView.stop());
+  ipcMain.handle('remoteplay:stats', () => (rpTrack ? rpTrack.stats() : null));
   ipcMain.handle('stream:state', () => ({ open: !!(streamView && streamView.open), full: !!(streamView && streamView.full) }));
   ipcMain.handle('discord:openApp', () => shell.openExternal('discord://'));
   ipcMain.handle('voice:get', () => voiceState);
@@ -1207,8 +1211,9 @@ function registerIpc() {
         consoleName = (pick && pick.name) || '';
       } catch {}
     }
+    rpConsole = consoleName;
     if (where === 'inapp') { streamView.start(consoleName); return { ok: true }; }
-    if (where === 'window') { if (streamView.open) streamView.stop(); return openRemotePlayWindow(win, consoleName); }
+    if (where === 'window') { if (streamView.open) streamView.stop(); return openRemotePlayWindow(win, consoleName, { onOpen: () => rpTrack && rpTrack.start('window', consoleName), onClose: () => rpTrack && rpTrack.stop('window') }); }
     if (where === 'appAuto') return openXboxAppAndConnect(consoleName);
     try {
       await launchItem({ launch: { type: 'aumid', target: XBOX_APP_AUMID } });
@@ -1316,7 +1321,8 @@ if (!app.requestSingleInstanceLock()) {
     for (const k of ['discordTab', 'closeDiscordInTray']) if (k in store.data.settings) { delete store.data.settings[k]; store.saveSoon(); }
     qol.start();
     consolePlay.start();
-    streamView = new StreamView(() => win, (st) => sendTo('stream:state', st));
+    rpTrack = new RemotePlayTracker({ store, current: () => (consolePlay && consolePlay.current && consolePlay.current.name) || '' });
+    streamView = new StreamView(() => win, (st) => { sendTo('stream:state', st); if (st.open) rpTrack.start('inapp', rpConsole); else rpTrack.stop('inapp'); });
     discordVoice = new DiscordVoice({
       getTokens: () => store.data.settings.discordVoiceTokens || null,
       saveTokens: (t) => { if (t) store.data.settings.discordVoiceTokens = t; else delete store.data.settings.discordVoiceTokens; store.saveSoon(); },
@@ -1347,6 +1353,7 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.on('before-quit', () => {
+    try { if (rpTrack) rpTrack.stop(); } catch {}
     quitting = true;
     diag.log('quit');
     globalShortcut.unregisterAll();

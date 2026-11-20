@@ -219,18 +219,11 @@ Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpe
 
 Crimson Vault is a free hobby project. No account, no analytics, no ads, nothing collected. Everything it reads, stores and sends is listed in [PRIVACY.md](PRIVACY.md), the short terms are in [TERMS.md](TERMS.md), and the code is [MIT licensed](LICENSE). It comes as is, with no warranty: if you like it, great, and if you find a problem, open an issue.
 
-## What's new in 0.22.1
+## What's new in 0.23.0: Remote Play on Stats
 
-- **Fixed:** many Store pictures were blank. Newer Steam games keep their pictures at addresses with a unique code in them, so the Store now uses the addresses Steam gives with each game, and falls back to the game's first letter if a picture still fails.
-- **Store tile** on the home screen.
-- Steam Deck, Steam Frame and other hardware no longer appear in the game rows.
-
-## What's new in 0.22.0: the Store
-
-- **A Store page** in the sidebar (and the guide). Browse On sale, Top sellers, New releases and Coming soon, or search any game on Steam, owned or not. Every card shows the Steam price and discount.
-- **Open any game** for its description, release date, developer, publisher, genre, Metacritic score and screenshots, its Steam price, and (with your GG.deals key) the lowest official store and keyshop prices, with **Loaded**, **Instant Gaming** and **All offers** buttons.
-- **Already own it?** The card says Owned, and the game page opens your copy in the library.
-- Steam prices use the country of your GG.deals region in Settings, so both price columns share a currency.
+- **Xbox Remote Play is tracked.** Streaming inside Crimson Vault or in its own Remote Play window counts as a session, from when the stream opens to when it closes. Sessions under a minute (a misclick, a failed connect) are left out.
+- **Stats page** gains an Xbox Remote Play section: total time streamed, sessions, this week, longest and average session, a 14 day bar chart, and the games you streamed most (from what your console reports, when Xbox is signed in).
+- Remote Play started through the separate Xbox app is not counted, since Crimson Vault cannot see that app's stream.
 
 Older releases are in [CHANGELOG.md](CHANGELOG.md).
 

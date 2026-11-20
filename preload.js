@@ -60,6 +60,7 @@ contextBridge.exposeInMainWorld('library', {
   discordTestPresence: call('discord:testPresence'),
   storeInfo: call('item:storeInfo'),
   keyshopPrices: call('item:keyshopPrices'),
+  remotePlayStats: call('remoteplay:stats'),
   storeSearch: call('store:search'),
   storeFeatured: call('store:featured'),
   storeApp: call('store:app'),

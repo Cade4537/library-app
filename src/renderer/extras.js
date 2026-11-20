@@ -122,6 +122,29 @@ async function renderStats() {
           h('div', { class: 'st-cl-info' }, h('div', { class: 'st-cl-name' }, displayName(it)), h('div', { class: 'hero-ach' }, h('span', { style: { width: `${pct}%` } })), h('div', { class: 'st-s' }, `${a.have} of ${a.total} · ${pct}%`)));
       }))) : null);
 
+  // 0.23.0: Xbox Remote Play time, from the sessions Crimson Vault saw.
+  if (api.remotePlayStats) api.remotePlayStats().then((rp) => {
+    if (!box.isConnected || !rp) return;
+    const t = (m) => (m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`);
+    if (!rp.sessions && !rp.live) {
+      box.append(h('div', { class: 'st-card' }, h('h3', { class: 'section-title' }, 'Xbox Remote Play'),
+        h('div', { class: 'help' }, 'Stream your Xbox from the Xbox Remote Play page, in the app or in its own window, and your streaming time shows up here. With Xbox signed in, it also tracks which games you streamed.')));
+      return;
+    }
+    const peak = Math.max(1, ...rp.days.map((d) => d.min));
+    const dayName = (at) => new Date(at).toLocaleDateString(undefined, { weekday: 'narrow' });
+    box.append(h('div', { class: 'st-card' }, h('h3', { class: 'section-title' }, 'Xbox Remote Play'),
+      h('div', { class: 'st-tiles', style: { margin: '0 0 12px' } },
+        tile('Streamed', t(rp.total), `${rp.sessions} ${rp.sessions === 1 ? 'session' : 'sessions'}`),
+        tile('This week', t(rp.week), rp.live ? 'Streaming now' : 'last 7 days'),
+        tile('Longest', t(rp.longest), `${t(rp.avg)} on average`)),
+      h('div', { class: 'rp-days', role: 'img', 'aria-label': 'Streaming minutes for each of the last 14 days' },
+        rp.days.map((d) => h('div', { class: 'rp-day', title: `${new Date(d.at).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}: ${t(d.min)}` },
+          h('span', { class: 'rp-bar' + (d.min ? '' : ' none'), style: { height: `${d.min ? Math.max(6, Math.round((d.min / peak) * 100)) : 3}%` } }),
+          h('i', {}, dayName(d.at))))),
+      rp.games.length ? h('div', { style: { marginTop: '14px' } }, h('h3', { class: 'section-title' }, 'Streamed most'), bars(rp.games.slice(0, 8).map((g) => ({ label: g.name, v: g.min, title: `${g.name}: ${t(g.min)}` })), (m) => t(m))) : null));
+  }).catch(() => {});
+
   // 0.18.5: your music, from the listening history Crimson Vault keeps on this PC.
   if (api.musicStats) api.musicStats().then((mu) => {
     if (!box.isConnected) return;

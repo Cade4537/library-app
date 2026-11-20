@@ -42,7 +42,7 @@ function chromeUA(ses) {
   return ses.getUserAgent().replace(/\s(Electron|crimson-vault|library-app|Crimson Vault)\/\S+/gi, '');
 }
 
-function openRemotePlayWindow(parent, consoleName) {
+function openRemotePlayWindow(parent, consoleName, hooks = {}) {
   if (win && !win.isDestroyed()) { win.focus(); return; }
   const ses = session.fromPartition(PARTITION);
   ses.setUserAgent(chromeUA(ses));
@@ -73,8 +73,9 @@ function openRemotePlayWindow(parent, consoleName) {
     if (input.key === 'F11') { e.preventDefault(); win.setFullScreen(!win.isFullScreen()); }
     else if (input.control && input.key.toLowerCase() === 'w') { e.preventDefault(); win.close(); }
   });
-  win.on('closed', () => { win = null; if (parent && !parent.isDestroyed()) parent.focus(); });
+  win.on('closed', () => { win = null; if (hooks.onClose) hooks.onClose(); if (parent && !parent.isDestroyed()) parent.focus(); });
   win.loadURL(CONSOLES_URL);
+  if (hooks.onOpen) hooks.onOpen();
 }
 
 // Opens the Xbox app, presses the console button at the bottom of its left bar, then your console.
