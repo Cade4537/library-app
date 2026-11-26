@@ -172,6 +172,11 @@ async function startRemotePlay(where) {
   else if (r && r.message) showToast(r.message);
 }
 
+// 0.24.0: a console plugged into a USB HDMI capture card, shown in its own window.
+function openCaptureCard() {
+  api.captureOpen().then((r) => { if (r && r.ok === false) showToast(r.error || 'The capture window did not open', 'error'); }).catch(() => showToast('The capture window did not open', 'error'));
+}
+
 function remotePlayMenu(pos) {
   openMenu([
     { label: 'Play here, next to the sidebar', run: () => startRemotePlay('inapp') },
@@ -179,6 +184,8 @@ function remotePlayMenu(pos) {
     { label: 'Open Xbox app and connect', run: () => startRemotePlay('appAuto') },
     { label: 'Open Xbox app only', run: () => startRemotePlay('app') },
     { label: 'Open in browser', run: () => startRemotePlay('web') },
+    '-',
+    { label: 'Capture card (HDMI)', run: () => openCaptureCard() },
     S.stream.open ? '-' : null,
     S.stream.open ? { label: 'End stream', danger: true, run: () => api.streamStop() } : null,
   ].filter(Boolean), pos);
@@ -733,6 +740,7 @@ function renderHeader() {
       S.console && S.console.current ? h('button', { class: 'cv-pill', onclick: openConsoleHistory, title: 'Your Xbox play history' }, h('span', { class: 'live-dot' }), `On Xbox: ${S.console.current.name}`, h('span', { class: 'count' }, consoleTime(consoleMins(S.console.current)))) : S.console && S.console.enabled ? h('button', { class: 'btn', onclick: openConsoleHistory }, icon('clock'), 'Xbox play history') : null,
       h('span', { class: 'help', style: { flex: 1 } }, S.stream.open ? 'Streaming from your Xbox. Use your controller in the stream; it keeps going while you look at other pages.' : 'Play your Xbox console on this PC, right here next to the sidebar.'),
       S.stream.open ? h('button', { class: 'btn', onclick: () => api.streamFull(true) }, icon('expand'), 'Full screen') : null,
+      h('button', { class: 'btn' + (S.capture && S.capture.open ? ' cap-live' : ''), title: 'Show a console plugged into your HDMI capture card', onclick: openCaptureCard }, S.capture && S.capture.open ? h('span', { class: 'live-dot' }) : icon('monitor'), S.capture && S.capture.open ? 'Capture card open' : 'Capture card'),
       h('button', { class: 'btn', onclick: (e) => remotePlayMenu({ el: e.currentTarget }) }, icon('more'), 'Other ways'),
       S.stream.open ? h('button', { class: 'btn danger', onclick: () => api.streamStop() }, icon('close'), 'End stream') : null));
   }

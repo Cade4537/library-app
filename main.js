@@ -5,6 +5,7 @@ const { GgDeals } = require('./src/main/ggdeals');
 let ggDeals = null;
 const { StreamView } = require('./src/main/streamView');
 const { RemotePlayTracker } = require('./src/main/rptrack');
+const { openCaptureWindow, captureOpen, closeCapture } = require('./src/main/capture');
 let rpTrack = null;
 let rpConsole = '';
 const { UbisoftActivity } = require('./src/main/ubisoftActivity');
@@ -947,6 +948,13 @@ function registerIpc() {
   ipcMain.handle('stream:full', (_e, v) => streamView && streamView.setFull(v));
   ipcMain.handle('stream:stop', () => streamView && streamView.stop());
   ipcMain.handle('remoteplay:stats', () => (rpTrack ? rpTrack.stats() : null));
+  // A console through a USB HDMI capture card, in its own window. Counts as Remote Play time.
+  ipcMain.handle('capture:open', () => openCaptureWindow(win, {
+    onOpen: () => { if (rpTrack) rpTrack.start('capture'); sendTo('capture:state', { open: true }); },
+    onClose: () => { if (rpTrack) rpTrack.stop('capture'); sendTo('capture:state', { open: false }); },
+  }));
+  ipcMain.handle('capture:close', () => closeCapture());
+  ipcMain.handle('capture:state', () => ({ open: captureOpen() }));
   ipcMain.handle('stream:state', () => ({ open: !!(streamView && streamView.open), full: !!(streamView && streamView.full) }));
   ipcMain.handle('discord:openApp', () => shell.openExternal('discord://'));
   ipcMain.handle('voice:get', () => voiceState);

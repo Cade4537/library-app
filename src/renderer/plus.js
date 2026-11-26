@@ -481,6 +481,7 @@ function importBackup() {
 
 // ---------- what's new ----------
 const WHATS_NEW = {
+  '0.24.0': ['Capture card: play a console through your USB HDMI capture card from the Xbox Remote Play page, in its own window with sound, almost no delay, and full screen', 'Picks the capture card and its sound by itself, with 1080p 60 up to 4K 60', 'Capture card time counts on the Stats page with Remote Play'],
   '0.23.0': ['Xbox Remote Play now counts on the Stats page: total streamed, this week, longest session, the last 14 days, and the games you streamed most'],
   '0.22.1': ['Store pictures show for every game: newer Steam games keep theirs at different addresses, and the Store now uses the ones Steam gives', 'A Store tile on the home screen', 'Steam Deck and other hardware no longer show up in the game rows'],
   '0.22.0': ['New Store page in the sidebar: browse what is on sale, top sellers, new releases and coming soon, or search any game on Steam', 'Open any game to see its Steam price next to the lowest official store and keyshop prices, with Loaded, Instant Gaming and All offers buttons', 'Games you already own are marked Owned and open your copy'],

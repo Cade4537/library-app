@@ -2,6 +2,12 @@
 
 Older release notes, newest first. The latest release's notes stay in the README.
 
+## What's new in 0.23.0: Remote Play on Stats
+
+- **Xbox Remote Play is tracked.** Streaming inside Crimson Vault or in its own Remote Play window counts as a session, from when the stream opens to when it closes. Sessions under a minute (a misclick, a failed connect) are left out.
+- **Stats page** gains an Xbox Remote Play section: total time streamed, sessions, this week, longest and average session, a 14 day bar chart, and the games you streamed most (from what your console reports, when Xbox is signed in).
+- Remote Play started through the separate Xbox app is not counted, since Crimson Vault cannot see that app's stream.
+
 ## What's new in 0.22.1
 
 - **Fixed:** many Store pictures were blank. Newer Steam games keep their pictures at addresses with a unique code in them, so the Store now uses the addresses Steam gives with each game, and falls back to the game's first letter if a picture still fails.

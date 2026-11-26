@@ -219,11 +219,13 @@ Crimson Vault keeps its memory use flat over long sessions: its PowerShell helpe
 
 Crimson Vault is a free hobby project. No account, no analytics, no ads, nothing collected. Everything it reads, stores and sends is listed in [PRIVACY.md](PRIVACY.md), the short terms are in [TERMS.md](TERMS.md), and the code is [MIT licensed](LICENSE). It comes as is, with no warranty: if you like it, great, and if you find a problem, open an issue.
 
-## What's new in 0.23.0: Remote Play on Stats
+## What's new in 0.24.0: capture card
 
-- **Xbox Remote Play is tracked.** Streaming inside Crimson Vault or in its own Remote Play window counts as a session, from when the stream opens to when it closes. Sessions under a minute (a misclick, a failed connect) are left out.
-- **Stats page** gains an Xbox Remote Play section: total time streamed, sessions, this week, longest and average session, a 14 day bar chart, and the games you streamed most (from what your console reports, when Xbox is signed in).
-- Remote Play started through the separate Xbox app is not counted, since Crimson Vault cannot see that app's stream.
+- **Play through a capture card.** On the Xbox Remote Play page, **Capture card** (also under Other ways, and on the start screen) opens a window showing whatever is plugged into your USB HDMI capture card: an Xbox, PlayStation, Switch or anything with HDMI. Unlike Remote Play, the picture comes straight over the cable, so there is almost no delay and no internet needed.
+- **Sets itself up.** It finds the capture card (not your webcam) and its sound by themselves, and remembers your pick. Choose 1080p 60, 1440p 60, 4K 30 or 4K 60, set the volume or mute, and go full screen with F11 or a double click. The controls and pointer hide while you play.
+- **Clear messages** when the card is busy in another app (like OBS), unplugged, or blocked by Windows camera privacy settings, with what to do about each.
+- **Counts as Remote Play time** on the Stats page.
+- Most 4K capture cards pass 4K through to a TV but send the PC 1080p 60 or 4K 30. If 4K 60 falls back, that is the card's limit.
 
 Older releases are in [CHANGELOG.md](CHANGELOG.md).
 

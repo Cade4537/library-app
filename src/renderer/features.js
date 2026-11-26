@@ -145,10 +145,14 @@ function wireFeatures() {
   $('#tvBtn').addEventListener('click', () => setTV(true));
   $('#tvExit').addEventListener('click', () => setTV(false));
   $('#streamStartBtn').addEventListener('click', () => startRemotePlay('inapp'));
+  $('#captureStartBtn').addEventListener('click', () => openCaptureCard());
   if (api.streamState) api.streamState().then((st) => { S.stream = st; if (S.view.type === 'remoteplay') render(); });
   window.addEventListener('resize', syncDiscord);
   const sHost = $('#streamHost');
   if (window.ResizeObserver && sHost) new ResizeObserver(() => syncDiscord()).observe(sHost);
+  S.capture = { open: false };
+  if (api.captureState) api.captureState().then((c) => { S.capture = c || { open: false }; }).catch(() => {});
+  if (api.onCaptureState) api.onCaptureState((c) => { S.capture = c || { open: false }; if (S.view.type === 'remoteplay') renderHeader(); });
   if (api.onStreamState) api.onStreamState((st) => { S.stream = st; if (S.view.type === 'remoteplay' || !st.open) render(); else renderSidebar(); });
   setInterval(tvClock, 15000);
   document.addEventListener('keydown', (e) => {

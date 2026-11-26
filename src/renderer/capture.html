@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <!-- The capture window: only this page, its own script and the capture device. No network. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:">
+  <title>Capture card</title>
+  <style>
+    :root { color-scheme: dark; --accent: #e5283f; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: #000; color: #eee; font: 14px/1.4 "Segoe UI", system-ui, sans-serif; overflow: hidden; user-select: none; }
+    video { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
+    body.idle { cursor: none; }
+    .bar { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 14px; background: rgba(14,11,13,.86); border: 1px solid rgba(255,255,255,.08); box-shadow: 0 16px 40px rgba(0,0,0,.6); backdrop-filter: blur(14px); transition: opacity .25s, transform .25s; max-width: calc(100vw - 24px); flex-wrap: wrap; justify-content: center; }
+    body.idle .bar { opacity: 0; transform: translate(-50%, 12px); pointer-events: none; }
+    button, select { height: 34px; border-radius: 9px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.07); color: #fff; font: inherit; padding: 0 12px; cursor: pointer; }
+    select { max-width: 190px; }
+    @media (min-width: 1000px) { .bar { flex-wrap: nowrap; } }
+    button:hover, select:hover { background: rgba(255,255,255,.14); }
+    button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+    button.on { background: rgba(229,40,63,.25); border-color: rgba(229,40,63,.5); }
+    .vol { display: flex; align-items: center; gap: 6px; }
+    input[type=range] { width: 90px; accent-color: var(--accent); }
+    .info { font-size: 12px; color: #9a9aa3; padding: 0 4px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .msg { position: fixed; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; }
+    .msg[hidden] { display: none; }
+    .msg div { max-width: 460px; }
+    .msg h2 { margin: 0 0 8px; font-weight: 600; font-size: 20px; }
+    .msg p { margin: 0 0 16px; color: #b7b3b6; }
+    .spin { width: 28px; height: 28px; border-radius: 50%; border: 3px solid rgba(255,255,255,.15); border-top-color: var(--accent); animation: s 0.8s linear infinite; margin: 0 auto 14px; }
+    @keyframes s { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2.4s; } .bar { transition: none; } }
+  </style>
+</head>
+<body>
+  <video id="v" autoplay playsinline></video>
+  <div class="msg" id="msg"><div><div class="spin" id="spin"></div><h2 id="msgT">Looking for your capture card</h2><p id="msgP"></p><button id="retry" hidden>Try again</button></div></div>
+  <div class="bar" id="bar">
+    <select id="dev" aria-label="Capture device"></select>
+    <select id="mode" aria-label="Resolution and frame rate">
+      <option value="1920x1080x60">1080p 60</option>
+      <option value="2560x1440x60">1440p 60</option>
+      <option value="3840x2160x30">4K 30</option>
+      <option value="3840x2160x60">4K 60</option>
+      <option value="1280x720x60">720p 60</option>
+    </select>
+    <div class="vol"><button id="mute" title="Mute (M)" aria-label="Mute">Sound on</button><input id="vol" type="range" min="0" max="100" aria-label="Volume"></div>
+    <span class="info" id="info"></span>
+    <button id="full" title="Full screen (F11 or double click)">Full screen</button>
+  </div>
+  <script src="capture.js"></script>
+</body>
+</html>

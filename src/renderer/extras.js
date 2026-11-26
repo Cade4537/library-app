@@ -128,7 +128,7 @@ async function renderStats() {
     const t = (m) => (m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`);
     if (!rp.sessions && !rp.live) {
       box.append(h('div', { class: 'st-card' }, h('h3', { class: 'section-title' }, 'Xbox Remote Play'),
-        h('div', { class: 'help' }, 'Stream your Xbox from the Xbox Remote Play page, in the app or in its own window, and your streaming time shows up here. With Xbox signed in, it also tracks which games you streamed.')));
+        h('div', { class: 'help' }, 'Stream your Xbox from the Xbox Remote Play page (in the app, in its own window, or through your capture card) and your time shows up here. With Xbox signed in, it also tracks which games you played.')));
       return;
     }
     const peak = Math.max(1, ...rp.days.map((d) => d.min));

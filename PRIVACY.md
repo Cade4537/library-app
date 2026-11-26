@@ -17,7 +17,7 @@ This page lists everything it reads, stores and sends, so you can check for your
 
 - No keyboard logging. The only keys watched outside the app are the two shortcuts you set (show or hide, and the guide), registered through Windows. Inside its own windows it only reacts to its own shortcuts.
 - No screen recording or screenshots.
-- No camera or microphone. The app's own pages are blocked from both.
+- No camera or microphone, except the capture card window. When you open it, it shows a USB HDMI capture card (Windows treats these as cameras) with its sound, in that window only. The picture and sound go to your screen and speakers and nowhere else; that window cannot reach the internet. Every other page of the app is blocked from video and sound inputs.
 - No reading your clipboard. It only writes to it when you press a Copy button.
 - No reading your files, browser history, passwords or other apps' data beyond the launcher files above.
 - No selling, sharing or uploading your library, playtime or activity anywhere.
